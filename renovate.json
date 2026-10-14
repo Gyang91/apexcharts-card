@@ -1,4 +1,5 @@
 {
+  "rollbackPrs": false,
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "forkProcessing": "enabled",
   "pre-commit": {
@@ -92,6 +93,12 @@
     {
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Tout ce qui monte se fusionne seul quand la CI est verte (opérateur, 2026-10-14)",
+      "matchUpdateTypes": ["minor", "major"],
       "automerge": true,
       "platformAutomerge": true
     }
