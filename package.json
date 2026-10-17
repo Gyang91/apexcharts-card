@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/apexcharts-card.js",
   "engines": {
-    "node": ">=24.21.0"
+    "node": ">=24.22.0"
   },
   "scripts": {
     "build": "npm run build:types-check && npm run typecheck && npm run rollup",
