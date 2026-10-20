@@ -79,7 +79,9 @@ export const stylesApex: CSSResultGroup = css`
   .wrapper {
     display: grid;
     grid-template-areas: 'header' 'graph';
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not 1fr: a track cannot shrink below its content's min-content width,
+       so a chart wider than the card would keep the header and #graph at that width (#160). */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: min-content 1fr;
   }
   ha-card.section .wrapper {
@@ -92,6 +94,7 @@ export const stylesApex: CSSResultGroup = css`
   #graph-wrapper {
     height: 100%;
     grid-area: graph;
+    min-width: 0;
   }
 
   /* Skeleton while ApexCharts has not rendered yet (#graph is empty until then) */
