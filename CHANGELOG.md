@@ -4,6 +4,32 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.6.17](https://github.com/foXaCe/apexcharts-card/compare/v2.6.16...v2.6.17) (2026-10-20)
+
+
+### Bug Fixes
+
+* let the chart shrink inside narrow cards on first load ([#161](https://github.com/foXaCe/apexcharts-card/issues/161)) ([21529de](https://github.com/foXaCe/apexcharts-card/commit/21529de548bbc6facce38bd9fc15c94d341bc520))
+
+
+### Dependencies
+
+* **deps:** lock file maintenance ([#177](https://github.com/foXaCe/apexcharts-card/issues/177)) ([06b35e8](https://github.com/foXaCe/apexcharts-card/commit/06b35e8ac32b17a0b242df3af9afb9cb28c44130))
+* **deps:** update dependency apexcharts to ^8.2.0 ([#169](https://github.com/foXaCe/apexcharts-card/issues/169)) ([456329c](https://github.com/foXaCe/apexcharts-card/commit/456329cb66409a30ec9f55a294807954a09075dc))
+* **deps:** update dependency apexcharts to ^8.3.0 ([#172](https://github.com/foXaCe/apexcharts-card/issues/172)) ([45c1f95](https://github.com/foXaCe/apexcharts-card/commit/45c1f95da954ca3fc0d07733a1af4cf3254771df))
+* **deps:** update dependency apexcharts to ^8.3.1 ([#173](https://github.com/foXaCe/apexcharts-card/issues/173)) ([4f6f9eb](https://github.com/foXaCe/apexcharts-card/commit/4f6f9ebcdd996ec1cf6d149354ea99c1c039f543))
+* **deps:** update dependency apexcharts to v8 ([#168](https://github.com/foXaCe/apexcharts-card/issues/168)) ([72f3553](https://github.com/foXaCe/apexcharts-card/commit/72f3553c9b3c358b4237754297be4e124dbc8667))
+* **deps:** update dependency happy-dom to ^21.0.3 ([#178](https://github.com/foXaCe/apexcharts-card/issues/178)) ([829a95f](https://github.com/foXaCe/apexcharts-card/commit/829a95fff3bd2da1ad1b183119f970f9c5fd10e2))
+* **deps:** update dependency happy-dom to v21 ([#176](https://github.com/foXaCe/apexcharts-card/issues/176)) ([cadf72c](https://github.com/foXaCe/apexcharts-card/commit/cadf72c266a5799a301d64fdfd8cd6864c0a5aa2))
+* **deps:** update dependency js-yaml to ^5.5.0 ([#175](https://github.com/foXaCe/apexcharts-card/issues/175)) ([2c78807](https://github.com/foXaCe/apexcharts-card/commit/2c78807220594abd27f170a7aa5afeece0639903))
+* **deps:** update dependency node to v24.22.0 ([#170](https://github.com/foXaCe/apexcharts-card/issues/170)) ([a5db4d7](https://github.com/foXaCe/apexcharts-card/commit/a5db4d7cbe80bedaafee894f579b77fb5f294feb))
+* **deps:** update dependency rollup to ^4.64.6 ([#166](https://github.com/foXaCe/apexcharts-card/issues/166)) ([7fbfc82](https://github.com/foXaCe/apexcharts-card/commit/7fbfc8239dfa0780740bdc7f5c9dec798c54088c))
+* **deps:** update dependency rollup to ^4.64.7 ([#171](https://github.com/foXaCe/apexcharts-card/issues/171)) ([6864f3a](https://github.com/foXaCe/apexcharts-card/commit/6864f3a331ecf9ca697d78a5369639f54d9c7e39))
+* **deps:** update dependency typescript-eslint to ^8.71.2 ([#162](https://github.com/foXaCe/apexcharts-card/issues/162)) ([08efa30](https://github.com/foXaCe/apexcharts-card/commit/08efa3040b9a14ed86b2723cb6e7cca0bf6b8c70))
+* **deps:** update google/osv-scanner-action action to v2.7.0 ([#164](https://github.com/foXaCe/apexcharts-card/issues/164)) ([400616e](https://github.com/foXaCe/apexcharts-card/commit/400616e0e82eef06d7f044a6454db50fb22fa4d2))
+* **deps:** update vitest monorepo to ^5.0.4 ([#163](https://github.com/foXaCe/apexcharts-card/issues/163)) ([b3c933b](https://github.com/foXaCe/apexcharts-card/commit/b3c933b8919067330f45a3afdf95bd8c748c9dfe))
+* **deps:** update vitest monorepo to ^5.0.5 ([#174](https://github.com/foXaCe/apexcharts-card/issues/174)) ([97e71ca](https://github.com/foXaCe/apexcharts-card/commit/97e71ca675647ab4e8c8efd948fdd7d8c5ae9351))
+
 ## [2.6.16](https://github.com/foXaCe/apexcharts-card/compare/v2.6.15...v2.6.16) (2026-10-13)
 
 
