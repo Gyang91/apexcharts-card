@@ -4,6 +4,17 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.6.19](https://github.com/foXaCe/apexcharts-card/compare/v2.6.18...v2.6.19) (2026-10-26)
+
+
+### Dependencies
+
+* **deps:** lock file maintenance ([#194](https://github.com/foXaCe/apexcharts-card/issues/194)) ([2eefa7a](https://github.com/foXaCe/apexcharts-card/commit/2eefa7ad040cbb066ec44a53d4a1ea2304a1cf84))
+* **deps:** update all non-major dependencies ([#189](https://github.com/foXaCe/apexcharts-card/issues/189)) ([c84c83c](https://github.com/foXaCe/apexcharts-card/commit/c84c83cb5bf2bdc19fce1b8699262beba4d6eaea))
+* **deps:** update build tools ([#192](https://github.com/foXaCe/apexcharts-card/issues/192)) ([c9ccc50](https://github.com/foXaCe/apexcharts-card/commit/c9ccc5002fafcc414be4108ab792fadfd4c432d7))
+* **deps:** update dependency @rollup/plugin-terser to ^1.0.1 ([#190](https://github.com/foXaCe/apexcharts-card/issues/190)) ([aaba2ae](https://github.com/foXaCe/apexcharts-card/commit/aaba2ae9aae6f09a4e542cfaf70f937e9bc46668))
+* **deps:** update dependency rollup to ^4.65.0 ([#193](https://github.com/foXaCe/apexcharts-card/issues/193)) ([92e36d2](https://github.com/foXaCe/apexcharts-card/commit/92e36d28ebec406c71621eaf438b667ca7f8a892))
+
 ## [2.6.18](https://github.com/foXaCe/apexcharts-card/compare/v2.6.17...v2.6.18) (2026-10-23)
 
 
