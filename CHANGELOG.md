@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.8.6](https://github.com/Gyang91/apexcharts-card/compare/v2.8.5...v2.8.6) (2026-10-27)
+
+
+### Bug Fixes
+
+* **time zones:** restore moment.tz() for data_generator without the time zone database ([47619a7](https://github.com/Gyang91/apexcharts-card/commit/47619a75008766a2e0f034897ecc7399cbe4bc04))
+
 ## [2.8.5](https://github.com/Gyang91/apexcharts-card/compare/v2.8.4...v2.8.5) (2026-10-27)
 
 
