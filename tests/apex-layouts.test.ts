@@ -25,7 +25,41 @@ describe('getLayoutConfig', () => {
 
   it('uses HA theme variable for foreColor', () => {
     const layout = getLayoutConfig(internalConfig(), undefined, []) as AnyRec;
-    expect(layout.chart.foreColor).toBe('var(--primary-text-color)');
+    expect(layout.chart.foreColor).toBe('var(--secondary-text-color)');
+  });
+
+  it('draws grid and axis lines in the theme divider color, text in the theme font', () => {
+    const layout = getLayoutConfig(internalConfig(), undefined, []) as AnyRec;
+    expect(layout.grid.borderColor).toBe('var(--divider-color)');
+    expect(layout.xaxis.axisBorder.color).toBe('var(--divider-color)');
+    expect(layout.chart.fontFamily).toBe('inherit');
+    expect((getBrushLayoutConfig(internalConfig(), undefined, '') as AnyRec).grid.borderColor).toBe(
+      'var(--divider-color)',
+    );
+  });
+
+  it('labels the x axis and tooltip by calendar period when all series share one', () => {
+    const july = new Date('2026-07-15T12:00:00').getTime();
+    const config = internalConfig({
+      series: [
+        { entity: 'sensor.a', group_by: { func: 'sum', period: 'quarter' } },
+        { entity: 'sensor.b', group_by: { func: 'sum', period: 'quarter' } },
+      ],
+    });
+    const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+    expect(layout.xaxis.labels.formatter(july, july)).toBe('T3 2026'); // mkHass is French
+    expect(layout.tooltip.x.formatter(july)).toBe('T3 2026');
+  });
+
+  it('keeps time labels when series use different periods or none', () => {
+    const config = internalConfig({
+      series: [
+        { entity: 'sensor.a', group_by: { func: 'sum', period: 'month' } },
+        { entity: 'sensor.b', group_by: { func: 'sum', duration: '1d' } },
+      ],
+    });
+    const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+    expect(layout.xaxis.labels.formatter).toBeUndefined();
   });
 
   it('follows hass.language for the locale by default', () => {

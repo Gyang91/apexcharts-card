@@ -11,11 +11,25 @@ import {
   TIMESERIES_TYPES,
 } from './const';
 import { ChartCardConfig } from './types';
-import { computeName, computeUom, is12Hour, mergeDeep, myFormatNumber, prettyPrintTime } from './utils';
+import type { CalendarPeriod } from './types-config';
+import { computeName, computeUom, getLang, is12Hour, mergeDeep, myFormatNumber, prettyPrintTime } from './utils';
+import { formatPeriod } from './calendar';
 import { layoutMinimal } from './layouts/minimal';
 import { getLocales, getDefaultLocale } from './locales';
 import { t } from './localize';
 import GraphEntry from './graphEntry';
+
+// Follow the Home Assistant theme: axis labels and legend in the secondary
+// text color and the theme font, grid and axis lines in the divider color.
+const THEME_CHART = {
+  foreColor: 'var(--secondary-text-color)',
+  fontFamily: 'inherit',
+};
+
+const THEME_GRID = {
+  borderColor: 'var(--divider-color)',
+  strokeDashArray: 3,
+};
 
 export function getLayoutConfig(
   config: ChartCardConfig,
@@ -34,7 +48,7 @@ export function getLayoutConfig(
         'en',
       type: config.chart_type || DEFAULT_SERIE_TYPE,
       stacked: config?.stacked,
-      foreColor: 'var(--primary-text-color)',
+      ...THEME_CHART,
       width: '100%',
       zoom: {
         enabled: false,
@@ -43,9 +57,7 @@ export function getLayoutConfig(
         show: false,
       },
     },
-    grid: {
-      strokeDashArray: 3,
-    },
+    grid: THEME_GRID,
     fill: {
       opacity: getFillOpacity(config, false),
       type: getFillType(config, false),
@@ -124,7 +136,7 @@ export function getBrushLayoutConfig(
         'en',
       type: config.chart_type || DEFAULT_SERIE_TYPE,
       stacked: config?.stacked,
-      foreColor: 'var(--primary-text-color)',
+      ...THEME_CHART,
       width: '100%',
       height: '120px',
       zoom: {
@@ -139,9 +151,7 @@ export function getBrushLayoutConfig(
         enabled: true,
       },
     },
-    grid: {
-      strokeDashArray: 3,
-    },
+    grid: THEME_GRID,
     fill: {
       opacity: getFillOpacity(config, true),
       type: getFillType(config, true),
@@ -212,16 +222,35 @@ function getLabels(config: ChartCardConfig, hass: HomeAssistant | undefined) {
   }
 }
 
+// The calendar period every series of the chart is grouped by, if they share one
+function getCommonPeriod(config: ChartCardConfig): CalendarPeriod | undefined {
+  const series = config.series_in_graph || [];
+  const period = series[0]?.group_by.period;
+  return period && series.every((serie) => serie.group_by.func !== 'raw' && serie.group_by.period === period)
+    ? period
+    : undefined;
+}
+
+// Display timestamps are already shifted to the displayed time zone, so
+// period labels are formatted in the browser's time zone.
+function periodFormatter(period: CalendarPeriod, lang: string): (value: number, timestamp?: number) => string {
+  return (value, timestamp) => formatPeriod(timestamp ?? value, period, lang, undefined);
+}
+
 function getXAxis(config: ChartCardConfig, hass: HomeAssistant | undefined) {
   if (TIMESERIES_TYPES.includes(config.chart_type)) {
     const hours12 = is12Hour(config, hass);
+    const period = getCommonPeriod(config);
     return {
       type: 'datetime',
       // range: getMilli(config.hours_to_show),
       labels: {
         datetimeUTC: false,
         datetimeFormatter: getDateTimeFormatter(hours12),
+        formatter: period ? periodFormatter(period, getLang(config, hass)) : undefined,
       },
+      axisBorder: { color: 'var(--divider-color)' },
+      axisTicks: { color: 'var(--divider-color)' },
     };
   } else {
     return {};
@@ -262,9 +291,11 @@ function getXTooltipFormatter(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): ((val: number, _a: any, _b: any) => string) | undefined {
   if (config.apex_config?.tooltip?.x?.format) return undefined;
+  const lang = getLang(config, hass);
+  const period = getCommonPeriod(config);
+  if (period) return periodFormatter(period, lang);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let hours12: any = undefined;
-  const lang = config.locale || hass?.language || 'en';
   hours12 = is12Hour(config, hass) ? { hour12: true } : { hourCycle: 'h23' };
 
   return parse(config.graph_span)! < HOUR_24 && !config.span?.offset

@@ -73,7 +73,7 @@ export function formatPeriod(ts: number, period: CalendarPeriod, lang: string, t
       return new Intl.DateTimeFormat(lang, { ...options, month: 'short', year: 'numeric' }).format(ts);
     case 'quarter': {
       const m = at(ts, timeZone);
-      return t('period.quarter', { quarter: m.quarter(), year: m.year() });
+      return t('period.quarter', { quarter: m.quarter(), year: m.year() }, lang);
     }
     case 'year':
       return String(at(ts, timeZone).year());

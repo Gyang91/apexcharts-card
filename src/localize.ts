@@ -16,8 +16,10 @@ export function setLocale(lang: string | undefined): void {
   _lang = normalize(lang);
 }
 
-export function t(key: string, vars?: Record<string, string | number>): string {
-  let str = LANGS[_lang][key] ?? LANGS.en[key] ?? key;
+// `lang` overrides the UI language, e.g. for a chart with its own `locale`
+export function t(key: string, vars?: Record<string, string | number>, lang?: string): string {
+  const code = lang ? normalize(lang) : _lang;
+  let str = LANGS[code][key] ?? LANGS.en[key] ?? key;
   if (vars) {
     for (const [name, value] of Object.entries(vars)) {
       str = str.replace(new RegExp(`\\{${name}\\}`, 'g'), String(value));
