@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.8.2](https://github.com/Gyang91/apexcharts-card/compare/v2.8.1...v2.8.2) (2026-10-27)
+
+
+### Bug Fixes
+
+* **group_by:** correct period labels and empty sum buckets ([714e76e](https://github.com/Gyang91/apexcharts-card/commit/714e76efd772183aa2505f41c3e1724819f20db0))
+
 ## [2.8.1](https://github.com/Gyang91/apexcharts-card/compare/v2.8.0...v2.8.1) (2026-10-27)
 
 
