@@ -1,12 +1,7 @@
 import Moment from 'moment-timezone';
-import { extendMoment } from 'moment-range';
 import momentDurationFormatSetup from 'moment-duration-format';
 momentDurationFormatSetup(Moment);
-// moment-timezone re-exports the very same moment instance at runtime, but
-// TypeScript resolves it to a different type identity than the one
-// moment-range expects (moment vs moment/ts3.1-typings): the cast only
-// reconciles these two nominal views of the same object.
-export const moment = extendMoment(Moment as unknown as Parameters<typeof extendMoment>[0]);
+export const moment = Moment;
 export const ONE_HOUR = 1000 * 3600;
 export const HOUR_24 = ONE_HOUR * 24;
 
