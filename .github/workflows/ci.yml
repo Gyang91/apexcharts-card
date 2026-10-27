@@ -14,9 +14,12 @@ concurrency:
 permissions:
   contents: read
 
+# Every job skips release-please's branch: the release workflow tests and
+# merges it itself, and running here too would race that merge and fail.
 jobs:
   lint:
     name: Lint & format
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -31,6 +34,7 @@ jobs:
 
   test:
     name: Tests
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -44,6 +48,7 @@ jobs:
 
   build:
     name: Build
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:

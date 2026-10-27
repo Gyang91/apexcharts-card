@@ -1,0 +1,35 @@
+# Weekly dependency update pull requests (GitHub Dependabot, free for public
+# repositories). Updates of libraries shipped in the card are committed as
+# `fix(deps): ...`, so merging one publishes a release; build tool and
+# workflow updates (`chore(deps)`, `ci(deps)`) do not.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
+    groups:
+      shipped:
+        dependency-type: production
+        update-types: [minor, patch]
+      build-tools:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ['*']
