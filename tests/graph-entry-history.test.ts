@@ -149,6 +149,31 @@ describe('user functions are compiled once per series', () => {
   });
 });
 
+describe('group_by fill last', () => {
+  it('starts from the value held before the window (sparse sensor, cached history)', async () => {
+    const MIN = 60 * 1000;
+    // A cached point before the window start, then a change late in the window:
+    // the leading buckets must hold the earlier value, not be cut off.
+    const entry = makeEntry(
+      seriesConfig({ type: 'line', group_by: { duration: '10min', offset: '+0h', func: 'avg', fill: 'last' } }),
+      async () => ({
+        [ENTITY]: [
+          { s: '10', lu: (T0 - 5 * MIN) / 1000 },
+          { s: '12', lu: (T0 + 2 * HOUR) / 1000 },
+        ],
+      }),
+    );
+
+    await entry._updateHistory(new Date(T0), new Date(T0 + 3 * HOUR));
+
+    const history = entry.history;
+    expect(history[0][0]).toBeLessThanOrEqual(T0 + 10 * MIN);
+    expect(history[0][1]).toBe(10);
+    expect(history.filter(([, v]) => v === null)).toHaveLength(0);
+    expect(history[history.length - 1][1]).toBe(12);
+  });
+});
+
 describe('update lock', () => {
   it('is released when the history request fails', async () => {
     let fail = true;

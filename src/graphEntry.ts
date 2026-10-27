@@ -596,7 +596,14 @@ export default class GraphEntry {
         return false;
       });
     });
-    let lastNonNullBucketValue: number | null = null;
+    // Last point before the first bucket: the value the entity held when the
+    // range starts. Cached history keeps such points, but they fall outside
+    // every bucket, so seed `fill: last` and `start_with_last` from it.
+    const firstIndexAfterStart = buckets.length
+      ? history.data.findIndex((entry) => entry[0] > buckets[0].timestamp)
+      : -1;
+    const valueBeforeStart = firstIndexAfterStart > 0 ? history.data[firstIndexAfterStart - 1][1] : null;
+    let lastNonNullBucketValue: number | null = valueBeforeStart;
     const now = new Date().getTime();
     buckets.forEach((bucket, index) => {
       if (bucket.data.length === 0) {
@@ -616,14 +623,8 @@ export default class GraphEntry {
             const prevBucketData = buckets[index - 1].data;
             bucket.data.unshift([bucket.timestamp, prevBucketData[prevBucketData.length - 1][1]]);
           }
-        } else {
-          const firstIndexAfter = history.data.findIndex((entry) => {
-            if (entry[0] > bucket.timestamp) return true;
-            return false;
-          });
-          if (firstIndexAfter > 0) {
-            bucket.data.unshift([bucket.timestamp, history.data[firstIndexAfter - 1][1]]);
-          }
+        } else if (firstIndexAfterStart > 0) {
+          bucket.data.unshift([bucket.timestamp, valueBeforeStart]);
         }
       }
     });
