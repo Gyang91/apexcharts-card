@@ -1,4 +1,4 @@
-import { computeTimezoneDiffWithLocal } from '../src/calendar';
+import { computeTimezoneDiffWithLocal } from '../src/zone';
 import {
   compress,
   decompress,

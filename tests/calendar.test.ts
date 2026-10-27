@@ -1,14 +1,7 @@
 // Calendar periods (group_by.period) and time-weighted averages (time_avg).
 import GraphEntry from '../src/graphEntry';
-import {
-  add,
-  computeTimezoneDiffWithLocal,
-  endOf,
-  formatPeriod,
-  periodBoundaries,
-  startOf,
-  startOfPeriod,
-} from '../src/calendar';
+import { formatPeriod, periodBoundaries, startOfPeriod } from '../src/calendar';
+import { add, computeTimezoneDiffWithLocal, endOf, startOf } from '../src/zone';
 import { mkHass, mkState } from './fixtures/hass';
 
 const TZ = 'Europe/Berlin';

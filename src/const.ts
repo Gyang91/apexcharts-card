@@ -1,7 +1,12 @@
 import Moment from 'moment';
+// moment-timezone's core only: zone data comes from the browser (see moment-timezones.ts)
+import MomentTz from 'moment-timezone/moment-timezone';
 import momentDurationFormatSetup from 'moment-duration-format';
+import { useBrowserTimeZones } from './moment-timezones';
 momentDurationFormatSetup(Moment);
-export const moment = Moment;
+useBrowserTimeZones(MomentTz);
+// Passed to user code (data_generator): moment with moment.tz() available
+export const moment = MomentTz;
 export const ONE_HOUR = 1000 * 3600;
 export const HOUR_24 = ONE_HOUR * 24;
 

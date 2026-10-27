@@ -4,3 +4,4 @@ package-lock.json
 CHANGELOG.md
 src/types-config-ti.ts
 README.md
+src/zone-abbreviations.ts

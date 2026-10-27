@@ -42,7 +42,8 @@ import {
   isUsingServerTimezone,
 } from './utils';
 import { getStatisticsMetadata } from './recorder';
-import { computeTimezoneDiffWithLocal, displayTimeZone, endOf, startOf } from './calendar';
+import { displayTimeZone } from './calendar';
+import { computeTimezoneDiffWithLocal, endOf, startOf } from './zone';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions, ApexYAxis } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
