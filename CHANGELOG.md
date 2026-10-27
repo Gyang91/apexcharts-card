@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.8.1](https://github.com/Gyang91/apexcharts-card/compare/v2.8.0...v2.8.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **layout:** period tooltip no longer throws on hover ([cfc1bf5](https://github.com/Gyang91/apexcharts-card/commit/cfc1bf554c7c91ed75a0e0dc7bfb0262054c1aff))
+
 ## [2.8.0](https://github.com/Gyang91/apexcharts-card/compare/v2.6.19...v2.8.0) (2026-10-27)
 
 
