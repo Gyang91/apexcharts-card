@@ -1652,13 +1652,17 @@ export class ChartsCard extends LitElement {
     }, series?.length > 0);
     if (onlyGroupBy) {
       const range = end.getTime() - start.getTime();
+      // Calendar buckets (group_by.period) already start and end on period
+      // boundaries: they need no trimming.
       offsetStart = series?.reduce((acc, serie) => {
+        if (serie.group_by.period) return acc === -1 ? 0 : Math.min(acc, 0);
         const dur = parse(serie.group_by.duration)!;
         const off = ((parse(serie.group_by.offset)! % dur) + dur) % dur; // Any possible offset is identiacal to one within [0, duration)
         if (acc === -1 || (range + off) % dur < acc) return (range + off) % dur;
         return acc;
       }, -1);
       offsetEnd = series?.reduce((acc, serie) => {
+        if (serie.group_by.period) return acc === -1 ? 0 : Math.min(acc, 0);
         const dur = parse(serie.group_by.duration)!;
         const off = ((parse(serie.group_by.offset)! % dur) + dur) % dur; // Any possible offset is identiacal to one within [0, duration)
         if (acc === -1 || dur - off < acc) return dur - off;

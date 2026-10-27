@@ -378,4 +378,7 @@ export const fr: Record<string, string> = {
   'preview.hide': 'Masquer l’aperçu',
   'preview.show': 'Afficher l’aperçu',
   'preview.addSeries': 'Ajoutez une série avec une entité pour voir l’aperçu.',
+
+  // ── Libellés de période (group_by.period) ──
+  'period.quarter': 'T{quarter} {year}',
 };

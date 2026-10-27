@@ -106,6 +106,9 @@ export interface ChartCardAllSeriesExternalConfig {
   show?: ChartCardSeriesShowConfigExt;
   group_by?: {
     duration?: string;
+    // Calendar buckets in the dashboard's time zone (DST and month lengths
+    // included). Replaces `duration` and `offset` when set.
+    period?: CalendarPeriod;
     offset?: string;
     func?: GroupByFunc;
     fill?: GroupByFill;
@@ -149,7 +152,10 @@ export type ChartCardPrettyTime = 'millisecond' | 'second' | 'minute' | 'hour' |
 
 export type GroupByFill = 'null' | 'last' | 'zero';
 
-export type GroupByFunc = 'raw' | 'avg' | 'min' | 'max' | 'last' | 'first' | 'sum' | 'median' | 'delta' | 'diff';
+export type GroupByFunc =
+  'raw' | 'avg' | 'time_avg' | 'min' | 'max' | 'last' | 'first' | 'sum' | 'median' | 'delta' | 'diff';
+
+export type CalendarPeriod = 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 export interface ChartCardHeaderExternalConfig {
   show?: boolean;

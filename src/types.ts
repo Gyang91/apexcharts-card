@@ -1,5 +1,6 @@
 import { ApexOptions } from 'apexcharts';
 import {
+  CalendarPeriod,
   ChartCardExternalConfig,
   ChartCardSeriesExternalConfig,
   ChartCardSeriesShowConfigExt,
@@ -23,6 +24,7 @@ export interface ChartCardSeriesConfig extends ChartCardSeriesExternalConfig {
   index: number;
   group_by: {
     duration: string;
+    period?: CalendarPeriod;
     offset: string;
     func: GroupByFunc;
     fill: GroupByFill;
@@ -104,6 +106,8 @@ export interface HassHistoryEntry {
 
 export interface HistoryBucket {
   timestamp: number;
+  // Start of the next bucket: buckets cover [timestamp, end)
+  end: number;
   data: EntityCachePoints;
 }
 

@@ -375,4 +375,7 @@ export const en: Record<string, string> = {
   'preview.hide': 'Hide Preview',
   'preview.show': 'Show Preview',
   'preview.addSeries': 'Add a series with an entity to see preview.',
+
+  // ── Period labels (group_by.period) ──
+  'period.quarter': 'Q{quarter} {year}',
 };

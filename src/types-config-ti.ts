@@ -102,6 +102,7 @@ export const ChartCardAllSeriesExternalConfig = t.iface([], {
   "show": t.opt("ChartCardSeriesShowConfigExt"),
   "group_by": t.opt(t.iface([], {
     "duration": t.opt("string"),
+    "period": t.opt("CalendarPeriod"),
     "offset": t.opt("string"),
     "func": t.opt("GroupByFunc"),
     "fill": t.opt("GroupByFill"),
@@ -145,7 +146,9 @@ export const ChartCardPrettyTime = t.union(t.lit('millisecond'), t.lit('second')
 
 export const GroupByFill = t.union(t.lit('null'), t.lit('last'), t.lit('zero'));
 
-export const GroupByFunc = t.union(t.lit('raw'), t.lit('avg'), t.lit('min'), t.lit('max'), t.lit('last'), t.lit('first'), t.lit('sum'), t.lit('median'), t.lit('delta'), t.lit('diff'));
+export const GroupByFunc = t.union(t.lit('raw'), t.lit('avg'), t.lit('time_avg'), t.lit('min'), t.lit('max'), t.lit('last'), t.lit('first'), t.lit('sum'), t.lit('median'), t.lit('delta'), t.lit('diff'));
+
+export const CalendarPeriod = t.union(t.lit('hour'), t.lit('day'), t.lit('week'), t.lit('month'), t.lit('quarter'), t.lit('year'));
 
 export const ChartCardHeaderExternalConfig = t.iface([], {
   "show": t.opt("boolean"),
@@ -252,6 +255,7 @@ const exportedTypeSuite: t.ITypeSuite = {
   ChartCardPrettyTime,
   GroupByFill,
   GroupByFunc,
+  CalendarPeriod,
   ChartCardHeaderExternalConfig,
   ChartCardColorThreshold,
   ChartCardYAxisExternal,

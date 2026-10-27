@@ -10,14 +10,14 @@ import {
 } from './types';
 import { compileUserFunction, compress, decompress, isExternalStatisticId, log } from './utils';
 import { fetchHistory, fetchStatistics } from './recorder';
+import { displayTimeZone, periodBoundaries, periodStep } from './calendar';
 import localForage from 'localforage';
 import { HassEntity } from 'home-assistant-js-websocket';
-import { DateRange } from 'moment-range';
 import type { Moment } from 'moment-timezone';
 import { DEFAULT_STATISTICS_PERIOD, DEFAULT_STATISTICS_TYPE, moment } from './const';
 import parse from 'parse-duration';
 import SparkMD5 from 'spark-md5';
-import { ChartCardSpanExtConfig, StatisticsPeriod } from './types-config';
+import { ChartCardSpanExtConfig } from './types-config';
 import * as pjson from '../package.json';
 
 // Signatures of the user functions documented for `transform` and `data_generator`
@@ -68,7 +68,8 @@ export default class GraphEntry {
 
   private _config: ChartCardSeriesConfig;
 
-  private _func: (item: EntityCachePoints) => number;
+  // Aggregates the points of one bucket covering [start, end)
+  private _func: (items: EntityCachePoints, start: number, end: number) => number | null;
 
   private _realStart: Date;
 
@@ -102,6 +103,7 @@ export default class GraphEntry {
   ) {
     const aggregateFuncMap = {
       avg: this._average,
+      time_avg: this._timeAverage,
       max: this._maximum,
       min: this._minimum,
       first: this._first,
@@ -252,13 +254,20 @@ export default class GraphEntry {
     }
   }
 
+  // Bucket boundaries for group_by: calendar periods when `period` is set,
+  // otherwise fixed `duration` steps ending at `end` + offset. The last
+  // boundary only closes the previous bucket.
+  private _bucketBoundaries(start: Date, end: Date): number[] {
+    const period = this._config.group_by.period;
+    if (period) return periodBoundaries(start.getTime(), end.getTime(), period, displayTimeZone(this._hass));
+    const last = end.getTime() + this._groupByOffsetMs;
+    const nbBuckets = Math.ceil((end.getTime() - start.getTime() + this._groupByOffsetMs) / this._groupByDurationMs);
+    return Array.from({ length: nbBuckets + 1 }, (_, i) => last - (nbBuckets - i) * this._groupByDurationMs);
+  }
+
   private async _computeHistory(start: Date, end: Date): Promise<boolean> {
-    let startHistory = new Date(start);
-    if (this._config.group_by.func !== 'raw') {
-      const range = end.getTime() - start.getTime() + this._groupByOffsetMs;
-      const nbBuckets = Math.ceil(range / this._groupByDurationMs);
-      startHistory = new Date(end.getTime() + this._groupByOffsetMs - nbBuckets * this._groupByDurationMs);
-    }
+    const boundaries = this._config.group_by.func !== 'raw' ? this._bucketBoundaries(start, end) : undefined;
+    const startHistory = new Date(boundaries ? boundaries[0] : start);
     this._lastRealState = undefined;
 
     // ignore_history is never set for statistics series (hence never for
@@ -463,8 +472,8 @@ export default class GraphEntry {
       return false;
     }
     if (this._config.group_by.func !== 'raw') {
-      const res: EntityCachePoints = this._dataBucketer(history, moment.range(startHistory, end)).map((bucket) => {
-        return [bucket.timestamp, this._func(bucket.data)];
+      const res: EntityCachePoints = this._dataBucketer(history, boundaries!, start).map((bucket) => {
+        return [bucket.timestamp, this._func(bucket.data, bucket.timestamp, bucket.end)];
       });
       if ([undefined, 'line', 'area'].includes(this._config.type)) {
         while (res.length > 0 && res[0][1] === null) res.shift();
@@ -505,14 +514,7 @@ export default class GraphEntry {
   ): EntityCachePoints {
     if (points.length === 0 || stats.length === 0) return points;
     const period = this._config.statistics?.period || DEFAULT_STATISTICS_PERIOD;
-    const UNITS: Record<StatisticsPeriod, [number, 'minute' | 'hour' | 'day' | 'week' | 'month']> = {
-      '5minute': [5, 'minute'],
-      hour: [1, 'hour'],
-      day: [1, 'day'],
-      week: [1, 'week'],
-      month: [1, 'month'],
-    };
-    const [amount, unit] = UNITS[period];
+    const [amount, unit] = periodStep(period);
     // Safety net against pathological spans (e.g. misconfigured graph_span)
     const MAX_PADDING_POINTS = 5000;
     const padded = [...points];
@@ -592,14 +594,15 @@ export default class GraphEntry {
     };
   }
 
-  private _dataBucketer(history: EntityEntryCache, timeRange: DateRange): HistoryBuckets {
-    timeRange.end.add(this._groupByOffsetMs, 'ms');
-    const ranges = Array.from(timeRange.reverseBy('milliseconds', { step: this._groupByDurationMs })).reverse();
-    // const res: EntityCachePoints[] = [[]];
-    const buckets: HistoryBuckets = [];
-    ranges.forEach((range, index) => {
-      buckets[index] = { timestamp: range.valueOf(), data: [] };
-    });
+  private _dataBucketer(history: EntityEntryCache, boundaries: number[], start: Date): HistoryBuckets {
+    const buckets: HistoryBuckets = boundaries.map((timestamp, index) => ({
+      timestamp,
+      end: boundaries[index + 1] ?? timestamp,
+      data: [],
+    }));
+    // time_avg weighs each value by how long it was held, so every bucket
+    // needs the value it starts with.
+    const startWithLast = this._config.group_by.start_with_last || this._config.group_by.func === 'time_avg';
     // Each point goes to the bucket whose [timestamp, next timestamp) holds it;
     // points outside the range are dropped. Binary search: O(n log b).
     history?.data.forEach((entry) => {
@@ -627,10 +630,11 @@ export default class GraphEntry {
       } else {
         lastNonNullBucketValue = bucket.data.slice(-1)[0][1];
       }
-      if (this._config.group_by.start_with_last) {
+      if (startWithLast) {
         if (index > 0) {
-          if (bucket.data.length === 0 || bucket.data[0][0] !== bucket.timestamp) {
-            const prevBucketData = buckets[index - 1].data;
+          const prevBucketData = buckets[index - 1].data;
+          // Empty previous bucket (future, unfilled): nothing to carry over
+          if (prevBucketData.length > 0 && (bucket.data.length === 0 || bucket.data[0][0] !== bucket.timestamp)) {
             bucket.data.unshift([bucket.timestamp, prevBucketData[prevBucketData.length - 1][1]]);
           }
         } else if (firstIndexAfterStart > 0) {
@@ -638,7 +642,9 @@ export default class GraphEntry {
         }
       }
     });
-    buckets.shift();
+    // Drop the first bucket when it starts before the range (partial), and the
+    // closing boundary. Fixed-duration buckets always start one step early.
+    if (!this._config.group_by.period || buckets[0]?.timestamp < start.getTime()) buckets.shift();
     buckets.pop();
     // Remove nulls at the end
     while (
@@ -664,6 +670,24 @@ export default class GraphEntry {
       }
       return sum + val;
     }, 0);
+  }
+
+  // Mean weighted by how long each value was held inside [start, end), as in
+  // Home Assistant's statistics. Time after now is not counted.
+  private _timeAverage(items: EntityCachePoints, start: number, end: number): number | null {
+    const points = [...items].sort((a, b) => a[0] - b[0]);
+    const until = Math.min(end, Date.now());
+    let weighted = 0;
+    let covered = 0;
+    points.forEach(([ts, value], index) => {
+      if (value === null) return;
+      const from = Math.max(ts, start);
+      const to = Math.min(points[index + 1]?.[0] ?? until, until);
+      if (to <= from) return;
+      weighted += value * (to - from);
+      covered += to - from;
+    });
+    return covered > 0 ? weighted / covered : null;
   }
 
   private _average(items: EntityCachePoints): number | null {
