@@ -5,13 +5,6 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    # Release pull requests only touch these files. The release workflow tests
-    # and merges them itself; a run here would wait for approval (opened by
-    # github-actions[bot]) and fail once the merge closes the pull request.
-    paths-ignore:
-      - CHANGELOG.md
-      - .release-please-manifest.json
-      - package.json
   workflow_dispatch:
 
 concurrency:
