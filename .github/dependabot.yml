@@ -10,6 +10,11 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    ignore:
+      # typescript-eslint only supports TypeScript below 6.1: a major update
+      # cannot install until it does
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: fix
       prefix-development: chore
