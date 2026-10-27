@@ -89,6 +89,9 @@ export default class GraphEntry {
   // last REAL value, not the trailing null padding points.
   private _lastRealState: number | null | undefined = undefined;
 
+  // Recent history of the previous refresh, extended incrementally
+  private _memoryHistory?: EntityEntryCache;
+
   // User functions from the config, compiled on first use
   private _transformFn?: TransformFn;
 
@@ -156,6 +159,15 @@ export default class GraphEntry {
   // need complete history rows; plain state series only need the states.
   private get _needsFullHistoryRows(): boolean {
     return !!(this._config.attribute || this._config.transform);
+  }
+
+  // Whether the entity recorded anything after `ts`. Full rows (attributes,
+  // transform) change on every update; plain states only on a state change.
+  // Unknown (no live state, e.g. external statistics) counts as changed.
+  private _changedSince(ts: number): boolean {
+    if (!this._entityState) return true;
+    const changed = this._needsFullHistoryRows ? this._entityState.last_updated : this._entityState.last_changed;
+    return new Date(changed).getTime() > ts;
   }
 
   set cache(cache: boolean) {
@@ -298,7 +310,11 @@ export default class GraphEntry {
 
       let skipInitialState = false;
 
-      history = this._cache ? await this._getCache(this._entityID, this._useCompress) : undefined;
+      // Recent history is kept in memory between refreshes; the browser cache
+      // is only read on the first load. Statistics are always fetched whole.
+      history = this._config.statistics
+        ? undefined
+        : (this._memoryHistory ?? (this._cache ? await this._getCache(this._entityID, this._useCompress) : undefined));
 
       if (history && history.span === this._graphSpan) {
         const currDataIndex = history.data.findIndex(
@@ -402,6 +418,8 @@ export default class GraphEntry {
             newStateHistory = this._padStatisticsSpan(newStateHistory, newHistory, start, end);
           }
         }
+      } else if (usableCache && !this._changedSince(history!.data[history!.data.length - 1][0])) {
+        // Nothing recorded since the last point: no request needed
       } else {
         const newHistory = await fetchHistory(this._hass, this._entityID, fetchStart, fetchEnd, {
           includeStartState: this._needsFullHistoryRows || !skipInitialState,
@@ -459,12 +477,14 @@ export default class GraphEntry {
         }
 
         if (this._cache) {
-          await this._setCache(this._entityID, history, this._useCompress).catch((err) => {
+          // Written in the background: the next refresh reads memory, not the cache
+          this._setCache(this._entityID, history, this._useCompress).catch((err) => {
             log(err);
             localForage.clear();
           });
         }
       }
+      if (!this._config.statistics) this._memoryHistory = history;
     }
 
     if (!history || history.data.length === 0) {

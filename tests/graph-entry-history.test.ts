@@ -149,6 +149,43 @@ describe('user functions are compiled once per series', () => {
   });
 });
 
+describe('refreshes', () => {
+  it('reuses the history in memory and only asks for what changed', async () => {
+    const calls: AnyRec[] = [];
+    const entry = makeEntry(seriesConfig(), async (msg) => {
+      calls.push(msg);
+      return calls.length === 1
+        ? { [ENTITY]: rows.slice(0, 2) }
+        : { [ENTITY]: [{ s: '22', lu: (T0 + 2 * HOUR) / 1000 }] };
+    });
+    const hass = (entry as AnyRec)._hass;
+    const setState = (ts: number) => {
+      entry.hass = {
+        ...hass,
+        states: { [ENTITY]: { ...hass.states[ENTITY], last_changed: new Date(ts).toISOString() } },
+      };
+    };
+
+    setState(T0 + HOUR);
+    await entry._updateHistory(new Date(T0), new Date(T0 + 3 * HOUR));
+    // Unchanged entity: no request at all
+    await entry._updateHistory(new Date(T0), new Date(T0 + 3 * HOUR));
+    expect(calls).toHaveLength(1);
+
+    // New state: one request from just after the last point, without the start state
+    setState(T0 + 2 * HOUR);
+    await entry._updateHistory(new Date(T0), new Date(T0 + 3 * HOUR));
+    expect(calls).toHaveLength(2);
+    expect(new Date(calls[1].start_time).getTime()).toBe(T0 + HOUR + 1);
+    expect(calls[1].include_start_time_state).toBe(false);
+    expect(entry.history).toEqual([
+      [T0, 20.5],
+      [T0 + HOUR, 21],
+      [T0 + 2 * HOUR, 22],
+    ]);
+  });
+});
+
 describe('group_by fill last', () => {
   it('starts from the value held before the window (sparse sensor, cached history)', async () => {
     const MIN = 60 * 1000;
