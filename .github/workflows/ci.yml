@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # Release pull requests only touch these files. The release workflow tests
+    # and merges them itself; a run here would wait for approval (opened by
+    # github-actions[bot]) and fail once the merge closes the pull request.
+    paths-ignore:
+      - CHANGELOG.md
+      - .release-please-manifest.json
+      - package.json
   workflow_dispatch:
 
 concurrency:
@@ -14,12 +21,9 @@ concurrency:
 permissions:
   contents: read
 
-# Every job skips release-please's branch: the release workflow tests and
-# merges it itself, and running here too would race that merge and fail.
 jobs:
   lint:
     name: Lint & format
-    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -34,7 +38,6 @@ jobs:
 
   test:
     name: Tests
-    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,7 +51,6 @@ jobs:
 
   build:
     name: Build
-    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
