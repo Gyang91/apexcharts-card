@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.8.4](https://github.com/Gyang91/apexcharts-card/compare/v2.8.3...v2.8.4) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** update apexcharts to 8.5.0 and drop unused moment-range ([92ecab3](https://github.com/Gyang91/apexcharts-card/commit/92ecab38c3bb396f2ca1159f9d02985c202de1b6))
+
 ## [2.8.3](https://github.com/Gyang91/apexcharts-card/compare/v2.8.2...v2.8.3) (2026-10-27)
 
 
