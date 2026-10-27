@@ -30,6 +30,21 @@ type DataGeneratorFn = (
   momentLib: typeof moment,
 ) => Promise<EntityCachePoints>;
 
+// Index of the bucket whose [timestamp, next bucket timestamp) contains `ts`,
+// or -1 when `ts` is before the first or at/after the last boundary.
+// `buckets` must be sorted by timestamp.
+export function findBucketIndex(buckets: HistoryBuckets, ts: number): number {
+  let low = 0;
+  let high = buckets.length - 2; // the last boundary only closes the previous bucket
+  if (high < 0 || ts < buckets[0].timestamp || ts >= buckets[buckets.length - 1].timestamp) return -1;
+  while (low < high) {
+    const mid = (low + high + 1) >> 1;
+    if (buckets[mid].timestamp <= ts) low = mid;
+    else high = mid - 1;
+  }
+  return low;
+}
+
 export default class GraphEntry {
   private _computedHistory?: EntityCachePoints;
 
@@ -585,16 +600,11 @@ export default class GraphEntry {
     ranges.forEach((range, index) => {
       buckets[index] = { timestamp: range.valueOf(), data: [] };
     });
+    // Each point goes to the bucket whose [timestamp, next timestamp) holds it;
+    // points outside the range are dropped. Binary search: O(n log b).
     history?.data.forEach((entry) => {
-      buckets.some((bucket, index) => {
-        if (bucket.timestamp > entry[0] && index > 0) {
-          if (entry[0] >= buckets[index - 1].timestamp) {
-            buckets[index - 1].data.push(entry);
-            return true;
-          }
-        }
-        return false;
-      });
+      const index = findBucketIndex(buckets, entry[0]);
+      if (index !== -1) buckets[index].data.push(entry);
     });
     // Last point before the first bucket: the value the entity held when the
     // range starts. Cached history keeps such points, but they fall outside
