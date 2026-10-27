@@ -1,6 +1,14 @@
 // Calendar periods (group_by.period) and time-weighted averages (time_avg).
 import GraphEntry from '../src/graphEntry';
-import { formatPeriod, periodBoundaries, startOfPeriod } from '../src/calendar';
+import {
+  add,
+  computeTimezoneDiffWithLocal,
+  endOf,
+  formatPeriod,
+  periodBoundaries,
+  startOf,
+  startOfPeriod,
+} from '../src/calendar';
 import { mkHass, mkState } from './fixtures/hass';
 
 const TZ = 'Europe/Berlin';
@@ -13,6 +21,63 @@ type AnyRec = Record<string, any>;
 
 // Berlin wall-clock time -> epoch ms
 const berlin = (iso: string, offset: '+01:00' | '+02:00') => new Date(`${iso}${offset}`).getTime();
+
+// Rules from the browser (Intl). The cases below are the ones a time zone
+// library typically gets wrong; the expected instants are hand-checked.
+describe('time zone arithmetic', () => {
+  const iso = (ts: number) => new Date(ts).toISOString();
+
+  it('stays in the same occurrence inside an hour that repeats (Berlin, clocks back)', () => {
+    // 02:57 summer time on 25 Oct 2026: that hour repeats in winter time
+    expect(iso(startOf(Date.parse('2026-10-25T00:57:12Z'), 'hour', TZ))).toBe('2026-10-25T00:00:00.000Z');
+    expect(iso(startOf(Date.parse('2026-10-25T01:57:12Z'), 'hour', TZ))).toBe('2026-10-25T01:00:00.000Z');
+  });
+
+  it('starts a day whose midnight was skipped right after the change (Santiago)', () => {
+    // 3 Sep 2023: 00:00 jumps to 01:00
+    const noon = Date.parse('2023-09-03T15:00:00Z');
+    expect(iso(startOf(noon, 'day', 'America/Santiago'))).toBe('2023-09-03T04:00:00.000Z');
+    expect(iso(endOf(noon, 'day', 'America/Santiago'))).toBe('2023-09-04T02:59:59.999Z');
+    expect(
+      periodBoundaries(
+        Date.parse('2023-09-02T12:00:00Z'),
+        Date.parse('2023-09-05T03:00:00Z'),
+        'day',
+        'America/Santiago',
+      ).map(iso),
+    ).toEqual([
+      '2023-09-02T04:00:00.000Z',
+      '2023-09-03T04:00:00.000Z', // 01:00, the day's first moment
+      '2023-09-04T03:00:00.000Z', // back on midnight
+      '2023-09-05T03:00:00.000Z',
+    ]);
+  });
+
+  it('starts a day whose midnight happens twice at the first one (Havana)', () => {
+    // 5 Nov 2023: 01:00 goes back to 00:00
+    expect(iso(startOf(Date.parse('2023-11-05T18:00:00Z'), 'day', 'America/Havana'))).toBe('2023-11-05T04:00:00.000Z');
+  });
+
+  it('ends a day that repeats its last hour after the repeat (Santiago)', () => {
+    // 1 Apr 2023 lasts 25 h: 23:00-24:00 happens twice
+    expect(iso(endOf(Date.parse('2023-04-01T15:00:00Z'), 'day', 'America/Santiago'))).toBe('2023-04-02T03:59:59.999Z');
+  });
+
+  it('starts weeks on Sunday or Monday and keeps month ends when adding months', () => {
+    const thursday = Date.parse('2026-10-29T12:00:00Z');
+    expect(iso(startOf(thursday, 'week', TZ))).toBe('2026-10-24T22:00:00.000Z'); // Sunday 25 Oct, summer time
+    expect(iso(startOf(thursday, 'isoWeek', TZ))).toBe('2026-10-25T23:00:00.000Z'); // Monday 26 Oct
+    expect(iso(add(Date.parse('2026-01-30T23:00:00Z'), 1, 'month', TZ))).toBe('2026-02-27T23:00:00.000Z'); // 31 Jan -> 28 Feb
+  });
+
+  it('measures the server time zone offset from the browser at a given time', () => {
+    const ts = Date.parse('2026-07-01T12:00:00Z');
+    // Kathmandu is UTC+5:45 all year: its offset relative to UTC's
+    expect(computeTimezoneDiffWithLocal('UTC', ts) - computeTimezoneDiffWithLocal('Asia/Kathmandu', ts)).toBe(
+      (5 * 60 + 45) * 60 * 1000,
+    );
+  });
+});
 
 describe('calendar periods', () => {
   it('day boundaries stay on midnight across the DST change (25 h day)', () => {

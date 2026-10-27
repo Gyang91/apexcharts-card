@@ -1,3 +1,4 @@
+import { computeTimezoneDiffWithLocal } from '../src/calendar';
 import {
   compress,
   decompress,
@@ -23,7 +24,6 @@ import {
   getLang,
   truncateFloat,
   myFormatNumber,
-  computeTimezoneDiffWithLocal,
   isUsingServerTimezone,
 } from '../src/utils';
 import { NO_VALUE } from '../src/const';

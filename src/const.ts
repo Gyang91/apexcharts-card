@@ -1,4 +1,4 @@
-import Moment from 'moment-timezone';
+import Moment from 'moment';
 import momentDurationFormatSetup from 'moment-duration-format';
 momentDurationFormatSetup(Moment);
 export const moment = Moment;

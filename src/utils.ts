@@ -355,14 +355,6 @@ export function myFormatNumber(
   });
 }
 
-export function computeTimezoneDiffWithLocal(timezone: string | undefined): number {
-  if (!timezone) return 0;
-  const diff = (moment().utcOffset() - moment().tz(timezone).utcOffset()) * 60 * 1000;
-  // moment().utcOffset() is -0 in UTC and that sign survives the multiplication, so a
-  // matching timezone would otherwise return -0 instead of 0.
-  return diff === 0 ? 0 : diff;
-}
-
 export function isUsingServerTimezone(/*config: ChartCardConfig, */ hass: HomeAssistant | undefined): boolean {
   return (hass?.locale as OverrideFrontendLocaleData).time_zone === 'server';
 }

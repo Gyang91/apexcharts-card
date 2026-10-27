@@ -40,9 +40,9 @@ import {
   validateOffset,
   getLovelace,
   isUsingServerTimezone,
-  computeTimezoneDiffWithLocal,
 } from './utils';
 import { getStatisticsMetadata } from './recorder';
+import { computeTimezoneDiffWithLocal, displayTimeZone, endOf, startOf } from './calendar';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions, ApexYAxis } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
@@ -71,7 +71,6 @@ import {
   DEFAULT_SHOW_ZERO_IN_HEADER,
   DEFAULT_SHOW_OFFSET_IN_NAME,
   DEFAULT_UPDATE_DELAY,
-  moment,
   NO_VALUE,
   PLAIN_COLOR_TYPES,
   TIMESERIES_TYPES,
@@ -89,7 +88,6 @@ import {
 import parse from 'parse-duration';
 import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
-import { OverrideFrontendLocaleData } from './types-ha';
 import { setLocale, t } from './localize';
 
 /* eslint no-console: 0 */
@@ -1685,18 +1683,13 @@ export class ChartsCard extends LitElement {
   private _getSpanDates(): { start: Date; end: Date } {
     let end = new Date();
     let start = new Date(end.getTime() - this._graphSpan + 1);
-    const curMoment = moment();
-    if ((this._hass?.locale as OverrideFrontendLocaleData).time_zone === 'server') {
-      curMoment.tz(this._hass!.config.time_zone);
-    }
+    const timeZone = displayTimeZone(this._hass);
     if (this._config?.span?.start) {
       // Just Span
-      const startM = curMoment.startOf(this._config.span.start);
-      start = startM.toDate();
+      start = new Date(startOf(end.getTime(), this._config.span.start, timeZone));
       end = new Date(start.getTime() + this._graphSpan);
     } else if (this._config?.span?.end) {
-      const endM = curMoment.endOf(this._config.span.end);
-      end = new Date(endM.toDate().getTime() + 1);
+      end = new Date(endOf(end.getTime(), this._config.span.end, timeZone) + 1);
       start = new Date(end.getTime() - this._graphSpan + 1);
     }
     if (this._offset) {

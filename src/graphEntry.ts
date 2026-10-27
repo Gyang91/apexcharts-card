@@ -10,10 +10,9 @@ import {
 } from './types';
 import { compileUserFunction, compress, decompress, isExternalStatisticId, log } from './utils';
 import { fetchHistory, fetchStatistics } from './recorder';
-import { displayTimeZone, periodBoundaries, periodStep } from './calendar';
+import { addPeriods, displayTimeZone, periodBoundaries } from './calendar';
 import localForage from 'localforage';
 import { HassEntity } from 'home-assistant-js-websocket';
-import type { Moment } from 'moment-timezone';
 import { DEFAULT_STATISTICS_PERIOD, DEFAULT_STATISTICS_TYPE, moment } from './const';
 import parse from 'parse-duration';
 import SparkMD5 from 'spark-md5';
@@ -524,7 +523,7 @@ export default class GraphEntry {
   // bucket boundary that carries no data, so ApexCharts always sees a constant
   // interval between points (correct column width even with a single bucket).
   // Boundaries are anchored on the real API bucket timestamps and extended with
-  // moment calendar arithmetic, which follows local DST transitions for
+  // calendar arithmetic (src/calendar.ts), which follows local DST transitions for
   // day/week/month periods instead of assuming fixed-length periods.
   private _padStatisticsSpan(
     points: EntityCachePoints,
@@ -534,26 +533,25 @@ export default class GraphEntry {
   ): EntityCachePoints {
     if (points.length === 0 || stats.length === 0) return points;
     const period = this._config.statistics?.period || DEFAULT_STATISTICS_PERIOD;
-    const [amount, unit] = periodStep(period);
     // Safety net against pathological spans (e.g. misconfigured graph_span)
     const MAX_PADDING_POINTS = 5000;
     const padded = [...points];
 
     // Backward from the first real bucket start down to the graph start
-    let curEnd: Moment = moment(Number(stats[0].start));
+    let curEnd = Number(stats[0].start);
     let guard = 0;
-    while (curEnd.valueOf() > start.getTime() && guard++ < MAX_PADDING_POINTS) {
-      const curStart = curEnd.clone().subtract(amount, unit);
-      padded.unshift([this._statDisplayDate(curStart.valueOf(), curEnd.valueOf()), null]);
+    while (curEnd > start.getTime() && guard++ < MAX_PADDING_POINTS) {
+      const curStart = addPeriods(curEnd, period, -1, undefined);
+      padded.unshift([this._statDisplayDate(curStart, curEnd), null]);
       curEnd = curStart;
     }
 
     // Forward from the last real bucket end up to the graph end
-    let curStart: Moment = moment(Number(stats[stats.length - 1].end));
+    let curStart = Number(stats[stats.length - 1].end);
     guard = 0;
-    while (curStart.valueOf() < end.getTime() && guard++ < MAX_PADDING_POINTS) {
-      const nextEnd = curStart.clone().add(amount, unit);
-      padded.push([this._statDisplayDate(curStart.valueOf(), nextEnd.valueOf()), null]);
+    while (curStart < end.getTime() && guard++ < MAX_PADDING_POINTS) {
+      const nextEnd = addPeriods(curStart, period, 1, undefined);
+      padded.push([this._statDisplayDate(curStart, nextEnd), null]);
       curStart = nextEnd;
     }
 
