@@ -1,6 +1,6 @@
 import { HassEntities, HassEntity } from 'home-assistant-js-websocket';
 import { compress as lzStringCompress, decompress as lzStringDecompress } from 'lz-string';
-import { ChartCardConfig, EntityCachePoints, StatisticsMetadata } from './types';
+import { ChartCardConfig, EntityCachePoints } from './types';
 import { TinyColor } from '@ctrl/tinycolor';
 import parse from 'parse-duration';
 import { ChartCardExternalConfig, ChartCardPrettyTime, ChartCardSeriesExternalConfig } from './types-config';
@@ -71,30 +71,17 @@ export function isExternalStatisticId(entityId: string | undefined): boolean {
   return !!entityId && /^[a-z0-9_]+:[a-z0-9_]+$/.test(entityId);
 }
 
-const statisticsMetadataCache: Map<string, Promise<StatisticsMetadata | undefined>> = new Map();
-
-export function getStatisticsMetadata(
-  hass: HomeAssistant | undefined,
-  statisticId: string,
-): Promise<StatisticsMetadata | undefined> {
-  if (!hass) return Promise.resolve(undefined);
-  let cached = statisticsMetadataCache.get(statisticId);
-  if (!cached) {
-    cached = hass
-      .callWS<StatisticsMetadata[]>({
-        type: 'recorder/get_statistics_metadata',
-        statistic_ids: [statisticId],
-      })
-      .then((metadata) =>
-        Array.isArray(metadata) ? metadata.find((item) => item.statistic_id === statisticId) : undefined,
-      )
-      .catch(() => {
-        statisticsMetadataCache.delete(statisticId);
-        return undefined;
-      });
-    statisticsMetadataCache.set(statisticId, cached);
-  }
-  return cached;
+// Compile user code from the card config (transform, data_generator) into a
+// strict-mode function. Compile once and reuse: it runs per point/refresh.
+export function compileUserFunction<F extends (...args: never[]) => unknown>(
+  params: string[],
+  body: string,
+  isAsync = false,
+): F {
+  const FunctionCtor: FunctionConstructor = isAsync
+    ? Object.getPrototypeOf(async function () {}).constructor
+    : Function;
+  return new FunctionCtor(...params, `'use strict'; ${body}`) as F;
 }
 
 export function computeName(

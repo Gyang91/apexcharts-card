@@ -3,14 +3,13 @@ import {
   ChartCardSeriesConfig,
   EntityCachePoints,
   EntityEntryCache,
-  HassHistory,
   HassHistoryEntry,
   HistoryBuckets,
   HistoryPoint,
-  Statistics,
   StatisticValue,
 } from './types';
-import { compress, decompress, isExternalStatisticId, log } from './utils';
+import { compileUserFunction, compress, decompress, isExternalStatisticId, log } from './utils';
+import { fetchHistory, fetchStatistics } from './recorder';
 import localForage from 'localforage';
 import { HassEntity } from 'home-assistant-js-websocket';
 import { DateRange } from 'moment-range';
@@ -20,6 +19,16 @@ import parse from 'parse-duration';
 import SparkMD5 from 'spark-md5';
 import { ChartCardSpanExtConfig, StatisticsPeriod } from './types-config';
 import * as pjson from '../package.json';
+
+// Signatures of the user functions documented for `transform` and `data_generator`
+type TransformFn = (x: unknown, hass: HomeAssistant | undefined, entity: unknown) => number | null;
+type DataGeneratorFn = (
+  entity: HassEntity | undefined,
+  start: Date,
+  end: Date,
+  hass: HomeAssistant | undefined,
+  momentLib: typeof moment,
+) => Promise<EntityCachePoints>;
 
 export default class GraphEntry {
   private _computedHistory?: EntityCachePoints;
@@ -63,6 +72,11 @@ export default class GraphEntry {
   // Set when span padding is applied: the header/legend must keep showing the
   // last REAL value, not the trailing null padding points.
   private _lastRealState: number | null | undefined = undefined;
+
+  // User functions from the config, compiled on first use
+  private _transformFn?: TransformFn;
+
+  private _dataGeneratorFn?: DataGeneratorFn;
 
   constructor(
     index: number,
@@ -119,6 +133,12 @@ export default class GraphEntry {
 
   get end(): Date {
     return this._realEnd;
+  }
+
+  // Attribute series and transforms (which receive the full history item)
+  // need complete history rows; plain state series only need the states.
+  private get _needsFullHistoryRows(): boolean {
+    return !!(this._config.attribute || this._config.transform);
   }
 
   set cache(cache: boolean) {
@@ -206,14 +226,24 @@ export default class GraphEntry {
   }
 
   public async _updateHistory(start: Date, end: Date): Promise<boolean> {
+    if ((!this._entityState && !this._isExternalStat) || this._updating) return false;
+    this._updating = true;
+    // Always release the lock: a failed fetch must not freeze this series
+    // until the page is reloaded.
+    try {
+      return await this._computeHistory(start, end);
+    } finally {
+      this._updating = false;
+    }
+  }
+
+  private async _computeHistory(start: Date, end: Date): Promise<boolean> {
     let startHistory = new Date(start);
     if (this._config.group_by.func !== 'raw') {
       const range = end.getTime() - start.getTime() + this._groupByOffsetMs;
       const nbBuckets = Math.ceil(range / this._groupByDurationMs);
       startHistory = new Date(end.getTime() + this._groupByOffsetMs - nbBuckets * this._groupByDurationMs);
     }
-    if ((!this._entityState && !this._isExternalStat) || this._updating) return false;
-    this._updating = true;
     this._lastRealState = undefined;
 
     // ignore_history is never set for statistics series (hence never for
@@ -231,7 +261,6 @@ export default class GraphEntry {
       let stateParsed: number | null = parseFloat(currentState as string);
       stateParsed = !Number.isNaN(stateParsed) ? stateParsed : null;
       this._computedHistory = [[new Date(this._entityState.last_updated).getTime(), stateParsed]];
-      this._updating = false;
       return true;
     }
 
@@ -282,7 +311,13 @@ export default class GraphEntry {
       let updateGraphHistory = false;
 
       if (this._config.statistics) {
-        const newHistory = await this._fetchStatistics(fetchStart, fetchEnd, this._config.statistics.period);
+        const newHistory = await fetchStatistics(
+          this._hass,
+          this._entityID,
+          fetchStart,
+          fetchEnd,
+          this._config.statistics.period,
+        );
         if (newHistory && newHistory.length > 0) {
           updateGraphHistory = true;
 
@@ -344,25 +379,24 @@ export default class GraphEntry {
           }
         }
       } else {
-        const newHistory = await this._fetchRecent(
-          fetchStart,
-          fetchEnd,
-          this._config.attribute || this._config.transform ? false : skipInitialState,
-        );
-        if (newHistory && newHistory[0] && newHistory[0].length > 0) {
+        const newHistory = await fetchHistory(this._hass, this._entityID, fetchStart, fetchEnd, {
+          includeStartState: this._needsFullHistoryRows || !skipInitialState,
+          minimal: !this._needsFullHistoryRows,
+        });
+        if (newHistory && newHistory.length > 0) {
           updateGraphHistory = true;
           /*
           hack because HA doesn't return anything if skipInitialState is false
           when retrieving for attributes so we retrieve it and we remove it.
           */
-          if ((this._config.attribute || this._config.transform) && skipInitialState) {
-            newHistory[0].shift();
+          if (this._needsFullHistoryRows && skipInitialState) {
+            newHistory.shift();
           }
           let lastNonNull: number | null = null;
           if (history && history.data && history.data.length > 0) {
             lastNonNull = history.data[history.data.length - 1][1];
           }
-          newStateHistory = newHistory[0].map((item) => {
+          newStateHistory = newHistory.map((item) => {
             let currentState: unknown = null;
             if (this._config.attribute) {
               if (item.attributes && item.attributes[this._config.attribute] !== undefined) {
@@ -410,7 +444,6 @@ export default class GraphEntry {
     }
 
     if (!history || history.data.length === 0) {
-      this._updating = false;
       this._computedHistory = undefined;
       return false;
     }
@@ -425,7 +458,6 @@ export default class GraphEntry {
     } else {
       this._computedHistory = history.data;
     }
-    this._updating = false;
     return true;
   }
 
@@ -514,41 +546,19 @@ export default class GraphEntry {
   }
 
   private _applyTransform(value: unknown, historyItem: HassHistoryEntry | StatisticValue): number | null {
-    return new Function('x', 'hass', 'entity', `'use strict'; ${this._config.transform}`).call(
-      this,
-      value,
-      this._hass,
-      historyItem,
-    );
-  }
-
-  private async _fetchRecent(
-    start: Date | undefined,
-    end: Date | undefined,
-    skipInitialState: boolean,
-  ): Promise<HassHistory | undefined> {
-    let url = 'history/period';
-    if (start) url += `/${start.toISOString()}`;
-    url += `?filter_entity_id=${this._entityID}`;
-    if (end) url += `&end_time=${end.toISOString()}`;
-    if (skipInitialState) url += '&skip_initial_state';
-    url += '&significant_changes_only=0';
-    return this._hass?.callApi('GET', url);
+    this._transformFn ??= compileUserFunction<TransformFn>(['x', 'hass', 'entity'], this._config.transform!);
+    return this._transformFn.call(this, value, this._hass, historyItem);
   }
 
   private async _generateData(start: Date, end: Date): Promise<EntityEntryCache> {
-    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
     let data;
     try {
-      const datafn = new AsyncFunction(
-        'entity',
-        'start',
-        'end',
-        'hass',
-        'moment',
-        `'use strict'; ${this._config.data_generator}`,
+      this._dataGeneratorFn ??= compileUserFunction<DataGeneratorFn>(
+        ['entity', 'start', 'end', 'hass', 'moment'],
+        this._config.data_generator!,
+        true,
       );
-      data = await datafn(this._entityState, start, end, this._hass, moment);
+      data = await this._dataGeneratorFn(this._entityState, start, end, this._hass, moment);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       const funcTrimmed =
@@ -565,24 +575,6 @@ export default class GraphEntry {
       last_fetched: new Date(),
       data,
     };
-  }
-
-  private async _fetchStatistics(
-    start: Date | undefined,
-    end: Date | undefined,
-    period: StatisticsPeriod = DEFAULT_STATISTICS_PERIOD,
-  ): Promise<StatisticValue[] | undefined> {
-    const statistics = await this._hass?.callWS<Statistics>({
-      type: 'recorder/statistics_during_period',
-      start_time: start?.toISOString(),
-      end_time: end?.toISOString(),
-      statistic_ids: [this._entityID],
-      period,
-    });
-    if (statistics && this._entityID in statistics) {
-      return statistics[this._entityID];
-    }
-    return undefined;
   }
 
   private _dataBucketer(history: EntityEntryCache, timeRange: DateRange): HistoryBuckets {

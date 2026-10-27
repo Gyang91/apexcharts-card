@@ -4,7 +4,8 @@
 import '../src/apexcharts-card';
 import GraphEntry from '../src/graphEntry';
 import { mkHass, mkState } from './fixtures/hass';
-import { computeName, computeUom, getStatisticsMetadata, isExternalStatisticId } from '../src/utils';
+import { computeName, computeUom, isExternalStatisticId } from '../src/utils';
+import { getStatisticsMetadata } from '../src/recorder';
 import { getSeriesEntitySchema } from '../src/editor/schemas/series';
 
 const DAY = 24 * 3600 * 1000;

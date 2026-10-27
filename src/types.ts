@@ -82,9 +82,19 @@ export interface StatisticValue {
   change: number | null;
 }
 
-export type HassHistory = Array<[HassHistoryEntry] | undefined>;
+// Row of the `history/history_during_period` websocket response. Timestamps
+// are epoch seconds; `lc` is omitted when equal to `lu`, and `a` is only sent
+// when attributes are requested.
+export interface HassCompressedState {
+  s: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  a?: Record<string, any>;
+  lc?: number;
+  lu: number;
+}
 
 export interface HassHistoryEntry {
+  entity_id?: string;
   last_updated: string;
   state: string;
   last_changed: string;

@@ -189,17 +189,9 @@ describe('statistics span padding (column width fix)', () => {
     const hass = mkHass({
       'sensor.water_meter': mkState('sensor.water_meter', '123.4', { unit_of_measurement: 'm³' }),
     }) as AnyRec;
-    hass.callApi = async () => [
-      [
-        {
-          entity_id: 'sensor.water_meter',
-          state: '0.5',
-          last_changed: new Date(T0 + 13 * DAY + HOUR).toISOString(),
-          last_updated: new Date(T0 + 13 * DAY + HOUR).toISOString(),
-          attributes: {},
-        },
-      ],
-    ];
+    hass.callWS = async () => ({
+      'sensor.water_meter': [{ s: '0.5', lu: (T0 + 13 * DAY + HOUR) / 1000 }],
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     entry.hass = hass as any;
 

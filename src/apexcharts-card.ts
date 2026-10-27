@@ -25,7 +25,6 @@ import {
   formatApexDate,
   getLang,
   getPercentFromValue,
-  getStatisticsMetadata,
   interpolateColor,
   is12Hour,
   isExternalStatisticId,
@@ -43,6 +42,7 @@ import {
   isUsingServerTimezone,
   computeTimezoneDiffWithLocal,
 } from './utils';
+import { getStatisticsMetadata } from './recorder';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions, ApexYAxis } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
