@@ -13,7 +13,7 @@ import {
 import { ChartCardConfig } from './types';
 import type { CalendarPeriod } from './types-config';
 import { computeName, computeUom, getLang, is12Hour, mergeDeep, myFormatNumber, prettyPrintTime } from './utils';
-import { formatPeriod } from './calendar';
+import { formatPeriod, nearestPeriodStart } from './calendar';
 import { layoutMinimal } from './layouts/minimal';
 import { getLocales, getDefaultLocale } from './locales';
 import { t } from './localize';
@@ -235,7 +235,10 @@ function getCommonPeriod(config: ChartCardConfig): CalendarPeriod | undefined {
 // period labels are formatted in the browser's time zone.
 // The x axis passes (value, timestamp); the tooltip passes (value, options).
 function periodFormatter(period: CalendarPeriod, lang: string): (value: number, timestamp?: unknown) => string {
-  return (value, timestamp) => formatPeriod(typeof timestamp === 'number' ? timestamp : value, period, lang, undefined);
+  return (value, timestamp) => {
+    const ts = typeof timestamp === 'number' ? timestamp : value;
+    return formatPeriod(nearestPeriodStart(ts, period, undefined), period, lang, undefined);
+  };
 }
 
 function getXAxis(config: ChartCardConfig, hass: HomeAssistant | undefined) {

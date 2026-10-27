@@ -677,8 +677,10 @@ export default class GraphEntry {
     return buckets;
   }
 
-  private _sum(items: EntityCachePoints): number {
+  private _sum(items: EntityCachePoints): number | null {
     if (items.length === 0) return 0;
+    // A bucket holding only nulls (`fill: null`) has no value, not 0
+    if (items.every((entry) => entry[1] === null)) return null;
     let lastIndex = 0;
     return items.reduce((sum, entry, index) => {
       let val: number;
@@ -713,7 +715,7 @@ export default class GraphEntry {
   private _average(items: EntityCachePoints): number | null {
     const nonNull = this._filterNulls(items);
     if (nonNull.length === 0) return null;
-    return this._sum(nonNull) / nonNull.length;
+    return this._sum(nonNull)! / nonNull.length;
   }
 
   private _minimum(items: EntityCachePoints): number | null {

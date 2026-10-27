@@ -97,6 +97,21 @@ describe('group_by.period', () => {
   });
 });
 
+describe('group_by.func sum with fill: null', () => {
+  it('leaves an empty period without a value instead of 0', async () => {
+    const entry = makeEntry({ func: 'sum', period: 'day' }, [
+      [berlin('2026-10-25T10:00:00', '+01:00'), 2],
+      [berlin('2026-10-27T10:00:00', '+01:00'), 5],
+    ]);
+    await entry._updateHistory(
+      new Date(berlin('2026-10-25T00:00:00', '+02:00')),
+      new Date(berlin('2026-10-28T00:00:00', '+01:00')),
+    );
+
+    expect(entry.history.map(([, v]) => v)).toEqual([2, null, 5]);
+  });
+});
+
 describe('group_by.func time_avg', () => {
   it('weighs each value by how long it was held', async () => {
     const t0 = berlin('2026-07-01T10:00:00', '+02:00');

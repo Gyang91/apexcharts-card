@@ -53,6 +53,16 @@ describe('getLayoutConfig', () => {
     expect(layout.tooltip.x.formatter(july, { seriesIndex: 0, dataPointIndex: 3, w: {} })).toBe('T3 2026');
   });
 
+  it('labels an axis tick placed just before a period boundary with the period that starts there', () => {
+    const config = internalConfig({
+      series: [{ entity: 'sensor.a', group_by: { func: 'sum', period: 'year' } }],
+    });
+    const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+    const tick = new Date('2025-12-31T19:00:00').getTime(); // bar for the year starting 1 Jan 2026
+    expect(layout.xaxis.labels.formatter(tick, tick)).toBe('2026');
+    expect(layout.xaxis.labels.formatter(new Date('2026-01-01T00:00:00').getTime())).toBe('2026');
+  });
+
   it('keeps time labels when series use different periods or none', () => {
     const config = internalConfig({
       series: [

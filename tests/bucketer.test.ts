@@ -64,7 +64,8 @@ describe('group_by bucketing', () => {
     await unsorted._updateHistory(new Date(T0), new Date(T0 + 4 * HOUR));
 
     expect(unsorted.history).toEqual(sorted.history);
-    expect(sorted.history.map(([, v]) => v)).toEqual([4, 0, 8]);
+    // The empty middle hour (fill: null) has no value, not 0
+    expect(sorted.history.map(([, v]) => v)).toEqual([4, null, 8]);
   });
 
   it('buckets a day of 5-second samples quickly', async () => {

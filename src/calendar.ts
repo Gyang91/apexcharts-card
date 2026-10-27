@@ -60,6 +60,16 @@ export function periodBoundaries(
   return boundaries;
 }
 
+// The period boundary closest to `ts`. Chart axis ticks for period buckets
+// can sit slightly before the boundary they stand for (e.g. 31 Dec 19:00 for
+// a year starting 1 Jan): snapping keeps their label on the right period.
+export function nearestPeriodStart(ts: number, period: CalendarPeriod, timeZone: string | undefined): number {
+  const start = startOfPeriod(ts, period, timeZone);
+  const [amount, unit] = periodStep(period);
+  const next = at(start, timeZone).add(amount, unit).valueOf();
+  return ts - start <= next - ts ? start : next;
+}
+
 // Short label of the period starting at `ts`, in the user's language
 export function formatPeriod(ts: number, period: CalendarPeriod, lang: string, timeZone: string | undefined): string {
   const options: Intl.DateTimeFormatOptions = { timeZone };
