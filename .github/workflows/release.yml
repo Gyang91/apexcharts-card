@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write # approve the release pull request's checks
   contents: write
   pull-requests: write
 
@@ -48,6 +49,17 @@ jobs:
           npm ci
           npm test
           npm run build
+      # Checks on a pull request opened by github-actions[bot] wait for approval
+      # and would expire as failed once it is merged: approve them so they run.
+      - name: Approve the release pull request's checks
+        if: ${{ steps.release.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+        run: |
+          for id in $(gh api "repos/${{ github.repository }}/actions/runs?branch=$BRANCH&status=action_required" --jq '.workflow_runs[].id'); do
+            gh api -X POST "repos/${{ github.repository }}/actions/runs/$id/approve" || echo "Could not approve run $id"
+          done
       - name: Merge the release pull request
         if: ${{ steps.release.outputs.pr }}
         env:
