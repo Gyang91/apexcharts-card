@@ -17,14 +17,45 @@ jobs:
   release-please:
     name: Release PR
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
+      release_created: ${{ steps.release.outputs.release_created || steps.auto-release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name || steps.auto-release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version || steps.auto-release.outputs.version }}
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # Release without a manual merge: when release-please opened or updated
+      # its pull request, test that branch, merge it, and run release-please
+      # again to tag the release. A merge made with GITHUB_TOKEN starts no new
+      # workflow run, so tagging has to happen in this one.
+      - uses: actions/checkout@v7
+        if: ${{ steps.release.outputs.pr }}
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+      - uses: actions/setup-node@v7
+        if: ${{ steps.release.outputs.pr }}
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - name: Test the release branch
+        if: ${{ steps.release.outputs.pr }}
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Merge the release pull request
+        if: ${{ steps.release.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge "${{ fromJSON(steps.release.outputs.pr).number }}" --squash --repo "${{ github.repository }}"
+      - uses: googleapis/release-please-action@v5
+        id: auto-release
+        if: ${{ steps.release.outputs.pr }}
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
