@@ -49,6 +49,8 @@ describe('getLayoutConfig', () => {
     const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
     expect(layout.xaxis.labels.formatter(july, july)).toBe('T3 2026'); // mkHass is French
     expect(layout.tooltip.x.formatter(july)).toBe('T3 2026');
+    // ApexCharts passes an options object, not a timestamp, as the tooltip's second argument
+    expect(layout.tooltip.x.formatter(july, { seriesIndex: 0, dataPointIndex: 3, w: {} })).toBe('T3 2026');
   });
 
   it('keeps time labels when series use different periods or none', () => {

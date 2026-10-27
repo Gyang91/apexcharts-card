@@ -233,8 +233,9 @@ function getCommonPeriod(config: ChartCardConfig): CalendarPeriod | undefined {
 
 // Display timestamps are already shifted to the displayed time zone, so
 // period labels are formatted in the browser's time zone.
-function periodFormatter(period: CalendarPeriod, lang: string): (value: number, timestamp?: number) => string {
-  return (value, timestamp) => formatPeriod(timestamp ?? value, period, lang, undefined);
+// The x axis passes (value, timestamp); the tooltip passes (value, options).
+function periodFormatter(period: CalendarPeriod, lang: string): (value: number, timestamp?: unknown) => string {
+  return (value, timestamp) => formatPeriod(typeof timestamp === 'number' ? timestamp : value, period, lang, undefined);
 }
 
 function getXAxis(config: ChartCardConfig, hass: HomeAssistant | undefined) {
