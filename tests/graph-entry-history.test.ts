@@ -232,3 +232,41 @@ describe('update lock', () => {
     await expect(entry._updateHistory(new Date(T0), new Date(T0 + HOUR))).rejects.toThrow('boom');
   });
 });
+
+describe('min and max', () => {
+  const withHistory = (history: unknown[][]): GraphEntry => {
+    const entry = makeEntry(seriesConfig(), async () => ({}));
+    (entry as AnyRec)._computedHistory = history;
+    return entry;
+  };
+
+  it('ignore null values', () => {
+    const entry = withHistory([
+      [T0, null],
+      [T0 + 1, 3],
+      [T0 + 2, -2],
+      [T0 + 3, null],
+      [T0 + 4, 7],
+    ]);
+    expect(entry.min).toBe(-2);
+    expect(entry.max).toBe(7);
+  });
+
+  it('keep the previous results without history or values', () => {
+    expect(withHistory([]).min).toBeUndefined();
+    expect(withHistory([]).max).toBeUndefined();
+    const nulls = withHistory([[T0, null]]);
+    expect(nulls.min).toBe(Infinity);
+    expect(nulls.max).toBe(-Infinity);
+  });
+
+  // Spreading this many values into Math.min/max throws a RangeError
+  it('handle histories beyond the engine argument limit', () => {
+    const history = Array.from({ length: 300_000 }, (_, i) => [T0 + i, i % 1000]);
+    history[150_000] = [T0 + 150_000, -5];
+    history[200_000] = [T0 + 200_000, 5000];
+    const entry = withHistory(history);
+    expect(entry.min).toBe(-5);
+    expect(entry.max).toBe(5000);
+  });
+});

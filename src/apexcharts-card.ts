@@ -11,6 +11,7 @@ import {
   HistoryPoint,
   minmax_type,
   StatisticsMetadata,
+  ActionHandlerDetail,
 } from './types';
 import { handleAction, HomeAssistant } from 'custom-card-helpers';
 import localForage from 'localforage';
@@ -100,6 +101,12 @@ console.info(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).ApexCharts = ApexCharts;
+
+type ThresholdColorFn = (opts: { value: number }) => string;
+
+// Optional `entity` of a tap/hold/double_tap action (ActionConfig does not declare it)
+const actionEntity = (config: ActionsConfig, action: ActionHandlerDetail['action']): string | undefined =>
+  (config[`${action}_action`] as { entity?: string } | undefined)?.entity;
 
 localForage.config({
   name: 'apexchart-card',
@@ -708,7 +715,7 @@ export class ChartsCard extends LitElement {
       role=${ifDefined(classes === 'actions' ? 'button' : undefined)}
       tabindex=${ifDefined(classes === 'actions' ? '0' : undefined)}
       aria-label=${ifDefined(classes === 'actions' ? this._config?.header?.title : undefined)}
-      @action=${(ev) => {
+      @action=${(ev: Event) => {
         this._handleTitleAction(ev);
       }}
       .actionHandler=${actionHandler({
@@ -719,25 +726,25 @@ export class ChartsCard extends LitElement {
           this._config?.header?.title_actions?.hold_action?.action &&
           this._config?.header?.title_actions?.hold_action.action !== 'none',
       })}
-      @focus="${(ev) => {
+      @focus="${(ev: Event) => {
         this.handleRippleFocus(ev, 'title');
       }}"
-      @blur="${(ev) => {
+      @blur="${(ev: Event) => {
         this.handleRippleBlur(ev, 'title');
       }}"
-      @mousedown="${(ev) => {
+      @mousedown="${(ev: Event) => {
         this.handleRippleActivate(ev, 'title');
       }}"
-      @mouseup="${(ev) => {
+      @mouseup="${(ev: Event) => {
         this.handleRippleDeactivate(ev, 'title');
       }}"
-      @touchstart="${(ev) => {
+      @touchstart="${(ev: Event) => {
         this.handleRippleActivate(ev, 'title');
       }}"
-      @touchend="${(ev) => {
+      @touchend="${(ev: Event) => {
         this.handleRippleDeactivate(ev, 'title');
       }}"
-      @touchcancel="${(ev) => {
+      @touchcancel="${(ev: Event) => {
         this.handleRippleDeactivate(ev, 'title');
       }}"
     >
@@ -774,7 +781,7 @@ export class ChartsCard extends LitElement {
                 aria-label=${ifDefined(
                   stateClasses === 'actions' ? computeName(index, this._config?.series, this._entities) : undefined,
                 )}
-                @action=${(ev) => {
+                @action=${(ev: Event) => {
                   this._handleAction(ev, serie);
                 }}
                 .actionHandler=${actionHandler({
@@ -784,25 +791,25 @@ export class ChartsCard extends LitElement {
                   hasHold:
                     serie.header_actions?.hold_action?.action && serie.header_actions?.hold_action.action !== 'none',
                 })}
-                @focus="${(ev) => {
+                @focus="${(ev: Event) => {
                   this.handleRippleFocus(ev, index);
                 }}"
-                @blur="${(ev) => {
+                @blur="${(ev: Event) => {
                   this.handleRippleBlur(ev, index);
                 }}"
-                @mousedown="${(ev) => {
+                @mousedown="${(ev: Event) => {
                   this.handleRippleActivate(ev, index);
                 }}"
-                @mouseup="${(ev) => {
+                @mouseup="${(ev: Event) => {
                   this.handleRippleDeactivate(ev, index);
                 }}"
-                @touchstart="${(ev) => {
+                @touchstart="${(ev: Event) => {
                   this.handleRippleActivate(ev, index);
                 }}"
-                @touchend="${(ev) => {
+                @touchend="${(ev: Event) => {
                   this.handleRippleDeactivate(ev, index);
                 }}"
-                @touchcancel="${(ev) => {
+                @touchcancel="${(ev: Event) => {
                   this.handleRippleDeactivate(ev, index);
                 }}"
               >
@@ -1436,8 +1443,9 @@ export class ChartsCard extends LitElement {
           }
         }
         yaxis.series_id?.forEach((id) => {
+          const apexYAxis = (this._config!.apex_config!.yaxis as ApexYAxis[])[id];
           if (min !== null && yaxis.min_type !== minmax_type.FIXED) {
-            this._config!.apex_config!.yaxis![id].min = this._getMinMaxBasedOnType(
+            apexYAxis.min = this._getMinMaxBasedOnType(
               true,
               min,
               yaxis.min as number,
@@ -1446,7 +1454,7 @@ export class ChartsCard extends LitElement {
             );
           }
           if (max !== null && yaxis.max_type !== minmax_type.FIXED) {
-            this._config!.apex_config!.yaxis![id].max = this._getMinMaxBasedOnType(
+            apexYAxis.max = this._getMinMaxBasedOnType(
               false,
               max,
               yaxis.max as number,
@@ -1499,8 +1507,8 @@ export class ChartsCard extends LitElement {
     throw new Error(t('error.yaxis.badMinMaxFormat', { value }));
   }
 
-  private _computeChartColors(brush: boolean): (string | (({ value }) => string))[] {
-    const defaultColors: (string | (({ value }) => string))[] = computeColors(brush ? this._brushColors : this._colors);
+  private _computeChartColors(brush: boolean): (string | ThresholdColorFn)[] {
+    const defaultColors: (string | ThresholdColorFn)[] = computeColors(brush ? this._brushColors : this._colors);
     const series = brush ? this._config?.series_in_brush : this._config?.series_in_graph;
     series?.forEach((serie, index) => {
       if (
@@ -1511,7 +1519,11 @@ export class ChartsCard extends LitElement {
       ) {
         const colors = this._colors;
 
-        defaultColors[index] = function ({ value }, sortedL = serie.color_threshold!, defColor = colors[index]) {
+        defaultColors[index] = function (
+          { value }: { value: number },
+          sortedL = serie.color_threshold!,
+          defColor = colors[index],
+        ) {
           let returnValue = sortedL[0].color || defColor;
           sortedL.forEach((color) => {
             if (value > color.value) returnValue = color.color || defColor;
@@ -1716,7 +1728,7 @@ export class ChartsCard extends LitElement {
         case 'hold':
         case 'double_tap':
           configDup.entity =
-            configDup[`${ev.detail.action}_action`]?.entity || (isExternalStat ? undefined : serieConfig.entity);
+            actionEntity(configDup, ev.detail.action) || (isExternalStat ? undefined : serieConfig.entity);
 
           handleAction(this, this._hass!, configDup, ev.detail.action);
           break;
@@ -1738,7 +1750,7 @@ export class ChartsCard extends LitElement {
         case 'tap':
         case 'hold':
         case 'double_tap':
-          configDup.entity = configDup[`${ev.detail.action}_action`]?.entity;
+          configDup.entity = actionEntity(configDup, ev.detail.action);
 
           handleAction(this, this._hass!, configDup, ev.detail.action);
           break;
@@ -1756,17 +1768,17 @@ export class ChartsCard extends LitElement {
     if (r && typeof r.startPress === 'function') r.startPress(evt);
   }
 
-  private handleRippleDeactivate(_, index: number | string): void {
+  private handleRippleDeactivate(_: Event, index: number | string): void {
     const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
     if (r && typeof r.endPress === 'function') r.endPress();
   }
 
-  private handleRippleFocus(_, index: number | string): void {
+  private handleRippleFocus(_: Event, index: number | string): void {
     const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
     if (r && typeof r.startFocus === 'function') r.startFocus();
   }
 
-  private handleRippleBlur(_, index: number | string): void {
+  private handleRippleBlur(_: Event, index: number | string): void {
     const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
     if (r && typeof r.endFocus === 'function') r.endFocus();
   }

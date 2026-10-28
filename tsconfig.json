@@ -5,7 +5,6 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
-    "noImplicitAny": false,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "noUnusedLocals": true,

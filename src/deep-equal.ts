@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // From https://github.com/epoberezkin/fast-deep-equal
 // MIT License - Copyright (c) 2017 Evgeny Poberezkin
@@ -58,14 +57,14 @@ export const deepEqual = (a: any, b: any): boolean => {
     }
 
     if (ArrayBuffer.isView(a) && ArrayBuffer.isView(b)) {
-      // @ts-ignore
-      length = a.length;
-      // @ts-ignore
-      if (length !== b.length) {
+      const viewA = a as unknown as ArrayLike<unknown>;
+      const viewB = b as unknown as ArrayLike<unknown>;
+      length = viewA.length;
+      if (length !== viewB.length) {
         return false;
       }
       for (i = length; i-- !== 0;) {
-        if (a[i] !== b[i]) {
+        if (viewA[i] !== viewB[i]) {
           return false;
         }
       }

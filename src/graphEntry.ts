@@ -16,7 +16,7 @@ import { HassEntity } from 'home-assistant-js-websocket';
 import { DEFAULT_STATISTICS_PERIOD, DEFAULT_STATISTICS_TYPE, moment } from './const';
 import parse from 'parse-duration';
 import SparkMD5 from 'spark-md5';
-import { ChartCardSpanExtConfig } from './types-config';
+import { ChartCardSpanExtConfig, GroupByFunc } from './types-config';
 import * as pjson from '../package.json';
 
 // Signatures of the user functions documented for `transform` and `data_generator`
@@ -29,6 +29,8 @@ type DataGeneratorFn = (
   momentLib: typeof moment,
 ) => Promise<EntityCachePoints>;
 
+// Aggregates the points of one bucket covering [start, end)
+type AggregateFn = (items: EntityCachePoints, start: number, end: number) => number | null;
 // Index of the bucket whose [timestamp, next bucket timestamp) contains `ts`,
 // or -1 when `ts` is before the first or at/after the last boundary.
 // `buckets` must be sorted by timestamp.
@@ -67,8 +69,8 @@ export default class GraphEntry {
 
   private _config: ChartCardSeriesConfig;
 
-  // Aggregates the points of one bucket covering [start, end)
-  private _func: (items: EntityCachePoints, start: number, end: number) => number | null;
+  // Undefined for `raw`, which is never bucketed
+  private _func?: AggregateFn;
 
   private _realStart: Date;
 
@@ -103,7 +105,7 @@ export default class GraphEntry {
     config: ChartCardSeriesConfig,
     span: ChartCardSpanExtConfig | undefined,
   ) {
-    const aggregateFuncMap = {
+    const aggregateFuncMap: Partial<Record<GroupByFunc, AggregateFn>> = {
       avg: this._average,
       time_avg: this._timeAverage,
       max: this._maximum,
@@ -190,13 +192,24 @@ export default class GraphEntry {
   }
 
   get min(): number | undefined {
-    if (!this._computedHistory || this._computedHistory.length === 0) return undefined;
-    return Math.min(...this._computedHistory.flatMap((item) => (item[1] === null ? [] : [item[1]])));
+    return this._extremum((value, current) => value < current, Infinity);
   }
 
   get max(): number | undefined {
+    return this._extremum((value, current) => value > current, -Infinity);
+  }
+
+  // Single pass without spreading: long histories exceed the engine's argument limit.
+  // `empty` keeps the previous Math.min/max result when every value is null.
+  private _extremum(isBetter: (value: number, current: number) => boolean, empty: number): number | undefined {
     if (!this._computedHistory || this._computedHistory.length === 0) return undefined;
-    return Math.max(...this._computedHistory.flatMap((item) => (item[1] === null ? [] : [item[1]])));
+    let result: number | undefined;
+    for (const [, value] of this._computedHistory) {
+      if (value === null) continue;
+      if (Number.isNaN(value)) return NaN;
+      if (result === undefined || isBetter(value, result)) result = value;
+    }
+    return result ?? empty;
   }
 
   public minMaxWithTimestamp(
@@ -492,7 +505,7 @@ export default class GraphEntry {
     }
     if (this._config.group_by.func !== 'raw') {
       const res: EntityCachePoints = this._dataBucketer(history, boundaries!, start).map((bucket) => {
-        return [bucket.timestamp, this._func(bucket.data, bucket.timestamp, bucket.end)];
+        return [bucket.timestamp, this._func!(bucket.data, bucket.timestamp, bucket.end)];
       });
       if ([undefined, 'line', 'area'].includes(this._config.type)) {
         while (res.length > 0 && res[0][1] === null) res.shift();

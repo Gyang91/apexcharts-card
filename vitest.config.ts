@@ -18,6 +18,8 @@ export default defineConfig({
         'src/editor/localize.ts',
         'src/editor/apex-config-utils.ts',
         'src/apexcharts-card.ts',
+        'src/graphEntry.ts',
+        'src/recorder.ts',
       ],
       exclude: ['src/types-config-ti.ts'],
     },

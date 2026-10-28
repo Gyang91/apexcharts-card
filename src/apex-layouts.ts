@@ -326,9 +326,17 @@ function getXTooltipFormatter(
       };
 }
 
+// Formatter context passed by ApexCharts; w is untyped in its own definitions
+interface ApexFormatterOpts {
+  seriesIndex: number;
+  dataPointIndex: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  w: any;
+}
+
 function getYTooltipFormatter(config: ChartCardConfig, hass: HomeAssistant | undefined) {
-  return function (value, opts, conf = config, hass2 = hass) {
-    let lValue = value;
+  return function (value: number, opts: ApexFormatterOpts, conf = config, hass2 = hass) {
+    let lValue: number | string | null = value;
     if (conf.series_in_graph[opts.seriesIndex]?.invert && lValue) {
       lValue = -lValue;
     }
@@ -362,7 +370,7 @@ function getDataLabelsFormatter(
   hass: HomeAssistant | undefined,
 ) {
   if (config.chart_type === 'pie' || config.chart_type === 'donut') {
-    return function (value, opts, lgraphs = graphs, conf = config, lHass = hass) {
+    return function (value: number, opts: ApexFormatterOpts, lgraphs = graphs, conf = config, lHass = hass) {
       if (conf.series_in_graph[opts.seriesIndex].show.datalabels !== false) {
         if (conf.series_in_graph[opts.seriesIndex].show.datalabels === 'percent') {
           return myFormatNumber(value, lHass?.locale, conf.series_in_graph[opts.seriesIndex].float_precision);
@@ -376,7 +384,7 @@ function getDataLabelsFormatter(
       return '';
     };
   }
-  return function (value, opts, conf = config, lHass = hass) {
+  return function (value: number | null, opts: ApexFormatterOpts, conf = config, lHass = hass) {
     if (conf.series_in_graph[opts.seriesIndex].show.datalabels === 'total') {
       return myFormatNumber(
         opts.w.globals.stackedSeriesTotals[opts.dataPointIndex],
@@ -401,11 +409,16 @@ function getPlotOptions_radialBar(config: ChartCardConfig, hass: HomeAssistant |
       },
       dataLabels: {
         value: {
-          formatter: function (value, opts, conf = config, lHass = hass) {
+          formatter: function (
+            value: string | number,
+            opts: { config?: { series?: number[] } } | undefined,
+            conf = config,
+            lHass = hass,
+          ) {
             const index = opts?.config?.series?.findIndex((x) => {
-              return parseFloat(value) === x;
+              return parseFloat(String(value)) === x;
             });
-            if (index != -1) {
+            if (index !== undefined && index !== -1) {
               return myFormatNumber(value, lHass?.locale, conf.series_in_graph[index].float_precision) + '%';
             }
             return value;
@@ -419,7 +432,7 @@ function getPlotOptions_radialBar(config: ChartCardConfig, hass: HomeAssistant |
 }
 
 function getLegendFormatter(config: ChartCardConfig, hass: HomeAssistant | undefined) {
-  return function (_, opts, conf = config, hass2 = hass) {
+  return function (_: string, opts: ApexFormatterOpts, conf = config, hass2 = hass) {
     const name = computeName(
       opts.seriesIndex,
       conf.series_in_graph,

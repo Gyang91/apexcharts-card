@@ -30,6 +30,8 @@ export function log(message: unknown): void {
   console.warn('apexcharts-card: ', message);
 }
 
+const isObject = (obj: unknown): boolean => !!obj && typeof obj === 'object';
+
 /**
  * Performs a deep merge of `source` into `target`.
  * Mutates `target` only but not its objects and arrays.
@@ -38,8 +40,6 @@ export function log(message: unknown): void {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mergeDeep(target: any, source: any): any {
-  const isObject = (obj) => obj && typeof obj === 'object';
-
   if (!isObject(target) || !isObject(source)) {
     return source;
   }
@@ -95,7 +95,8 @@ export function computeName(
   if (!name && entity) {
     name = entity.attributes?.friendly_name || entity.entity_id || '';
   } else if (!name && entities) {
-    name = entities[index]?.attributes?.friendly_name || entities[index]?.entity_id || '';
+    const entry = (entities as Record<number, HassEntity | undefined>)[index];
+    name = entry?.attributes?.friendly_name || entry?.entity_id || '';
   }
   if (!name && isExternalStatisticId(series[index].entity)) {
     name = series[index].entity;
@@ -235,8 +236,6 @@ export function mergeConfigTemplates(ll: any, config: ChartCardExternalConfig): 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mergeDeepConfig(target: any, source: any): any {
-  const isObject = (obj) => obj && typeof obj === 'object';
-
   if (!isObject(target) || !isObject(source)) {
     return source;
   }
