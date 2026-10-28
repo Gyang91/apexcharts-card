@@ -43,7 +43,7 @@ jobs:
           ref: ${{ needs.release-please.outputs.tag_name }}
       - uses: actions/setup-node@v7
         with:
-          node-version: '26.12.0'
+          node-version: '26.12.1'
           cache: npm
       - run: npm ci
       - run: npm run build
