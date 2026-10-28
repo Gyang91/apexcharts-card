@@ -1,0 +1,11 @@
+# Vulnerabilities reviewed and accepted for now. OSV-Scanner reports each one
+# again after its ignoreUntil date; npm audit keeps listing them meanwhile.
+
+[[IgnoredVulns]]
+# deepmerge prototype poisoning: deepmerge is only used at build time by
+# @rollup/plugin-node-resolve to merge its own options; it is not part of the
+# card. No fixed deepmerge release exists yet (npm audit's only "fix"
+# downgrades the plugin to 7.x).
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2027-01-31
+reason = "Build-time only (rollup plugin options), not shipped; no fixed release yet"

@@ -3,8 +3,8 @@ name: HACS Validation
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  # No pull_request trigger: HACS validates the published release asset, which
+  # a pull request branch never has, so those runs could only fail.
   # Release commits are validated once the asset is uploaded (Release workflow done).
   workflow_run:
     workflows: [Release]
