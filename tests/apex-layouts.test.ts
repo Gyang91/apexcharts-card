@@ -115,6 +115,31 @@ describe('getLayoutConfig', () => {
     expect(layout.chart.stacked).toBe(true);
   });
 
+  it('initializes hidden time-series by index even with duplicate names and brush-only series', () => {
+    const config = internalConfig({
+      experimental: { brush: true, hidden_by_default: true },
+      series: [
+        { entity: 'sensor.brush', show: { in_chart: false, in_brush: true } },
+        { entity: 'sensor.a', name: 'Same name', show: { hidden_by_default: true, in_brush: true } },
+        { entity: 'sensor.b', name: 'Same name' },
+      ],
+    });
+    const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+    expect(layout.series).toHaveLength(2);
+    expect(layout.series[0]).toMatchObject({ name: 'Same name', hidden: true });
+    expect(layout.series[1].hidden).not.toBe(true);
+    const brush = getBrushLayoutConfig(config, mkHass(), 'main-id') as AnyRec;
+    expect(brush.series.every((serie: { hidden?: boolean }) => !serie.hidden)).toBe(true);
+  });
+
+  it('keeps initially hidden time-series visible when the experimental flag is off', () => {
+    const config = internalConfig({
+      series: [{ entity: 'sensor.a', show: { hidden_by_default: true } }],
+    });
+    const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+    expect(layout.series[0].hidden).not.toBe(true);
+  });
+
   it('apex_config deep-merges over the defaults', () => {
     const layout = getLayoutConfig(
       internalConfig({ apex_config: { grid: { strokeDashArray: 7 }, chart: { height: 321 } } }),
@@ -123,6 +148,47 @@ describe('getLayoutConfig', () => {
     ) as AnyRec;
     expect(layout.grid.strokeDashArray).toBe(7);
     expect(layout.chart.height).toBe(321);
+  });
+
+  it.each(['solid', 'pattern', ['gradient', 'pattern']])(
+    'lets explicit fill type %s override automatic threshold gradients',
+    (type) => {
+      const config = internalConfig({
+        experimental: { color_threshold: true },
+        apex_config: { fill: { type, opacity: 0.4 } },
+        series: [
+          { entity: 'sensor.a', type: 'area', color_threshold: [{ value: 0, color: 'red' }] },
+          { entity: 'sensor.b', type: 'area' },
+        ],
+      });
+      const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+      expect(layout.fill.type).toEqual(type);
+      expect(layout.fill.opacity).toBe(0.4);
+    },
+  );
+
+  it('uses solid defaults for explicit fill settings without a fill type', () => {
+    const config = internalConfig({
+      experimental: { color_threshold: true },
+      apex_config: { fill: { opacity: 0.4 } },
+      series: [{ entity: 'sensor.a', type: 'area', color_threshold: [{ value: 0 }] }],
+    });
+    expect((getLayoutConfig(config, mkHass(), []) as AnyRec).fill.type).toBe('solid');
+  });
+
+  it.each([false, true])('preserves per-series custom fill arrays with thresholds enabled=%s', (enabled) => {
+    const fill = { type: ['solid', 'pattern'], opacity: [0.2, 0.8] };
+    const config = internalConfig({
+      experimental: { brush: true, color_threshold: enabled },
+      apex_config: { fill },
+      brush: { apex_config: { fill } },
+      series: [
+        { entity: 'sensor.a', type: 'area', show: { in_brush: true }, color_threshold: [{ value: 0 }] },
+        { entity: 'sensor.b', type: 'area', show: { in_brush: true } },
+      ],
+    });
+    expect((getLayoutConfig(config, mkHass(), []) as AnyRec).fill).toEqual(fill);
+    expect((getBrushLayoutConfig(config, mkHass(), 'main-id') as AnyRec).fill).toEqual(fill);
   });
 });
 
@@ -135,5 +201,17 @@ describe('getBrushLayoutConfig', () => {
     expect(layout.chart.brush.enabled).toBe(true);
     expect(layout.legend.show).toBe(false);
     expect(layout.tooltip.enabled).toBe(false);
+  });
+
+  it('applies custom brush fill without changing the main threshold fill', () => {
+    const config = internalConfig({
+      experimental: { brush: true, color_threshold: true },
+      brush: { apex_config: { fill: { type: ['pattern'], opacity: 0.3 } } },
+      series: [{ entity: 'sensor.a', type: 'area', show: { in_brush: true }, color_threshold: [{ value: 0 }] }],
+    });
+    expect((getLayoutConfig(config, mkHass(), []) as AnyRec).fill.type).toEqual(['gradient']);
+    const layout = getBrushLayoutConfig(config, mkHass(), 'main-id') as AnyRec;
+    expect(layout.fill.type).toEqual(['pattern']);
+    expect(layout.fill.opacity).toBe(0.3);
   });
 });

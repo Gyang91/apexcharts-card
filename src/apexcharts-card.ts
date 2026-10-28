@@ -179,6 +179,8 @@ export class ChartsCard extends LitElement {
 
   private _yAxisConfig?: ChartCardYAxis[];
 
+  private _hiddenSeries?: Set<number>;
+
   private _serverTimeOffset = 0;
 
   private _resizeObserver?: ResizeObserver;
@@ -247,7 +249,7 @@ export class ChartsCard extends LitElement {
     this._dataLoaded = true;
     this._updating = true;
     this._updateData().then(() => {
-      if (this._config?.experimental?.hidden_by_default) {
+      if (this._config?.experimental?.hidden_by_default && !TIMESERIES_TYPES.includes(this._config.chart_type)) {
         this._config.series_in_graph.forEach((serie, index) => {
           if (serie.show.hidden_by_default) {
             const name = computeName(index, this._config?.series_in_graph, this._entities);
@@ -325,6 +327,7 @@ export class ChartsCard extends LitElement {
   }
 
   private _destroyCharts() {
+    this._hiddenSeries = undefined;
     if (this._apexChart) {
       this._apexChart.destroy();
       this._apexChart = undefined;
@@ -893,6 +896,7 @@ export class ChartsCard extends LitElement {
         this._heightFilled = true;
       }
       chartCfg.chart.redrawOnParentResize = true;
+      this._configureSeriesVisibility(chartCfg);
       if (this._config.series_in_brush.length) {
         chartCfg.chart.id = Math.random().toString(36).substring(7);
       }
@@ -1126,38 +1130,13 @@ export class ChartsCard extends LitElement {
             }),
           ),
         };
-        // graphData.fill = { colors: graphData.colors };
         graphData.legend = { markers: { fillColors: computeColors(this._colors) } };
         graphData.tooltip = { marker: { fillColors: graphData.legend.markers.fillColors } };
-        graphData.fill = {
-          gradient: {
-            type: 'vertical',
-            colorStops: this._config.series_in_graph.map((serie, index) => {
-              if (!serie.color_threshold || ![undefined, 'area', 'line'].includes(serie.type)) return [];
-              const min = this._graphs?.[serie.index]?.min;
-              const max = this._graphs?.[serie.index]?.max;
-              if (min === undefined || max === undefined) return [];
-              return (
-                this._computeFillColorStops(serie, min, max, computeColor(this._colors[index]), serie.invert) || []
-              );
-            }),
-          },
-        };
+        const mainFill = this._computeThresholdFill(false);
+        if (mainFill) graphData.fill = mainFill;
         if (this._apexBrush) {
-          brushData.fill = {
-            gradient: {
-              type: 'vertical',
-              colorStops: this._config.series_in_brush.map((serie, index) => {
-                if (!serie.color_threshold || ![undefined, 'area', 'line'].includes(serie.type)) return [];
-                const min = this._graphs?.[serie.index]?.min;
-                const max = this._graphs?.[serie.index]?.max;
-                if (min === undefined || max === undefined) return [];
-                return (
-                  this._computeFillColorStops(serie, min, max, computeColor(this._colors[index]), serie.invert) || []
-                );
-              }),
-            },
-          };
+          const brushFill = this._computeThresholdFill(true);
+          if (brushFill) brushData.fill = brushFill;
         }
       }
       // graphData.tooltip = { marker: { fillColors: ['#ff0000', '#00ff00'] } };
@@ -1194,18 +1173,23 @@ export class ChartsCard extends LitElement {
             selection: {
               enabled: true,
               xaxis: {
-                min: brushData.xaxis.max - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
+                min: Math.max(
+                  newMinMax.start,
+                  newMinMax.end - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
+                ),
                 max: brushData.xaxis.max,
               },
             },
           };
         } else {
+          const selectionWidth = Math.min(currentMax - currentMin, newMinMax.end - newMinMax.start);
+          const selectionStart = Math.max(newMinMax.start, Math.min(currentMin, newMinMax.end - selectionWidth));
           brushData.chart = {
             selection: {
               enabled: true,
               xaxis: {
-                min: currentMin < newMinMax.start ? newMinMax.start : currentMin,
-                max: currentMin < newMinMax.end ? newMinMax.end + (currentMax - currentMin) : currentMax,
+                min: selectionStart,
+                max: selectionStart + selectionWidth,
               },
             },
           };
@@ -1393,17 +1377,56 @@ export class ChartsCard extends LitElement {
     return {};
   }
 
+  private _configureSeriesVisibility(layout: ApexOptions): void {
+    this._hiddenSeries = new Set(
+      this._config?.series_in_graph
+        .filter((serie) => this._config?.experimental?.hidden_by_default && serie.show.hidden_by_default)
+        .map((serie) => serie.index),
+    );
+    if (
+      !this._config?.experimental?.hidden_by_default ||
+      !this._yAxisConfig ||
+      !TIMESERIES_TYPES.includes(this._config.chart_type) ||
+      layout.plotOptions?.bar?.distributed === true ||
+      layout.legend?.onItemClick?.toggleDataSeries === false
+    ) {
+      return;
+    }
+    layout.chart ??= {};
+    layout.chart.events ??= {};
+    const customLegendClick = layout.chart.events.legendClick;
+    layout.chart.events.legendClick = (chart, index, options) => {
+      customLegendClick?.(chart, index, options);
+      const serie = index === undefined ? undefined : this._config?.series_in_graph[index];
+      if (!serie || chart !== this._apexChart) return;
+      if (this._hiddenSeries!.has(serie.index)) this._hiddenSeries!.delete(serie.index);
+      else this._hiddenSeries!.add(serie.index);
+      window.requestAnimationFrame(() => {
+        if (chart !== this._apexChart) return;
+        const { start, end } = this._getSpanDates();
+        const yaxis = this._computeYAxisAutoMinMax(start, end);
+        chart.updateOptions({ yaxis }, false, false, false).catch(log);
+      });
+    };
+  }
+
   private _computeYAxisAutoMinMax(start: Date, end: Date) {
     if (!this._config) return;
     this._yAxisConfig?.map((yaxis) => {
       if (yaxis.min_type !== minmax_type.FIXED || yaxis.max_type !== minmax_type.FIXED) {
         const minMax = yaxis.series_id?.map((id) => {
-          const lMinMax = this._graphs![id]?.minMaxWithTimestampForYAxis(
-            this._seriesOffset[id] ? new Date(start.getTime() + this._seriesOffset[id]).getTime() : start.getTime(),
-            this._seriesOffset[id] ? new Date(end.getTime() + this._seriesOffset[id]).getTime() : end.getTime(),
+          const serie = this._config!.series_in_graph[id];
+          const hidden = this._hiddenSeries
+            ? this._hiddenSeries.has(serie.index)
+            : this._config?.experimental?.hidden_by_default && serie.show.hidden_by_default;
+          if (hidden) return undefined;
+          const graphIndex = serie.index;
+          const lMinMax = this._graphs![graphIndex]?.minMaxWithTimestampForYAxis(
+            start.getTime() + (this._seriesOffset[graphIndex] || 0),
+            end.getTime() + (this._seriesOffset[graphIndex] || 0),
           );
           if (!lMinMax) return undefined;
-          if (this._config?.series[id].invert) {
+          if (serie.invert) {
             const cmin = lMinMax.min[1];
             const cmax = lMinMax.max[1];
             if (cmin !== null) {
@@ -1444,23 +1467,21 @@ export class ChartsCard extends LitElement {
         }
         yaxis.series_id?.forEach((id) => {
           const apexYAxis = (this._config!.apex_config!.yaxis as ApexYAxis[])[id];
-          if (min !== null && yaxis.min_type !== minmax_type.FIXED) {
-            apexYAxis.min = this._getMinMaxBasedOnType(
-              true,
-              min,
-              yaxis.min as number,
-
-              yaxis.min_type!,
-            );
+          if (yaxis.min_type !== minmax_type.FIXED) {
+            apexYAxis.min =
+              min === null
+                ? yaxis.min_type === minmax_type.SOFT
+                  ? yaxis.min
+                  : undefined
+                : this._getMinMaxBasedOnType(true, min, yaxis.min as number, yaxis.min_type!);
           }
-          if (max !== null && yaxis.max_type !== minmax_type.FIXED) {
-            apexYAxis.max = this._getMinMaxBasedOnType(
-              false,
-              max,
-              yaxis.max as number,
-
-              yaxis.max_type!,
-            );
+          if (yaxis.max_type !== minmax_type.FIXED) {
+            apexYAxis.max =
+              max === null
+                ? yaxis.max_type === minmax_type.SOFT
+                  ? yaxis.max
+                  : undefined
+                : this._getMinMaxBasedOnType(false, max, yaxis.max as number, yaxis.max_type!);
           }
         });
       }
@@ -1508,7 +1529,8 @@ export class ChartsCard extends LitElement {
   }
 
   private _computeChartColors(brush: boolean): (string | ThresholdColorFn)[] {
-    const defaultColors: (string | ThresholdColorFn)[] = computeColors(brush ? this._brushColors : this._colors);
+    const colors = brush ? this._brushColors : this._colors;
+    const defaultColors: (string | ThresholdColorFn)[] = computeColors(colors);
     const series = brush ? this._config?.series_in_brush : this._config?.series_in_graph;
     series?.forEach((serie, index) => {
       if (
@@ -1517,8 +1539,6 @@ export class ChartsCard extends LitElement {
         serie.color_threshold &&
         serie.color_threshold.length > 0
       ) {
-        const colors = this._colors;
-
         defaultColors[index] = function (
           { value }: { value: number },
           sortedL = serie.color_threshold!,
@@ -1532,7 +1552,27 @@ export class ChartsCard extends LitElement {
         };
       }
     });
-    return defaultColors.slice(0, this._config?.series_in_graph.length);
+    return defaultColors.slice(0, series?.length);
+  }
+
+  private _computeThresholdFill(brush: boolean): ApexOptions['fill'] {
+    if (!this._config) return undefined;
+    const customFill = brush ? this._config.brush?.apex_config?.fill : this._config.apex_config?.fill;
+    if (customFill !== undefined) return undefined;
+    const series = brush ? this._config.series_in_brush : this._config.series_in_graph;
+    const colors = brush ? this._brushColors : this._colors;
+    return {
+      gradient: {
+        type: 'vertical',
+        colorStops: series.map((serie, index) => {
+          if (!serie.color_threshold || ![undefined, 'area', 'line'].includes(serie.type)) return [];
+          const min = this._graphs?.[serie.index]?.min;
+          const max = this._graphs?.[serie.index]?.max;
+          if (min === undefined || max === undefined) return [];
+          return this._computeFillColorStops(serie, min, max, computeColor(colors[index]), serie.invert) || [];
+        }),
+      },
+    };
   }
 
   private _computeFillColorStops(
@@ -1541,7 +1581,7 @@ export class ChartsCard extends LitElement {
     max: number,
     defColor: string,
     invert = false,
-  ): { offset: number; color: string; opacity?: number }[] | undefined {
+  ): { offset: number; color: string; opacity: number }[] | undefined {
     if (!serie.color_threshold) return undefined;
     const scale = max - min;
 
@@ -1593,11 +1633,11 @@ export class ChartsCard extends LitElement {
       }
       color = color || new TinyColor(thres.color || defColor).toHexString();
       if ([undefined, 'line'].includes(serie.type)) color = new TinyColor(color).setAlpha(opacity).toHex8String();
+      const position = Math.max(0, Math.min(100, (max - thres.value) * (100 / scale)));
       return [
         {
           color: color || new TinyColor(thres.color || defColor).toHexString(),
-          offset:
-            scale <= 0 ? 0 : invert ? 100 - (max - thres.value) * (100 / scale) : (max - thres.value) * (100 / scale),
+          offset: scale <= 0 ? 0 : invert ? 100 - position : position,
           opacity,
         },
       ];
