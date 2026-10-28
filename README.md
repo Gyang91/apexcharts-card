@@ -1,14 +1,17 @@
-[![License](https://img.shields.io/github/license/foXaCe/apexcharts-card.svg)](LICENSE)
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-![Downloads](https://img.shields.io/github/downloads/foXaCe/apexcharts-card/total)
-![GitHub Activity](https://img.shields.io/github/commit-activity/y/foXaCe/apexcharts-card.svg?label=commits)
-[![Stable](https://img.shields.io/github/release/foXaCe/apexcharts-card.svg)](https://github.com/foXaCe/apexcharts-card/releases/latest)
-[![CI](https://img.shields.io/github/actions/workflow/status/foXaCe/apexcharts-card/ci.yml?branch=main&label=CI)](https://github.com/foXaCe/apexcharts-card/actions/workflows/ci.yml)
+[![Stable](https://img.shields.io/github/v/release/Gyang91/apexcharts-card?label=release)](https://github.com/Gyang91/apexcharts-card/releases/latest)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
+[![CI](https://img.shields.io/github/actions/workflow/status/Gyang91/apexcharts-card/ci.yml?branch=main&label=CI)](https://github.com/Gyang91/apexcharts-card/actions/workflows/ci.yml)
+[![HACS Validation](https://img.shields.io/github/actions/workflow/status/Gyang91/apexcharts-card/hacs.yml?branch=main&label=HACS%20validation)](https://github.com/Gyang91/apexcharts-card/actions/workflows/hacs.yml)
+[![Security audit](https://img.shields.io/github/actions/workflow/status/Gyang91/apexcharts-card/security-audit.yml?branch=main&label=security%20audit)](https://github.com/Gyang91/apexcharts-card/actions/workflows/security-audit.yml)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/Gyang91/apexcharts-card/network/updates)
+[![License](https://img.shields.io/github/license/Gyang91/apexcharts-card.svg)](LICENSE)
+![Downloads](https://img.shields.io/github/downloads/Gyang91/apexcharts-card/total)
+![GitHub Activity](https://img.shields.io/github/commit-activity/y/Gyang91/apexcharts-card.svg?label=commits)
 [![Community Forum](https://img.shields.io/badge/community-forum-brightgreen.svg)](https://community.home-assistant.io/t/apexcharts-card-a-highly-customizable-graph-card/272877)
 
 # ApexCharts Card <!-- omit in toc -->
 
-_Originally created by [@RomRider](https://github.com/RomRider); this is a fork maintained by [@foXaCe](https://github.com/foXaCe)._
+_Originally created by [@RomRider](https://github.com/RomRider) and maintained by [@foXaCe](https://github.com/foXaCe); this fork by [@Gyang91](https://github.com/Gyang91) builds on foXaCe's version. See [What's different in this fork](#whats-different-in-this-fork)._
 
 ![Header](docs/Header.png)
 
@@ -23,6 +26,7 @@ However, some things might be broken :grin:
 
 ## Table of Content <!-- omit in toc -->
 
+- [What's different in this fork](#whats-different-in-this-fork)
 - [Installation](#installation)
   - [HACS (recommended)](#hacs-recommended)
   - [Manual install](#manual-install)
@@ -71,16 +75,36 @@ However, some things might be broken :grin:
   - [Use apexcharts-card with auto-entities](#use-apexcharts-card-with-auto-entities)
   - [Change the height of the graph](#change-the-height-of-the-graph)
 
+## What's different in this fork
+
+Everything documented below keeps working as before; this fork adds:
+
+- **Faster history loading**: recent history comes over Home Assistant's websocket with only the fields a series needs (about 7x smaller for busy sensors), and each series refreshes only what changed since its last point.
+- **Faster statistics**: statistics are shared between cards for 10 minutes, so a card shown again (tabs, visibility conditions) only asks for the current period.
+- **Calendar buckets**: [`group_by.period`](#group_by-options) groups by `hour`, `day`, `week`, `month`, `quarter` or `year` in your time zone, following DST changes and month lengths; the x axis and tooltip then show the period (`Oct 2026`, `Q3 2026`, `2026`).
+- **Time-weighted average**: [`func: time_avg`](#func-options) weighs each value by how long it was held, like Home Assistant's statistics.
+- **Theme-aware defaults**: labels in `--secondary-text-color` with the theme font, grid and axis lines in `--divider-color`.
+- **Smaller card** (about 1.5 MB instead of 2.1 MB): time zone rules come from the browser instead of a bundled database; `moment.tz()` still works in [`data_generator`](#data_generator-option).
+- **Fixes**: no frozen series after a failed request, correct start of slow sensors with cached history, empty `sum` buckets stay empty, correct labels on yearly and quarterly charts.
+- **Maintenance**: automatic releases, CI, CodeQL, a daily dependency audit (npm audit and OSV-Scanner) and Dependabot updates.
+
 ## Installation
 
 ### HACS (recommended)
 
-This card is available in [HACS](https://hacs.xyz/) (Home Assistant Community Store).
+[HACS](https://hacs.xyz/) (Home Assistant Community Store) installs this fork as a custom repository:
+
+1. In HACS, open the menu (⋮) > **Custom repositories**.
+2. Add `https://github.com/Gyang91/apexcharts-card` with the type **Dashboard**.
+3. Open **apexcharts-card** in HACS and **Download** it. HACS adds the dashboard resource for you.
+
+If another apexcharts-card is installed through HACS, remove it first: both use the same folder. HACS checks custom repositories for updates about every 48 hours; **Update information** in the repository's menu checks right away.
+
 <small>_HACS is a third-party community store and is not included in Home Assistant out of the box._</small>
 
 ### Manual install
 
-1. Download and copy `apexcharts-card.js` from the [latest release](https://github.com/foXaCe/apexcharts-card/releases/latest) into your `config/www` directory.
+1. Download and copy `apexcharts-card.js` from the [latest release](https://github.com/Gyang91/apexcharts-card/releases/latest) into your `config/www` directory.
 
 2. Add the resource reference as described below.
 
@@ -91,7 +115,7 @@ This card is available in [HACS](https://hacs.xyz/) (Home Assistant Community St
 2. Grab `apexcharts-card.js`:
 
 ```
-$ wget https://github.com/foXaCe/apexcharts-card/releases/latest/download/apexcharts-card.js
+$ wget https://github.com/Gyang91/apexcharts-card/releases/latest/download/apexcharts-card.js
 ```
 
 3. Add the resource reference as described below.
@@ -102,7 +126,7 @@ If you configure Lovelace via YAML, add a reference to `apexcharts-card.js` insi
 
 ```yaml
 resources:
-  - url: /local/apexcharts-card.js?v=2.2.3
+  - url: /local/apexcharts-card.js?v=2.8.6 # change the version after each update
     type: module
 ```
 
@@ -280,6 +304,8 @@ series:
 | `period` | string | `hour` | v2.0.0 | Period of statistics to pull. Can be one of `5minute`, `hour`, `day`, `week` or `month` |
 | `align` | string | `middle` | v2.0.0 | Align the data points to the `start`, `end` or `middle` of the period of the statistics |
 
+Since v2.8.3, statistics fetched by one card are kept for 10 minutes and shared with the others: a card shown again (tabs, visibility conditions) only asks Home Assistant for the current, still open period.
+
 #### External statistics
 
 Since v2.6.0, `entity` also accepts external long-term statistic IDs (`source:object_id`, e.g. `veolia:1235075_daily_consumption`, as pushed by integrations like Veolia, GRDF or the energy dashboard imports). These have no entity in Home Assistant (no state, no history), only long-term statistics, so:
@@ -342,7 +368,8 @@ The position of the marker will only update when the card updates (state change 
 | Name | Type | Default | Since | Description |
 | ---- | :--: | :-----: | :---: | ----------- |
 | `func` | string | `raw` | v1.0.0 | See [func](#func-options) |
-| `duration` | string | `1h` | v1.0.0 | If `func` is **not** `raw` only. It builds buckets of states over a `duration`. Doesn't work for months. Eg of valid values: `2h`, `1d`, `10s`, `25min`, `1h30`, ... |
+| `duration` | string | `1h` | v1.0.0 | If `func` is **not** `raw` only. It builds buckets of states over a `duration`. Doesn't work for months (use `period`). Eg of valid values: `2h`, `1d`, `10s`, `25min`, `1h30`, ... |
+| `period` | string | | v2.8.0 | If `func` is **not** `raw` only. Builds calendar buckets instead of fixed `duration` ones: `hour`, `day`, `week` (starting Monday), `month`, `quarter` or `year`, in the time zone the dashboard displays. Buckets follow DST changes and month lengths, and replace `duration` and `offset`. When every series of the chart uses the same `period`, the x axis and the tooltip show the period (`Oct 27`, `Oct 2026`, `Q3 2026`, `2026`) |
 | `fill` | string | `last` | v1.0.0 | If `func` is **not** `raw` only. If there is any missing value in the buckets of history data (grouped by duration), `last` will replace them with the last non-empty state, `zero` will fill missing values with `0`, `'null'` will fill missing values with `null` |
 | `start_with_last` | boolean | `false` | v1.8.0 | If `true`, each bucket of data will start with the last value from the previous bucket of data. Mostly useful only with `func: diff` |
 
@@ -352,6 +379,7 @@ The position of the marker will only update when the card updates (state change 
 | ---- | :---: | ----------- |
 | `raw` | v1.0.0 | Displays all the state history as known by Home Assistant |
 | `avg` | v1.0.0 | Will return the average of all the states in each bucket |
+| `time_avg` | v2.8.0 | Will return the average of the states in each bucket weighted by how long each state was held (as Home Assistant's statistics do). A bucket starts with the state held at its start; time after now is not counted |
 | `min` | v1.0.0 | Will return the smallest state of each bucket |
 | `max` | v1.0.0 | Will return the biggest state of each bucket |
 | `last` | v1.0.0 | Will return the last state of each bucket |
@@ -480,7 +508,7 @@ Inside your javascript code, you'll have access to those variables:
 * `start` (Date object): the start Date object of the graph currently displayed
 * `end` (Date object): the end Date object of the graph currently displayed
 * `hass`: the complete `hass` object
-* `moment`: the [Moment.JS](https://momentjs.com/) object to help you manipulate time and dates
+* `moment`: the [Moment.JS](https://momentjs.com/) object to help you manipulate time and dates, including [`moment.tz()`](https://momentjs.com/timezone/docs/) (time zone rules from the browser, names from the IANA database)
 
 Let's take this example:
 * My sensor (`sensor.test`) has this state as its last state:
