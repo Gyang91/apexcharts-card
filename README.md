@@ -934,6 +934,7 @@ Things to know:
 * All the features from a normal series can be applied to the brush series.
 * Brush series keep their own colors and color threshold defaults, even when they differ from the main chart's series.
 * On refresh, a selection at the latest end follows new data. A historical selection stays in place until the history window moves past it; it then moves inside the available range, preserving its width where possible.
+* If the chart's current selection bounds are missing or invalid, the brush resets to the latest range and logs a warning rather than passing invalid coordinates to the chart.
 * You can configure the bottom chart the way you want with another specific `apex_config` also
 * It might be compute-heavy and slow with a lot of history data points
 * It is not recommended to show too much data on the bottom chart for the sake of visibility
