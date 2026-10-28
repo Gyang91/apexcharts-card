@@ -862,7 +862,6 @@ Generates the same result as repeating the configuration in each series:
 If enabled, it might:
 * display the wrong series color in the tooltip in some cases (series with data points not aligned mostly)
 * display thin columns instead of the standard size
-* completely render `apex_config.fill` options unusable, and if you do, it will break the card
 
 Now that you are warned, it works with:
 * `chart_type`: `radialBar`, `line`, `pie`, `donut`
@@ -874,6 +873,8 @@ Some notes:
   * Only the filled area will be displayed with the gradient. It is not possible to do so for the line.
   * It works better with `stroke_width: 1` or `stroke_width: 0`
 * If using `invert: true`, the values in `color_threshold` should stay the same as with `invert: false`.
+* Gradient stops are clipped to the series' value range, interpolating colors and opacity at the boundaries.
+* Explicit `apex_config.fill` settings take precedence over automatic threshold gradients for the entire main chart. The same applies independently to `brush.apex_config.fill` for the brush. Even an empty `fill: {}` opts out of automatic threshold gradients; without a custom fill type, the default is `solid`. Header and column threshold colors remain enabled.
 
 
 And this is how to use it:
@@ -904,7 +905,9 @@ series:
 
 ### `hidden_by_default` experimental feature
 
-Enabling this experimental feature might/will break the auto-scaling and auto-column width feature. Don't open an issue for that. It only works if all the series have a unique name.
+Enabling this experimental feature may affect automatic column widths. Series names should remain unique for legend interactions. Time-series charts apply initial visibility by series index before the first data load, while leaving brush series visible; pie, donut and radialBar charts still hide series by name after loading.
+
+With the experimental flag enabled, custom `yaxis` limits exclude hidden time-series and recalculate after legend toggles without fetching history again. Fixed limits remain fixed; soft limits still apply. If all series on an axis are hidden, automatic limits are cleared and configured soft limits are restored. Changes made directly through the ApexCharts API rather than the legend are not tracked.
 
 This option is useful if you want to hide a series from the chart by default when it's loaded as if you had clicked on the legend to disable this series.
 
@@ -929,6 +932,8 @@ series:
 Things to know:
 * You might have some glitches if you are using colums in either the top or the bottom of the chart. There's nothing I can do about it.
 * All the features from a normal series can be applied to the brush series.
+* Brush series keep their own colors and color threshold defaults, even when they differ from the main chart's series.
+* On refresh, a selection at the latest end follows new data. A historical selection stays in place until the history window moves past it; it then moves inside the available range, preserving its width where possible.
 * You can configure the bottom chart the way you want with another specific `apex_config` also
 * It might be compute-heavy and slow with a lot of history data points
 * It is not recommended to show too much data on the bottom chart for the sake of visibility

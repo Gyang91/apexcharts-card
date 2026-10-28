@@ -189,7 +189,10 @@ export function getBrushLayoutConfig(
   return config.brush?.apex_config ? mergeDeep(def, evalApexConfig(config.brush.apex_config)) : def;
 }
 
-function getFillOpacity(config: ChartCardConfig, brush: boolean): number[] {
+function getFillOpacity(config: ChartCardConfig, brush: boolean): number[] | undefined {
+  const customFill = brush ? config.brush?.apex_config?.fill : config.apex_config?.fill;
+  // Avoid concatenating the default opacity array with an explicit one during merging.
+  if (customFill?.opacity !== undefined) return undefined;
   const series = brush ? config.series_in_brush : config.series_in_graph;
   return series.map((serie) => {
     return serie.opacity !== undefined ? serie.opacity : serie.type === 'area' ? DEFAULT_AREA_OPACITY : 1;
@@ -204,6 +207,7 @@ function getSeries(config: ChartCardConfig, hass: HomeAssistant | undefined, bru
         name: computeName(index, series, undefined, hass?.states[serie.entity]),
         group: config.stacked && serie.type === 'column' ? serie.stack_group : undefined,
         type: serie.type,
+        ...(!brush && config.experimental?.hidden_by_default && serie.show.hidden_by_default ? { hidden: true } : {}),
         data: [],
       };
     });
@@ -519,8 +523,10 @@ function getStrokeDash(config: ChartCardConfig, brush: boolean) {
 }
 
 function getFillType(config: ChartCardConfig, brush: boolean) {
-  if (!config.experimental?.color_threshold) {
-    return brush ? config.brush?.apex_config?.fill?.type || 'solid' : config.apex_config?.fill?.type || 'solid';
+  const customFill = brush ? config.brush?.apex_config?.fill : config.apex_config?.fill;
+  if (!config.experimental?.color_threshold || customFill !== undefined) {
+    // The final apex_config merge applies custom types, including per-series arrays.
+    return 'solid';
   } else {
     const series = brush ? config.series_in_brush : config.series_in_graph;
     return series.map((serie) => {
