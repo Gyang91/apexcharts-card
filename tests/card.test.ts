@@ -346,6 +346,7 @@ describe('apexcharts-card', () => {
       initialized = true,
       previousEnd = 24,
       selectionSpan = '6h',
+      missingAxes = false,
     ) => {
       const card = new (customElements.get('apexcharts-card') as CustomElementConstructor)() as AnyCard;
       card.setConfig({
@@ -367,9 +368,10 @@ describe('apexcharts-card', () => {
         updateOptions: vi.fn().mockResolvedValue(undefined),
       };
       card._apexBrush = {
-        axes: { w: { globals: { maxX: T0 + previousEnd * HOUR } } },
+        axes: { w: { globals: { minX: T0 + (previousEnd - 24) * HOUR, maxX: T0 + previousEnd * HOUR } } },
         updateOptions: vi.fn().mockResolvedValue(undefined),
       };
+      if (missingAxes) delete card._apexChart.axes;
 
       await card._updateData();
 
@@ -412,6 +414,34 @@ describe('apexcharts-card', () => {
 
     it('bounds an initial selection span larger than the available history', async () => {
       expect(await refresh(0, 24, 10, 34, false, 24, '48h')).toEqual([10, 34]);
+    });
+
+    it.each([
+      [NaN, 18],
+      [12, Infinity],
+      [18, 12],
+      [12, 12],
+    ])('resets invalid selection bounds (%s, %s) with a warning', async (min, max) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        expect(await refresh(min, max)).toEqual([28, 34]);
+        expect(warn).toHaveBeenCalledWith(
+          'apexcharts-card: ',
+          'Brush selection bounds are unavailable or invalid; resetting to the latest range.',
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('recovers when the chart has no axes yet', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        expect(await refresh(12, 18, 10, 34, true, 24, '6h', true)).toEqual([28, 34]);
+        expect(warn).toHaveBeenCalledOnce();
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 

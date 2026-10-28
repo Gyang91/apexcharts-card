@@ -1140,15 +1140,9 @@ export class ChartsCard extends LitElement {
         }
       }
       // graphData.tooltip = { marker: { fillColors: ['#ff0000', '#00ff00'] } };
-      const brushIsAtEnd =
-        this._apexBrush &&
-        this._brushInit &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this._apexChart as any).axes?.w?.globals?.maxX === (this._apexBrush as any).axes?.w?.globals?.maxX;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const currentMin = (this._apexChart as any).axes?.w?.globals?.minX;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const currentMax = (this._apexChart as any).axes?.w?.globals?.maxX;
+      const currentRange = this._apexBrush ? this._readChartRange(this._apexChart) : undefined;
+      const brushRange = this._apexBrush ? this._readChartRange(this._apexBrush) : undefined;
+      const brushIsAtEnd = currentRange && brushRange && currentRange.max === brushRange.max;
       this._headerState = [...this._headerState];
       const chartUpdates: Promise<unknown>[] = [];
       chartUpdates.push(
@@ -1168,7 +1162,10 @@ export class ChartsCard extends LitElement {
           min: newMinMax.start,
           max: newMinMax.end,
         };
-        if (brushIsAtEnd || !this._brushInit) {
+        if (this._brushInit && !currentRange) {
+          log('Brush selection bounds are unavailable or invalid; resetting to the latest range.');
+        }
+        if (brushIsAtEnd || !this._brushInit || !currentRange) {
           brushData.chart = {
             selection: {
               enabled: true,
@@ -1182,8 +1179,8 @@ export class ChartsCard extends LitElement {
             },
           };
         } else {
-          const selectionWidth = Math.min(currentMax - currentMin, newMinMax.end - newMinMax.start);
-          const selectionStart = Math.max(newMinMax.start, Math.min(currentMin, newMinMax.end - selectionWidth));
+          const selectionWidth = Math.min(currentRange.max - currentRange.min, newMinMax.end - newMinMax.start);
+          const selectionStart = Math.max(newMinMax.start, Math.min(currentRange.min, newMinMax.end - selectionWidth));
           brushData.chart = {
             selection: {
               enabled: true,
@@ -1205,6 +1202,24 @@ export class ChartsCard extends LitElement {
       log(err);
     }
     this._updating = false;
+  }
+
+  private _readChartRange(chart: ApexCharts): { min: number; max: number } | undefined {
+    // ApexCharts exposes these bounds internally, not in its public type definitions.
+    const globals = (chart as ApexCharts & { axes?: { w?: { globals?: { minX?: unknown; maxX?: unknown } } } }).axes?.w
+      ?.globals;
+    const min = globals?.minX;
+    const max = globals?.maxX;
+    if (
+      typeof min !== 'number' ||
+      typeof max !== 'number' ||
+      !Number.isFinite(min) ||
+      !Number.isFinite(max) ||
+      min >= max
+    ) {
+      return undefined;
+    }
+    return { min, max };
   }
 
   private _computeAnnotations(start: Date, end: Date, now: Date) {
