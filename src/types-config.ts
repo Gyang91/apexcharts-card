@@ -30,6 +30,7 @@ export interface ChartCardExternalConfig {
     version?: boolean;
   };
   cache?: boolean;
+  downsample?: boolean;
   stacked?: boolean;
   layout?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

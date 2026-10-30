@@ -36,6 +36,7 @@ export const ChartCardExternalConfig = t.iface([], {
     "version": t.opt("boolean"),
   })),
   "cache": t.opt("boolean"),
+  "downsample": t.opt("boolean"),
   "stacked": t.opt("boolean"),
   "layout": t.opt("string"),
   "apex_config": t.opt("any"),

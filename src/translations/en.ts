@@ -1,6 +1,9 @@
 export const en: Record<string, string> = {
   // ── Card runtime ──
   'card.loading': 'Loading...',
+  'field.downsample': 'Reduce rendered points',
+  'helper.downsample':
+    'Optional width-aware line/area sampling. Calculations retain full history; zoom and brush restore local detail.',
   'card.warning.entityNotAvailable': 'Entity not available: {entity}',
   'card.warning.initializationFailed':
     'Chart could not start. Reload the dashboard to retry; details are in the browser console.',

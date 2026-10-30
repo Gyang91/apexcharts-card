@@ -21,6 +21,7 @@ export default defineConfig({
         'src/apexcharts-card.ts',
         'src/graphEntry.ts',
         'src/recorder.ts',
+        'src/downsample.ts',
       ],
       exclude: ['src/types-config-ti.ts'],
     },
