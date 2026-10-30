@@ -2,6 +2,16 @@ export const fr: Record<string, string> = {
   // ── Runtime de la carte ──
   'card.loading': 'Chargement…',
   'card.warning.entityNotAvailable': 'Entité indisponible : {entity}',
+  'card.warning.initializationFailed':
+    'Le graphique n’a pas pu démarrer. Rechargez le tableau de bord ; les détails sont dans la console du navigateur.',
+  'card.warning.refreshFailed':
+    'Échec de l’actualisation. Les données affichées peuvent être anciennes ; les détails sont dans la console du navigateur.',
+  'card.warning.historyFailed':
+    'Impossible de charger les données de {entity}. Vérifiez la connexion à Home Assistant, recorder et la configuration de la série ; les détails sont dans la console du navigateur. Les données affichées peuvent être anciennes.',
+  'card.warning.noHistory':
+    'Aucune donnée numérique sur cette période. Vérifiez l’historique recorder, la période et les transformations.',
+  'card.warning.noStatistics':
+    'Aucune statistique numérique sur cette période. Vérifiez l’identifiant, le type de statistique et les statistiques Home Assistant.',
 
   // ── Erreurs de configuration (affichées dans la carte d'erreur HA) ──
   'error.span.startEnd': "span : une seule des options 'start' ou 'end' est autorisée.",

@@ -153,6 +153,18 @@ export class ChartsCard extends LitElement {
 
   private _intervalTimeout?: ReturnType<typeof setTimeout>;
 
+  private _updateTimeout?: ReturnType<typeof setTimeout>;
+
+  private _lifecycle = 0;
+
+  private _initializing?: number;
+
+  private _historyUpdate?: Promise<PromiseSettledResult<boolean | undefined>[]>;
+
+  @property({ attribute: false }) private _loadError?: string;
+
+  @property({ type: Boolean }) private _empty = false;
+
   private _colors: string[] = [];
 
   private _brushColors: string[] = [];
@@ -188,10 +200,12 @@ export class ChartsCard extends LitElement {
   // Whether the main chart currently has a fill height, so leaving fill mode can undo it.
   private _heightFilled = false;
 
+  private _lastChartSize?: { width: number; height?: number };
+
   // Set by HA: 'grid' in a sections view.
   @property({ attribute: false }) public layout?: string;
 
-  @property({ attribute: false }) _lastUpdated: Date = new Date();
+  @property({ attribute: false }) _lastUpdated?: Date;
 
   @property({ type: Boolean }) private _warning = false;
 
@@ -215,14 +229,10 @@ export class ChartsCard extends LitElement {
   }
 
   disconnectedCallback() {
-    if (this._intervalTimeout) {
+    if (this._intervalTimeout !== undefined) {
       clearInterval(this._intervalTimeout);
+      this._intervalTimeout = undefined;
     }
-    if (this._resizeObserver) {
-      this._resizeObserver.disconnect();
-      this._resizeObserver = undefined;
-    }
-    this._updating = false;
     // ApexCharts adds a window resize listener that only destroy() removes, so a chart left
     // alive here keeps the whole card in memory after HA discards it (dashboard save or
     // navigation). connectedCallback rebuilds it, and the resize observer, via _initialLoad().
@@ -231,7 +241,7 @@ export class ChartsCard extends LitElement {
   }
 
   private _updateOnInterval(): void {
-    if (!this._updating && this._hass) {
+    if (this.isConnected && this._apexChart && !this._warning && !this._updating && this._hass) {
       this._updating = true;
       this._updateData();
     }
@@ -239,7 +249,7 @@ export class ChartsCard extends LitElement {
 
   protected updated(changedProperties: PropertyValues) {
     super.updated(changedProperties);
-    if (this._config && this._hass && this.isConnected && !this._loaded) {
+    if (this._config && this._hass && this.isConnected && !this._loaded && !this._loadError) {
       this._initialLoad();
     }
   }
@@ -248,7 +258,9 @@ export class ChartsCard extends LitElement {
     if (this._updating || this._dataLoaded || !this._apexChart || !this._config || !this._hass) return;
     this._dataLoaded = true;
     this._updating = true;
+    const chart = this._apexChart;
     this._updateData().then(() => {
+      if (this._apexChart !== chart) return;
       if (this._config?.experimental?.hidden_by_default && !TIMESERIES_TYPES.includes(this._config.chart_type)) {
         this._config.series_in_graph.forEach((serie, index) => {
           if (serie.show.hidden_by_default) {
@@ -316,37 +328,52 @@ export class ChartsCard extends LitElement {
         if (!this._dataLoaded) {
           this._firstDataLoad();
         } else {
-          this._updating = true;
-          // give time to HA's recorder component to write the data in the history
-          setTimeout(() => {
-            this._updateData();
-          }, this._updateDelay);
+          if (this.isConnected) {
+            this._updating = true;
+            // Give HA's recorder time to write history; disconnect cancels this delay.
+            this._updateTimeout = setTimeout(() => {
+              this._updateTimeout = undefined;
+              this._updating = false;
+              this._updateOnInterval();
+            }, this._updateDelay);
+          }
         }
       }
     }
   }
 
   private _destroyCharts() {
+    this._lifecycle++;
+    this._initializing = undefined;
+    if (this._updateTimeout !== undefined) {
+      clearTimeout(this._updateTimeout);
+      this._updateTimeout = undefined;
+    }
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = undefined;
+    this._loaded = false;
+    this._dataLoaded = false;
+    this._updating = false;
+    this._loadError = undefined;
+    this._empty = false;
+    this._serverTimeOffset = 0;
+    this._heightFilled = false;
+    this._lastChartSize = undefined;
     this._hiddenSeries = undefined;
     if (this._apexChart) {
       this._apexChart.destroy();
       this._apexChart = undefined;
-      this._loaded = false;
-      this._dataLoaded = false;
-      this._updating = false;
-      this._serverTimeOffset = 0;
-      this._heightFilled = false;
-      if (this._apexBrush) {
-        this._apexBrush.destroy();
-        this._apexBrush = undefined;
-        this._brushInit = false;
-      }
     }
+    if (this._apexBrush) {
+      this._apexBrush.destroy();
+      this._apexBrush = undefined;
+    }
+    this._brushInit = false;
   }
 
   private _reset() {
     this._destroyCharts();
-    if (this._config && this._hass && !this._loaded) {
+    if (this.isConnected && this._config && this._hass && !this._loaded) {
       this._initialLoad();
     }
   }
@@ -672,6 +699,20 @@ export class ChartsCard extends LitElement {
 
     return html`
       <ha-card header=${ifDefined(standardHeaderTitle)} class=${classMap(haCardClasses)}>
+        ${
+          this._loadError || this._empty
+            ? html`<div class="data-status" role="status" aria-live="polite">
+                ${
+                  this._loadError ||
+                  t(
+                    this._config.series_in_graph.every((serie) => serie.statistics)
+                      ? 'card.warning.noStatistics'
+                      : 'card.warning.noHistory',
+                  )
+                }
+              </div>`
+            : ''
+        }
         <div id="spinner-wrapper">
           <div id="spinner" class=${classMap(spinnerClass)}>
             <div></div>
@@ -876,7 +917,7 @@ export class ChartsCard extends LitElement {
   }
 
   private _renderLastUpdated(): TemplateResult {
-    if (this._config?.show?.last_updated) {
+    if (this._config?.show?.last_updated && this._lastUpdated) {
       return html` <div id="last_updated">${formatApexDate(this._config, this._hass, this._lastUpdated, true)}</div> `;
     }
     return html``;
@@ -890,68 +931,91 @@ export class ChartsCard extends LitElement {
   }
 
   private async _initialLoad() {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    await this.updateComplete;
-    if (isUsingServerTimezone(this._hass)) {
-      this._serverTimeOffset = computeTimezoneDiffWithLocal(this._hass?.config.time_zone);
-    }
-    // Disconnected while waiting: building the chart now would leak it.
-    if (!this.isConnected) return;
-    const graph = this.shadowRoot?.querySelector<HTMLElement>('#graph');
-    const brush = this.shadowRoot?.querySelector<HTMLElement>('#brush');
-    if (!this._apexChart && graph && this._config) {
-      this._loaded = true;
-      let chartWidth = graph.clientWidth;
-      if (chartWidth < 50) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        await this.updateComplete;
-        chartWidth = graph.clientWidth;
+    const lifecycle = this._lifecycle;
+    if (this._initializing === lifecycle) return;
+    this._initializing = lifecycle;
+    const current = () => this.isConnected && this._lifecycle === lifecycle;
+    try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await this.updateComplete;
+      if (!current()) return;
+      if (isUsingServerTimezone(this._hass)) {
+        this._serverTimeOffset = computeTimezoneDiffWithLocal(this._hass?.config.time_zone);
+      }
+      const graph = this.shadowRoot?.querySelector<HTMLElement>('#graph');
+      const brush = this.shadowRoot?.querySelector<HTMLElement>('#brush');
+      if (!this._apexChart && graph && this._config) {
+        this._loaded = true;
+        let chartWidth = graph.clientWidth;
         if (chartWidth < 50) {
-          chartWidth = graph.parentElement?.clientWidth || chartWidth;
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          await this.updateComplete;
+          if (!current()) return;
+          chartWidth = graph.clientWidth;
+          if (chartWidth < 50) {
+            chartWidth = graph.parentElement?.clientWidth || chartWidth;
+          }
         }
-      }
-      // Resolve external statistics names/units before the layout is built so
-      // legends and tooltips pick them up on first render.
-      await this._applyExternalStatisticsMetadata();
-      const layout = getLayoutConfig(this._config, this._hass, this._graphs);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const chartCfg: any = layout;
-      chartCfg.chart.width = chartWidth > 50 ? chartWidth : '100%';
-      const fillHeight = this._chartFillHeight(graph);
-      if (fillHeight !== undefined) {
-        chartCfg.chart.height = fillHeight;
-        this._heightFilled = true;
-      }
-      chartCfg.chart.redrawOnParentResize = true;
-      this._configureSeriesVisibility(chartCfg);
-      if (this._config.series_in_brush.length) {
-        chartCfg.chart.id = Math.random().toString(36).substring(7);
-      }
-      this._apexChart = new ApexCharts(graph, chartCfg);
-      const promises: Promise<unknown>[] = [];
-      promises.push(this._apexChart.render());
-      if (this._config.series_in_brush.length && brush) {
-        const brushCfg = getBrushLayoutConfig(this._config, this._hass, chartCfg.chart.id);
+        // Resolve external statistics names/units before the layout is built so
+        // legends and tooltips pick them up on first render.
+        await this._applyExternalStatisticsMetadata();
+        if (!current()) return;
+        const layout = getLayoutConfig(this._config, this._hass, this._graphs);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (brushCfg as any).chart.redrawOnParentResize = true;
-        this._apexBrush = new ApexCharts(brush, brushCfg as ApexOptions);
-        promises.push(this._apexBrush.render());
+        const chartCfg: any = layout;
+        chartCfg.chart.width = chartWidth > 50 ? chartWidth : '100%';
+        const fillHeight = this._chartFillHeight(graph);
+        if (fillHeight !== undefined) {
+          chartCfg.chart.height = fillHeight;
+          this._heightFilled = true;
+        }
+        chartCfg.chart.redrawOnParentResize = true;
+        this._configureSeriesVisibility(chartCfg);
+        if (this._config.series_in_brush.length) {
+          chartCfg.chart.id = Math.random().toString(36).substring(7);
+        }
+        this._apexChart = new ApexCharts(graph, chartCfg);
+        const promises: Promise<unknown>[] = [];
+        promises.push(this._apexChart.render());
+        if (this._config.series_in_brush.length && brush) {
+          const brushCfg = getBrushLayoutConfig(this._config, this._hass, chartCfg.chart.id);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (brushCfg as any).chart.redrawOnParentResize = true;
+          this._apexBrush = new ApexCharts(brush, brushCfg as ApexOptions);
+          promises.push(this._apexBrush.render());
+        }
+        const renders = await Promise.allSettled(promises);
+        if (!current()) return;
+        const failure = renders.find((result) => result.status === 'rejected');
+        if (failure?.status === 'rejected') throw failure.reason;
+        if (graph && this._apexChart) {
+          this._resizeObserver = new ResizeObserver(() => {
+            if (current()) this._resizeCharts(graph);
+          });
+          this._resizeObserver.observe(graph);
+          if (brush && this._apexBrush) this._resizeObserver.observe(brush);
+        }
+        this._firstDataLoad();
       }
-      await Promise.all(promises);
-      if (graph && this._apexChart) {
-        this._resizeObserver = new ResizeObserver(() => this._resizeCharts(graph));
-        this._resizeObserver.observe(graph);
-        if (brush && this._apexBrush) this._resizeObserver.observe(brush);
+    } catch (err) {
+      if (current()) {
+        log(err);
+        this._destroyCharts();
+        this._loadError = t('card.warning.initializationFailed');
       }
-      this._firstDataLoad();
+    } finally {
+      if (this._initializing === lifecycle) this._initializing = undefined;
     }
   }
 
   private _resizeCharts(graph: HTMLElement): void {
     const width = graph.clientWidth;
-    if (width <= 50) return;
+    if (width <= 50 || !this._apexChart) return;
     const chart: { width: number; height?: number | string } = { width };
     const height = this._chartFillHeight(graph);
+    if (this._lastChartSize?.width === width && this._lastChartSize.height === height) return;
+    const size = { width, height };
+    this._lastChartSize = size;
     if (height !== undefined) {
       chart.height = height;
       this._heightFilled = true;
@@ -960,8 +1024,12 @@ export class ChartsCard extends LitElement {
       chart.height = 'auto';
       this._heightFilled = false;
     }
-    this._apexChart?.updateOptions({ chart }, false, true);
-    this._apexBrush?.updateOptions({ chart: { width } }, false, true);
+    const onError = (error: unknown) => {
+      if (this._lastChartSize === size) this._lastChartSize = undefined;
+      log(error);
+    };
+    Promise.resolve(this._apexChart.updateOptions({ chart }, false, true)).catch(onError);
+    Promise.resolve(this._apexBrush?.updateOptions({ chart: { width } }, false, true)).catch(onError);
   }
 
   // A sections cell only has a fixed height when rows is a number. 'auto' rows size to the
@@ -1001,11 +1069,14 @@ export class ChartsCard extends LitElement {
   // (cached per ID); fallback is the raw statistic ID.
   private async _applyExternalStatisticsMetadata(): Promise<void> {
     if (!this._config || !this._hass) return;
+    const config = this._config;
+    const lifecycle = this._lifecycle;
     if (!this._config.series.some((serie) => isExternalStatisticId(serie.entity))) return;
     await Promise.all(
       this._config.series.map(async (serie, index) => {
         if (!isExternalStatisticId(serie.entity)) return;
         const metadata = await getStatisticsMetadata(this._hass, serie.entity);
+        if (this._config !== config || this._lifecycle !== lifecycle) return;
         if (!serie.name && metadata?.name) serie.name = metadata.name;
         if (!serie.unit && metadata?.statistics_unit_of_measurement) {
           serie.unit = metadata.statistics_unit_of_measurement;
@@ -1013,19 +1084,28 @@ export class ChartsCard extends LitElement {
         this._entities[index] = this._buildExternalStatisticEntity(serie.entity, metadata);
       }),
     );
-    this._entities = [...this._entities];
+    if (this._config === config && this._lifecycle === lifecycle) this._entities = [...this._entities];
   }
 
   private async _updateData() {
-    if (!this._config || !this._apexChart || !this._graphs) return;
+    if (!this._config || !this._apexChart || !this._graphs) {
+      this._updating = false;
+      return;
+    }
 
+    const chart = this._apexChart;
+    const lifecycle = this._lifecycle;
+    const current = () => this._apexChart === chart && this._lifecycle === lifecycle;
     const { start, end } = this._getSpanDates();
     const now = new Date();
-    this._lastUpdated = now;
     const editMode = getLovelace()?.editMode;
 
     const caching = editMode === true ? false : this._config!.cache;
+    let errorMessage = t('card.warning.refreshFailed');
     try {
+      // Reusing GraphEntry while its previous fetch is pending would skip the new refresh.
+      await this._historyUpdate;
+      if (!current()) return;
       const promise = this._graphs.map((graph, index) => {
         if (graph) graph.cache = caching;
         return graph?._updateHistory(
@@ -1033,10 +1113,19 @@ export class ChartsCard extends LitElement {
           this._seriesOffset[index] ? new Date(end.getTime() + this._seriesOffset[index]) : end,
         );
       });
-      await Promise.all(promise);
+      const historyUpdate = Promise.allSettled(promise);
+      this._historyUpdate = historyUpdate;
+      const results = await historyUpdate;
+      if (this._historyUpdate === historyUpdate) this._historyUpdate = undefined;
       // The chart was destroyed (card disconnected) while history loaded. Leave _updating
       // alone: disconnect already reset it and a reconnect may have started a fresh load.
-      if (!this._apexChart) return;
+      if (!current()) return;
+      const failedIndex = results.findIndex((result) => result.status === 'rejected');
+      if (failedIndex !== -1) {
+        errorMessage = t('card.warning.historyFailed', { entity: this._config.series[failedIndex].entity });
+        const failure = results[failedIndex];
+        if (failure.status === 'rejected') throw failure.reason;
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let graphData: any = { series: [] };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1144,6 +1233,16 @@ export class ChartsCard extends LitElement {
           }),
         };
       }
+      if (TIMESERIES_TYPES.includes(this._config.chart_type) && this._config.experimental?.hidden_by_default) {
+        // Partial series updates otherwise inherit the original hidden flag in ApexCharts.
+        graphData.series = graphData.series.map((series: { hidden?: boolean }, index: number) => {
+          const config = this._config!.series_in_graph[index];
+          return {
+            ...series,
+            hidden: this._hiddenSeries ? this._hiddenSeries.has(config.index) : config.show.hidden_by_default === true,
+          };
+        });
+      }
       graphData.colors = this._computeChartColors(false);
       if (this._apexBrush) {
         brushData.colors = this._computeChartColors(true);
@@ -1224,11 +1323,25 @@ export class ChartsCard extends LitElement {
         this._brushInit = true;
         chartUpdates.push(this._apexBrush?.updateOptions(brushData, false, false));
       }
-      await Promise.all(chartUpdates);
+      const updates = await Promise.allSettled(chartUpdates);
+      if (!current()) return;
+      const failure = updates.find((result) => result.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
+      this._lastUpdated = now;
+      this._loadError = undefined;
+      this._empty =
+        this._config.series_in_graph.length > 0 &&
+        !this._config.series_in_graph.some((serie) =>
+          this._graphs?.[serie.index]?.history.some(([, value]) => value !== null && Number.isFinite(value)),
+        );
     } catch (err) {
-      log(err);
+      if (current()) {
+        log(err);
+        this._loadError = errorMessage;
+      }
+    } finally {
+      if (current()) this._updating = false;
     }
-    this._updating = false;
   }
 
   private _readChartRange(chart: ApexCharts): { min: number; max: number } | undefined {
@@ -1427,7 +1540,6 @@ export class ChartsCard extends LitElement {
     );
     if (
       !this._config?.experimental?.hidden_by_default ||
-      !this._yAxisConfig ||
       !TIMESERIES_TYPES.includes(this._config.chart_type) ||
       layout.plotOptions?.bar?.distributed === true ||
       layout.legend?.onItemClick?.toggleDataSeries === false
@@ -1443,6 +1555,7 @@ export class ChartsCard extends LitElement {
       if (!serie || chart !== this._apexChart) return;
       if (this._hiddenSeries!.has(serie.index)) this._hiddenSeries!.delete(serie.index);
       else this._hiddenSeries!.add(serie.index);
+      if (!this._yAxisConfig) return;
       window.requestAnimationFrame(() => {
         if (chart !== this._apexChart) return;
         const { start, end } = this._getSpanDates();

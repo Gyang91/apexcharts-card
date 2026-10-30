@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --primary-text-color: #222;
+        --secondary-text-color: #555;
+        --primary-color: #03a9f4;
+        --card-background-color: #fff;
+        --divider-color: #ddd;
+      }
+      body {
+        margin: 0;
+        font-family: sans-serif;
+      }
+      #dashboard {
+        width: min(100%, 700px);
+      }
+    </style>
+  </head>
+  <body>
+    <main id="dashboard"></main>
+    <script type="module">
+      import '/card.js';
+      customElements.define(
+        'ha-card',
+        class extends HTMLElement {
+          constructor() {
+            super();
+            this.attachShadow({ mode: 'open' }).innerHTML = '<style>:host { display: block; }</style><slot></slot>';
+          }
+        },
+      );
+      window.fixture = { fail: false, empty: false, zero: false };
+      window.makeCard = (extra = {}) => {
+        const card = document.createElement('apexcharts-card');
+        const state = {
+          entity_id: 'sensor.temp',
+          state: '12',
+          attributes: { friendly_name: 'Temperature', unit_of_measurement: '°C' },
+          last_changed: new Date().toISOString(),
+          last_updated: new Date().toISOString(),
+          context: { id: 'test', parent_id: null, user_id: null },
+        };
+        card.setConfig({
+          type: 'custom:apexcharts-card',
+          update_delay: '0s',
+          header: { show: true, title: 'Test chart', show_states: true },
+          apex_config: { chart: { animations: { enabled: false } } },
+          series: [
+            {
+              entity: 'sensor.temp',
+              data_generator: `
+                if (window.fixture.fail) throw new Error('test data failure');
+                if (window.fixture.empty) return [];
+                return Array.from({length: 200}, (_, i) =>
+                  [start.getTime() + i * (end.getTime() - start.getTime()) / 199, window.fixture.zero ? 0 : 12 + Math.sin(i / 10)]);
+              `,
+            },
+          ],
+          ...extra,
+        });
+        card.hass = {
+          language: 'en',
+          locale: { language: 'en', number_format: 'decimal', time_format: '24' },
+          config: { time_zone: 'UTC' },
+          themes: { darkMode: false },
+          states: { 'sensor.temp': state },
+          callWS: async () => {
+            throw new Error('Unexpected Home Assistant request in generated-data fixture');
+          },
+        };
+        return card;
+      };
+      window.ready = true;
+    </script>
+  </body>
+</html>

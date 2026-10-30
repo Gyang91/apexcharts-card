@@ -159,7 +159,23 @@ describe('apexcharts-card', () => {
         true,
       );
       card._resizeCharts(graph(170));
-      expect(card._apexChart.updateOptions).toHaveBeenLastCalledWith({ chart: { width: 400 } }, false, true);
+      expect(card._apexChart.updateOptions).toHaveBeenCalledTimes(2);
+      expect(card._apexBrush.updateOptions).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not redraw either chart for unchanged observer dimensions', () => {
+      const card = withCharts(cardWith({ grid_options: { rows: 4 } }, 'grid'));
+      card._resizeCharts(graph(208));
+      card._resizeCharts(graph(208));
+      expect(card._apexChart.updateOptions).toHaveBeenCalledOnce();
+      expect(card._apexBrush.updateOptions).toHaveBeenCalledOnce();
+      card._resizeCharts(graph(220));
+      expect(card._apexChart.updateOptions).toHaveBeenCalledTimes(2);
+      expect(card._apexChart.updateOptions).toHaveBeenLastCalledWith(
+        { chart: { width: 400, height: 220 } },
+        false,
+        true,
+      );
     });
 
     it('leaves the height alone for auto rows', () => {
