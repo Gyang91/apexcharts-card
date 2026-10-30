@@ -14,6 +14,16 @@ interface ChartTypeOption {
 function getOptions(): ChartTypeOption[] {
   return [
     {
+      value: 'rangeArea',
+      labelKey: 'general.chartType.rangeArea',
+      icon: 'M3 3H5V19H21V21H3V3M7 8L11 5L15 9L20 6V13L15 16L11 12L7 15V8Z',
+    },
+    {
+      value: 'heatmap',
+      labelKey: 'general.chartType.heatmap',
+      icon: 'M3 3H8V8H3V3M10 3H15V8H10V3M17 3H22V8H17V3M3 10H8V15H3V10M10 10H15V15H10V10M17 10H22V15H17V10M3 17H8V22H3V17M10 17H15V22H10V17M17 17H22V22H17V17Z',
+    },
+    {
       value: 'line',
       labelKey: 'series.chartType.line',
       icon: 'M2,3H4.5V20H2V3M21.5,3H19V20H21.5V3M16.5,8V20H14V8H16.5M7,12V20H9.5V12H7M12,15V20H14.5V15H12Z',

@@ -1,6 +1,42 @@
 import { css, CSSResultGroup } from 'lit';
 
 export const stylesApex: CSSResultGroup = css`
+  .time-navigation {
+    padding: 8px 12px;
+    color: var(--secondary-text-color);
+  }
+  .time-navigation-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .time-navigation button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 10px;
+    cursor: pointer;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font: inherit;
+  }
+  .time-navigation button[aria-pressed='true'] {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+  .time-navigation button:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+  .time-navigation button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .time-navigation-range {
+    margin-top: 6px;
+    font-size: 0.85em;
+  }
   :host {
     display: block;
     container-type: inline-size;

@@ -175,6 +175,10 @@ export default class GraphEntry {
     this._cache = this._config.statistics ? false : cache;
   }
 
+  public resetHistory(): void {
+    this._memoryHistory = undefined;
+  }
+
   get lastState(): number | null {
     if (this._lastRealState !== undefined) return this._lastRealState;
     return this.history.length > 0 ? this.history[this.history.length - 1][1] : null;

@@ -37,6 +37,13 @@ export const ChartCardExternalConfig = t.iface([], {
   })),
   "cache": t.opt("boolean"),
   "downsample": t.opt("boolean"),
+  "navigation": t.opt(t.iface([], {
+    "show": t.opt("boolean"),
+    "initial": t.opt("NavigationPeriod"),
+  })),
+  "heatmap": t.opt(t.iface([], {
+    "max_cells": t.opt("number"),
+  })),
   "stacked": t.opt("boolean"),
   "layout": t.opt("string"),
   "apex_config": t.opt("any"),
@@ -57,7 +64,9 @@ export const ChartCardExternalConfig = t.iface([], {
   "yaxis": t.opt(t.array("ChartCardYAxisExternal")),
 });
 
-export const ChartCardChartType = t.union(t.lit('line'), t.lit('scatter'), t.lit('pie'), t.lit('donut'), t.lit('radialBar'));
+export const ChartCardChartType = t.union(t.lit('line'), t.lit('scatter'), t.lit('pie'), t.lit('donut'), t.lit('radialBar'), t.lit('rangeArea'), t.lit('heatmap'));
+
+export const NavigationPeriod = t.union(t.lit('day'), t.lit('week'), t.lit('month'));
 
 export const ChartCardBrushExtConfig = t.iface([], {
   "selection_span": t.opt("string"),
@@ -247,6 +256,7 @@ export const ActionConfig = t.union("ToggleActionConfig", "CallServiceActionConf
 const exportedTypeSuite: t.ITypeSuite = {
   ChartCardExternalConfig,
   ChartCardChartType,
+  NavigationPeriod,
   ChartCardBrushExtConfig,
   ChartCardSpanExtConfig,
   ChartCardStartEnd,

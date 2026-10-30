@@ -104,6 +104,27 @@ export function getLayoutConfig(
     },
   };
 
+  if (config.chart_type === 'rangeArea' || config.chart_type === 'heatmap') {
+    const names = config.series_in_graph.map((serie, index) =>
+      computeName(index, config.series_in_graph, undefined, hass?.states[serie.entity]),
+    );
+    const visual: Record<string, unknown> = {
+      series:
+        config.chart_type === 'rangeArea'
+          ? [{ name: names.join(' - '), data: [] }]
+          : names.map((name) => ({ name, data: [] })),
+      legend: { show: false },
+      dataLabels: { enabled: false },
+      stroke: { width: config.chart_type === 'rangeArea' ? 1 : 0, curve: 'straight' },
+      fill: { type: 'solid', opacity: config.chart_type === 'rangeArea' ? 0.3 : 1 },
+      tooltip: { shared: false },
+    };
+    if (config.chart_type === 'heatmap') {
+      visual.plotOptions = { heatmap: { radius: 2, enableShades: true, distributed: false } };
+    }
+    return mergeDeep(mergeDeep(def, visual), config.apex_config ? evalApexConfig(config.apex_config) : {});
+  }
+
   let conf = {};
   switch (config.layout) {
     case 'minimal':

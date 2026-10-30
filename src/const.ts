@@ -47,7 +47,7 @@ export const DEFAULT_COLORS = [
 ];
 
 export const NO_VALUE = 'N/A';
-export const TIMESERIES_TYPES = ['line', 'scatter', undefined];
+export const TIMESERIES_TYPES = ['line', 'scatter', 'rangeArea', 'heatmap', undefined];
 export const PLAIN_COLOR_TYPES = ['scatter', 'radialBar', 'pie', 'donut'];
 
 export const DEFAULT_MIN = 0;

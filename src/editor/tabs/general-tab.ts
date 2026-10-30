@@ -17,6 +17,7 @@ import '../components/bool-grid';
 import { BoolField } from '../components/bool-grid';
 import { HaFormSchema } from '../types';
 import { t } from '../localize';
+import { applyPreset, EditorPreset } from '../presets';
 
 interface FormData {
   graph_span?: string;
@@ -159,6 +160,31 @@ export class ApexChartsCardEditorGeneral extends LitElement {
     );
   };
 
+  private _applyPreset(preset: EditorPreset): void {
+    if (!this.config) return;
+    this.dispatchEvent(
+      new CustomEvent('config-changed', {
+        detail: { config: applyPreset(this.config, preset) },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _navigationChanged = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    if (!this.config) return;
+    const config = { ...this.config, navigation: { ...this.config.navigation, show: ev.detail.value } };
+    if (ev.detail.value) delete config.span;
+    this.dispatchEvent(
+      new CustomEvent('config-changed', {
+        detail: { config },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
   protected render(): TemplateResult {
     if (!this.config || !this.hass) return html``;
     const data = this._formData();
@@ -177,6 +203,27 @@ export class ApexChartsCardEditorGeneral extends LitElement {
     ];
     return html`
       <div class="section">
+        <div class="preset-actions">
+          <strong>${t('preset.title')}</strong>
+          <p>${t('preset.helper')}</p>
+          ${(['temperature', 'power', 'consumption'] as const).map(
+            (preset) => html`
+              <button type="button" @click=${() => this._applyPreset(preset)}>${t(`preset.${preset}`)}</button>
+            `,
+          )}
+        </div>
+        <apexcharts-card-bool-grid
+          .fields=${[
+            {
+              name: 'navigation',
+              label: t('field.navigation'),
+              helper: t('helper.navigation'),
+              value: this.config.navigation?.show ?? false,
+            },
+          ]}
+          .columns=${1}
+          @value-changed=${this._navigationChanged}
+        ></apexcharts-card-bool-grid>
         <div>
           <div style="font-size: 0.85em; color: var(--secondary-text-color); margin-bottom: 4px;">
             ${t('general.chartType')}

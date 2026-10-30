@@ -1,6 +1,21 @@
 import { css } from 'lit';
 
 export const editorStyles = css`
+  .preset-actions button {
+    min-height: 44px;
+    margin: 4px;
+    padding: 8px 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    cursor: pointer;
+    font: inherit;
+  }
+  .preset-actions p {
+    color: var(--secondary-text-color);
+    font-size: 0.9em;
+  }
   :host {
     display: block;
   }

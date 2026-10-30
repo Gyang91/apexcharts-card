@@ -31,6 +31,13 @@ export interface ChartCardExternalConfig {
   };
   cache?: boolean;
   downsample?: boolean;
+  navigation?: {
+    show?: boolean;
+    initial?: NavigationPeriod;
+  };
+  heatmap?: {
+    max_cells?: number;
+  };
   stacked?: boolean;
   layout?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,7 +67,9 @@ export interface ChartCardExternalConfig {
   yaxis?: ChartCardYAxisExternal[];
 }
 
-export type ChartCardChartType = 'line' | 'scatter' | 'pie' | 'donut' | 'radialBar';
+export type ChartCardChartType = 'line' | 'scatter' | 'pie' | 'donut' | 'radialBar' | 'rangeArea' | 'heatmap';
+
+export type NavigationPeriod = 'day' | 'week' | 'month';
 
 export interface ChartCardBrushExtConfig {
   selection_span?: string;
