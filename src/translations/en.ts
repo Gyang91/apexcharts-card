@@ -1,4 +1,34 @@
 export const en: Record<string, string> = {
+  'navigation.label': 'Chart time range',
+  'navigation.previous': 'Previous period',
+  'navigation.next': 'Next period',
+  'navigation.current': 'Current',
+  'error.navigation.span': 'navigation.show cannot be combined with span; navigation uses calendar boundaries.',
+  'error.navigation.timeline': 'Navigation requires a timeline chart.',
+  'field.navigation': 'Calendar navigation',
+  'helper.navigation':
+    'Day/week/month and previous/next controls. Replaces span settings; uses dashboard timezone and ISO weeks.',
+  'preset.title': 'Apply a starter preset',
+  'preset.helper':
+    'Explicitly replaces chart type, time span and series aggregation. Keeps your entities, units, transforms and advanced settings. Consumption requires an energy counter with HA sum statistics; never use it for instantaneous power.',
+  'preset.temperature': 'Apply temperature',
+  'preset.power': 'Apply power',
+  'preset.consumption': 'Apply consumption',
+  'general.chartType.rangeArea': 'Range band',
+  'general.chartType.heatmap': 'Heatmap',
+  'error.visual.options':
+    'Range bands and heatmaps do not support stacking, brush, custom yaxis, color thresholds or initially hidden series.',
+  'error.visual.series':
+    'Range bands and heatmaps require visible, non-inverted series without extrema, data labels, thresholds or yaxis_id.',
+  'error.visual.pair': 'rangeArea requires exactly two series: lower bound first, upper bound second.',
+  'error.visual.timestamps':
+    'Visual data timestamps must be finite, unique and ascending. Align both bounds to the same buckets.',
+  'error.visual.bounds': 'A range lower bound exceeds its upper bound. Check source data and transformations.',
+  'error.heatmap.limit': 'heatmap.max_cells must be an integer from 1 to 2048.',
+  'error.heatmap.budget':
+    'Heatmap exceeds {limit} cells. Shorten the range or use coarser statistics/group_by buckets.',
+  'error.heatmap.aggregation': 'Each heatmap series requires statistics or non-raw group_by aggregation.',
+  'error.heatmap.type': 'heatmap options require chart_type: heatmap.',
   // ── Card runtime ──
   'card.loading': 'Loading...',
   'field.downsample': 'Reduce rendered points',

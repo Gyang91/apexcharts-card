@@ -1,4 +1,34 @@
 export const fr: Record<string, string> = {
+  'navigation.label': 'Période du graphique',
+  'navigation.previous': 'Période précédente',
+  'navigation.next': 'Période suivante',
+  'navigation.current': 'Actuelle',
+  'error.navigation.span':
+    'navigation.show ne peut pas être combiné avec span ; la navigation utilise les limites du calendrier.',
+  'error.navigation.timeline': 'La navigation exige un graphique chronologique.',
+  'field.navigation': 'Navigation calendrier',
+  'helper.navigation':
+    'Commandes jour/semaine/mois et précédent/suivant. Remplace span ; fuseau du tableau de bord et semaines ISO.',
+  'preset.title': 'Appliquer un préréglage',
+  'preset.helper':
+    'Remplace explicitement type, période et agrégation. Conserve entités, unités, transformations et réglages avancés. La consommation exige un compteur énergie avec statistiques sum, pas une puissance instantanée.',
+  'preset.temperature': 'Appliquer température',
+  'preset.power': 'Appliquer puissance',
+  'preset.consumption': 'Appliquer consommation',
+  'general.chartType.rangeArea': 'Bande de valeurs',
+  'general.chartType.heatmap': 'Carte de chaleur',
+  'error.visual.options':
+    'Les bandes et cartes de chaleur ne prennent pas en charge empilement, brush, yaxis personnalisé, seuils ou séries masquées.',
+  'error.visual.series':
+    'Ces graphiques exigent des séries visibles, non inversées, sans extrema, étiquettes, seuils ou yaxis_id.',
+  'error.visual.pair': 'rangeArea exige deux séries : limite basse puis limite haute.',
+  'error.visual.timestamps':
+    'Les dates doivent être finies, uniques et croissantes. Alignez les limites sur les mêmes intervalles.',
+  'error.visual.bounds': 'Une limite basse dépasse la limite haute. Vérifiez les données et transformations.',
+  'error.heatmap.limit': 'heatmap.max_cells doit être un entier de 1 à 2048.',
+  'error.heatmap.budget': 'La carte dépasse {limit} cellules. Réduisez la période ou agrégez davantage.',
+  'error.heatmap.aggregation': 'Chaque série exige statistics ou une agrégation group_by non raw.',
+  'error.heatmap.type': 'Les options heatmap exigent chart_type: heatmap.',
   // ── Runtime de la carte ──
   'card.loading': 'Chargement…',
   'field.downsample': 'Réduire les points affichés',

@@ -46,6 +46,10 @@ The optional-downsampling scenarios also generate 100,000 points, compare full-d
 
 Recorder unit regressions check concurrent request counts, connection/range/wire-option separation, attribute isolation, retry behavior, ten-minute expiry and cache eviction at 64 entries or 32,000 statistics rows. Eviction must not truncate returned statistics. Adaptive rendering must not alter numerical calculations or install sampling work for unsupported/disabled configurations.
 
+The roadmap scenarios (`npm run test:browser -- roadmap`) cover calendar navigation/reconnects, touch-emulated statistics navigation, explicit editor presets, range-band gaps/crossed-bound recovery, and bounded heatmaps with missing cells. Unit regressions cover DST, ISO weeks, leap months, backward-history cache resets, exact cell budgets and rejection before history requests. These tests use fixtures, not a live HA instance.
+
+To deliberately refresh the four generated-data README screenshots in PowerShell, build first, then run `$env:UPDATE_DOC_IMAGES='1'; npm run test:browser -- roadmap; Remove-Item Env:UPDATE_DOC_IMAGES`. Normal test runs and CI do not rewrite documentation images. Review the pictures before committing them; the screenshots illustrate features, not real HA measurements.
+
 `npm run check:bundle` enforces ceilings of 1,550,000 bytes raw and 450,000 bytes gzip (level 9). These are explicit review budgets, not a claim about HA's HTTP compression. Investigate growth before adjusting them. No additional runtime dependency is needed for either measurement.
 
 Before completing a reliability milestone, also test real HA entity/statistics data, dashboard navigation, connection recovery and a representative lower-powered device. Simulated browser tests cannot establish compatibility with every HA version or guarantee the absence of defects.

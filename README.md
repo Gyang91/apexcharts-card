@@ -17,16 +17,21 @@ _Originally created by [@RomRider](https://github.com/RomRider) and maintained b
 
 This is a highly customizable graph card for [Home-Assistant](https://www.home-assistant.io)'s Lovelace UI.<br/>
 
-It is based on [ApexCharts.js](https://apexcharts.com) and offers most of the features of the library.
+It is based on [ApexCharts.js](https://apexcharts.com), with Home Assistant history, statistics, calendar navigation and a visual editor. The focus is useful dashboard charts with lightweight, reliable data handling—not full ApexCharts.js parity.
 
 It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/mini-graph-card) by [@kalkih](https://github.com/kalkih)
 
 
-However, some things might be broken :grin:
+New features are optional. Automated regression and real-browser checks protect existing configurations; real HA/device validation remains important.
 
 ## Table of Content <!-- omit in toc -->
 
 - [What's different in this fork](#whats-different-in-this-fork)
+- [Feature guide](#feature-guide)
+- [Calendar navigation](#calendar-navigation)
+- [Visual-editor starter presets](#visual-editor-starter-presets)
+- [Range-area bands](#range-area-bands)
+- [Bounded heatmaps](#bounded-heatmaps)
 - [Reliability and data status](#reliability-and-data-status)
 - [Large-history performance](#large-history-performance)
 - [Installation](#installation)
@@ -90,6 +95,158 @@ Everything documented below keeps working as before; this fork adds:
 - **Smaller card** (about 1.5 MB instead of 2.1 MB): time zone rules come from the browser instead of a bundled database; `moment.tz()` still works in [`data_generator`](#data_generator-option).
 - **Fixes**: no frozen series after a failed request, correct start of slow sensors with cached history, empty `sum` buckets stay empty, correct labels on yearly and quarterly charts.
 - **Maintenance**: automatic releases, CI, CodeQL, a daily dependency audit (npm audit and OSV-Scanner) and Dependabot updates.
+- **Adaptive large-history rendering**: opt-in [`downsample`](#large-history-performance) retains spikes/gaps and restores local detail on zoom, brush selection and resize without fetching history again.
+- **Calendar navigation**: optional day/week/month, previous/next and current-period controls, following the dashboard time zone.
+- **Explicit editor presets**: temperature, power and consumption starters without replacing your entity IDs.
+- **Selected visual insights**: paired range-area bands and aggregated heatmaps with enforced cell budgets, using the existing ApexCharts runtime.
+
+## Feature guide
+
+| What you want to understand | Use | Data / performance guidance |
+| --- | --- | --- |
+| Temperature, humidity, power over time | Line/area chart, optional [sampling](#large-history-performance) | Use `avg` or `time_avg` for appropriate state aggregation; sampling changes only rendered detail. |
+| Energy consumed per day | Column chart with [`statistics.type: change`](#statistics-options) | Use an energy counter with sum statistics, not a power sensor or cumulative `sum` values as daily consumption. |
+| Compare different units | [Multiple Y axes](#yaxis-options-multi-y-axis), optional log scale | Keep units explicit; logarithmic domains must be positive. |
+| Explore previous days or months | [Calendar navigation](#calendar-navigation) | Fetches only on normal refresh or explicit navigation; does not add polling. |
+| Configure common charts quickly | [Editor starter presets](#visual-editor-starter-presets) | Explicit action; review the aggregation and source requirements before saving. |
+| See a min/max or forecast envelope | [Range-area bands](#range-area-bands) | Two supplied bounds with matching timestamps; no forecasting engine. |
+| Spot hourly/daily patterns across rooms | [Bounded heatmaps](#bounded-heatmaps) | Aggregate first; default 512 cells, hard maximum 2,048. Missing cells are not zero. |
+
+The screenshots below are actual card/editor renders from generated browser fixtures, **not live HA measurements**. Chart examples show colorful light/dark variants, like the existing gallery. Colors can be selected per series with `color` or through `color_list`. Existing chart examples remain in [Examples](#examples-1).
+
+## Calendar navigation
+
+![Calendar navigation with day/week/month presets, previous/next buttons and the selected date range](docs/calendar-navigation.png)
+
+Enable **Calendar navigation** in the visual editor's General tab, or configure:
+
+```yaml
+type: custom:apexcharts-card
+navigation:
+  show: true
+  initial: week
+series:
+  - entity: sensor.living_room_temperature
+    group_by:
+      func: avg
+      duration: 1h
+      fill: null
+```
+
+- `navigation.show` defaults to `false`; `navigation.initial` defaults to `day` and accepts `day`, `week`, `month`.
+- Periods are complete calendar days, ISO weeks (Monday start) or months in the dashboard's display time zone. DST days can be 23/25 hours; months are not fixed 30-day windows.
+- **Previous/next** moves by one selected calendar period. **Current** returns to the current period. Selecting day/week/month also returns to its current period. Future periods are allowed for integration-supplied forecasts.
+- When enabled, navigation determines the requested range instead of `graph_span`. Combining it with `span` is rejected to avoid ambiguous offsets; enabling the editor switch removes existing `span` settings.
+- Works with timeline charts, including statistics, range bands and heatmaps. Buttons have keyboard focus styles, labels, 44px touch targets and busy-state disabling.
+- Changing range discards the series' incremental history before loading the new range. Navigation does not retain a growing cache of visited periods or add polling. Shared statistics caches remain bounded. Dense month views should use suitable statistics/grouping and optional sampling.
+- Returning to a dashboard preserves the selected period within the same card instance; a new card/configuration starts at `initial`. Header actions and sensor values retain their documented behavior.
+
+For energy navigation, choose your **energy counter** and use `statistics: {type: change, period: day, align: start}` with `type: column`. The navigation controls do not automatically change aggregation or convert power into energy.
+
+## Visual-editor starter presets
+
+![Explicit temperature, power and consumption preset buttons with source-data guidance](docs/editor-presets.png)
+
+In the visual editor's **General** tab, choose an **Apply** button:
+
+| Preset | Chart / range | Source handling |
+| --- | --- | --- |
+| Temperature | Line, 24 hours | Five-minute `avg` history buckets with null gaps; external statistic IDs use hourly `mean`. |
+| Power | Line, 24 hours | The same lightweight average configuration; values stay in the source unit (for example W). No energy integration or unit conversion. |
+| Consumption | Columns, 7 days | Daily statistics `change`, aligned to the middle of the bucket. Requires an energy counter with HA sum statistics. |
+
+Presets run **only when clicked**. They replace chart type, `graph_span` and series aggregation/statistics, remove heatmap options, and preserve entity IDs, names, units, transforms, actions and other advanced settings. Shared aggregation defaults in `all_series_config` are removed so they cannot silently override the preset. Existing calendar navigation still takes precedence over `graph_span`.
+
+These are starter configurations, not automatic sensor classification. Choose the correct entities first and review advanced overrides afterward. A consumption preset cannot make a power sensor produce valid energy statistics.
+
+## Range-area bands
+
+![A lower and upper temperature envelope with a deliberately missing interval](docs/range-band.png)
+
+Use `chart_type: rangeArea` for one lower/upper envelope. Exactly two numeric source series are required: **lower first, upper second**. They can come from history, statistics, transformed attributes or an integration-fed `data_generator`.
+
+```yaml
+type: custom:apexcharts-card
+chart_type: rangeArea
+graph_span: 7d
+header:
+  show: true
+  title: Daily temperature envelope
+  show_states: true
+series:
+  - entity: sensor.outdoor_temperature
+    name: Minimum
+    statistics:
+      type: min
+      period: day
+      align: start
+  - entity: sensor.outdoor_temperature
+    name: Maximum
+    statistics:
+      type: max
+      period: day
+      align: start
+```
+
+The card pairs **exact timestamps**, retaining numeric zero. A missing/null/non-finite bound leaves a gap; it does not interpolate, swap inverted bounds or invent forecasts. Duplicate/unsorted timestamps and lower values above upper values produce an actionable error while keeping the previous successful chart. Both source values remain available in the header.
+
+Use the **same unit and aligned buckets** for both sources. For comfort limits, supply lower/upper attributes or generator data at common timestamps. For forecast uncertainty, use bounds already supplied by an integration. Native `apex_config.yaxis` can set a single axis' limits; this dedicated band mode does not support mixed line overlays, multiple bands, card-managed multi-axes, stacking, brush, initially hidden series, thresholds, inversion, extrema annotations or data labels. `extend_to` is disabled so the card cannot invent a trailing bound. Sampling is not applied.
+
+## Bounded heatmaps
+
+![Hourly aggregated room temperatures with a blank cell for missing data](docs/heatmap.png)
+
+Each configured series is a row; timestamps form the columns. Use `chart_type: heatmap` with `statistics` or non-raw `group_by` on **every** series:
+
+```yaml
+type: custom:apexcharts-card
+chart_type: heatmap
+graph_span: 24h
+heatmap:
+  max_cells: 512
+header:
+  show: true
+  title: Room temperatures by hour
+series:
+  - entity: sensor.living_room_temperature
+    name: Living room
+    group_by:
+      func: avg
+      duration: 1h
+      fill: null
+  - entity: sensor.bedroom_temperature
+    name: Bedroom
+    group_by:
+      func: avg
+      duration: 1h
+      fill: null
+```
+
+For energy patterns, use energy counters with `statistics: {type: change, period: hour, align: start}`. For occupancy, transform the source state into numeric 0/1 and use an appropriate aggregate; `avg` of event samples is not a time-occupancy percentage—use `time_avg` when you need time weighting.
+
+The screenshot uses explicit temperature colors (blue/teal/yellow/orange), rather than the default single-color intensity scale. Add this optional block to the example above to get those bands; adapt the thresholds to your units and use case:
+
+```yaml
+apex_config:
+  plotOptions:
+    heatmap:
+      enableShades: false
+      colorScale:
+        ranges:
+          - {from: -100, to: 14.999, color: '#3498db', name: Cool}
+          - {from: 15, to: 17.999, color: '#00bfa5', name: Mild}
+          - {from: 18, to: 20.999, color: '#ffca28', name: Comfort}
+          - {from: 21, to: 100, color: '#ff7043', name: Warm}
+```
+
+- `heatmap.max_cells` defaults to **512**, configurable from **1 to 2,048**. The limit is rows multiplied by the union of timestamp columns, including missing cells.
+- Oversized projected bucket ranges are rejected **before recorder requests**. Actual aligned data is checked again before rendering. An error asks for a shorter range/coarser aggregation; nothing is silently truncated.
+- Missing/non-finite cells are omitted from painting, not colored as zero. Zero remains valid. Use matching aggregation periods, alignments and units for meaningful cross-row comparison.
+- Heatmaps use a shared numeric color scale by default; per-row colors or native `apex_config.plotOptions.heatmap.colorScale` ranges can customize it. Rows compare entities, rather than automatically pivoting one entity into a day-by-hour calendar.
+- Native datetime cells preserve timestamp spacing. A selected month with hourly buckets may exceed the budget: switch to daily statistics/grouping or a shorter range.
+- Card-managed multi-axes, stacking, brush, initially hidden series, thresholds, inversion, extrema annotations and data labels are deliberately excluded. No sampling or automatic unit conversion is performed, and `extend_to` is disabled.
+
+Neither visual mode adds a runtime library, forecasting service or extra polling. Cell limits bound heatmap rendering, **not every possible source-history response**; prefer long-term statistics for large ranges.
 
 ## Reliability and data status
 
@@ -219,6 +376,8 @@ The card strictly validates all the options available (but not for the `apex_con
 | `hours_12` | boolean | | v1.8.0 | If undefined, it will follow Home-Assistant's user time format. If `true`, it will force time to be displayed in 12h format. If `false` it will force the time to be displayed in 24h format. |
 | `cache` | boolean | `true` | v1.0.0 | Use in-browser data caching to reduce the load on Home Assistant's server |
 | `downsample` | boolean | `false` | v2.11.0 | Optional width-aware line/area sampling with adaptive zoom/brush detail. Calculations retain full history. See [Large-history performance](#large-history-performance) for exclusions and trade-offs. |
+| `navigation` | object | | v2.12.0 | Optional calendar controls: `{show: true, initial: day}`. See [Calendar navigation](#calendar-navigation). |
+| `heatmap` | object | | v2.12.0 | Heatmap cell budget: `{max_cells: 512}`; hard maximum 2,048. Requires `chart_type: heatmap`. See [Bounded heatmaps](#bounded-heatmaps). |
 | `stacked` | boolean | `false` | v1.0.0 | Enable if you want the data to be stacked on the graph |
 | `layout` | string | | v1.0.0 | See [layouts](#layouts) |
 | `header` | object | | v1.0.0 | See [header](#header-options) |
@@ -443,6 +602,8 @@ The position of the marker will only update when the card updates (state change 
 | ---- | :---: | ----------- |
 | `line` | v1.0.0 | This is the default and will show a timeline. It is compatible with `series.type` = `column`, `line` and `area` |
 | `scatter` | v1.4.0 | Displays a cloud of points without a line between the values |
+| `rangeArea` | v2.12.0 | Dedicated lower/upper band from two timestamp-aligned numeric series. See [Range-area bands](#range-area-bands) for restrictions. |
+| `heatmap` | v2.12.0 | Bounded aggregated entity-by-time matrix. See [Bounded heatmaps](#bounded-heatmaps). |
 | `pie` | v1.4.0 | This will display a pie chart with the last value computed for each sensor |
 | `donut` | v1.4.0 | This will display a donut chart with the last value computed of each sensor, the same as pie but with a hole in the center |
 | `radialBar` | v1.4.0 | This will display a radial bar chart with the last value computed for each sensor. The value is represented in percentage only. It is required to provide `min` and `max` for each series displayed as it requires converting the value into a percentage. The default value for `min` is `0` and for `max` it is `100`. This graph works well if you want to display sensors natively in percentages |
@@ -1093,14 +1254,19 @@ Ordered by customer value for Home Assistant: reliable operation first, then fas
 
 ### 3. Everyday usability
 
-* [ ] Add optional day/week/month presets and previous/next period controls without requiring YAML edits.
-* [ ] Add a small set of explicit visual-editor presets for temperature, power and consumption; preserve the distinction between history/statistics and power/energy.
-* [ ] Validate touch interactions and long-term-statistics configurations without adding a UI framework.
+* [X] Add optional day/week/month presets, previous/next and current-period controls without requiring YAML edits.
+* [X] Add explicit visual-editor presets for temperature, power and consumption; preserve source identities and distinguish history/statistics and power/energy.
+* [X] Add touch-emulated Chromium checks and statistics-request regressions without adding a UI framework. Physical-device validation remains separate.
 
 ### 4. Selected visual insights
 
-* [ ] Range-area bands for min/max envelopes, comfort ranges and forecast uncertainty supplied by integrations.
-* [ ] Optional bounded-size heatmaps for hourly/daily energy, temperature and occupancy patterns.
+* [X] Dedicated range-area bands for min/max envelopes, comfort ranges and forecast uncertainty supplied by integrations, with timestamp pairing, gaps and invalid-bound checks.
+* [X] Optional bounded-size entity-by-time heatmaps for aggregated energy, temperature and occupancy patterns, including pre-fetch budget checks and missing-cell handling.
+* [X] Illustrated feature guide, YAML examples, source requirements and performance/compatibility trade-offs.
+
+### Remaining acceptance work—not missing features
+
+The planned feature implementation is delivered. The unchecked real-HA/tablet items above remain intentionally open: generated fixtures and touch emulation do not establish live integration compatibility, physical touch behavior or long-running wall-tablet memory stability. Test your own entities, statistics, DST dates, dashboard navigation and representative device before treating those checks as complete.
 
 Full ApexCharts.js parity, built-in forecasting and heavyweight analytics are not goals. Optional chart types must justify their data-loading cost, bundle impact and HA use case before being added.
 

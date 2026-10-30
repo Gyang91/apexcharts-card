@@ -3,7 +3,7 @@
 // (see zone.ts), so the card ships no time zone database.
 import type { HomeAssistant } from 'custom-card-helpers';
 import { t } from './localize';
-import type { CalendarPeriod, StatisticsPeriod } from './types-config';
+import type { CalendarPeriod, StatisticsPeriod, NavigationPeriod } from './types-config';
 import { isUsingServerTimezone } from './utils';
 import { add, startOf, wallTime, type CalendarUnit } from './zone';
 
@@ -36,6 +36,16 @@ export function addPeriods(ts: number, period: Period, count: number, timeZone: 
 // Start of the calendar period holding `ts`
 export function startOfPeriod(ts: number, period: CalendarPeriod, timeZone: string | undefined): number {
   return startOf(ts, PERIOD_STEPS[period][1], timeZone);
+}
+
+export function navigationRange(
+  now: number,
+  period: NavigationPeriod,
+  timeZone: string | undefined,
+  anchor = now,
+): { start: Date; end: Date } {
+  const start = startOfPeriod(anchor, period, timeZone);
+  return { start: new Date(start), end: new Date(nextPeriodStart(start, period, timeZone)) };
 }
 
 // Start of the period after the one starting at `start`. Rounding again keeps

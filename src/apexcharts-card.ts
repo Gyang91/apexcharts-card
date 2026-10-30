@@ -43,7 +43,7 @@ import {
   isUsingServerTimezone,
 } from './utils';
 import { getStatisticsMetadata } from './recorder';
-import { displayTimeZone } from './calendar';
+import { addPeriods, displayTimeZone, navigationRange } from './calendar';
 import { computeTimezoneDiffWithLocal, endOf, startOf } from './zone';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions, ApexYAxis } from 'apexcharts';
@@ -58,6 +58,7 @@ import {
   ChartCardColorThreshold,
   ChartCardExternalConfig,
   ChartCardSeriesExternalConfig,
+  NavigationPeriod,
 } from './types-config';
 import exportedTypeSuite from './types-config-ti';
 import {
@@ -92,6 +93,13 @@ import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import { downsample, SamplingRange } from './downsample';
+import {
+  DEFAULT_HEATMAP_CELLS,
+  MAX_HEATMAP_CELLS,
+  assertHeatmapBudget,
+  heatmapData,
+  rangeAreaData,
+} from './visual-data';
 
 interface SamplingSeries {
   data: EntityCachePoints;
@@ -186,6 +194,10 @@ export class ChartsCard extends LitElement {
   private _dataLoaded = false;
 
   private _seriesOffset: number[] = [];
+
+  private _navigationPeriod: NavigationPeriod = 'day';
+
+  private _navigationAnchor?: number;
 
   private _seriesTimeDelta: number[] = [];
 
@@ -428,6 +440,54 @@ export class ChartsCard extends LitElement {
           configDup.series[index] = mergeDeepConfig(allDup, serie);
         });
       }
+      const visual = configDup.chart_type === 'rangeArea' || configDup.chart_type === 'heatmap';
+      if (visual) {
+        if (
+          configDup.stacked ||
+          configDup.experimental?.brush ||
+          configDup.experimental?.hidden_by_default ||
+          configDup.experimental?.color_threshold ||
+          configDup.yaxis ||
+          configDup.apex_config?.chart?.stacked
+        ) {
+          throw new Error(t('error.visual.options'));
+        }
+        if (
+          configDup.series.some(
+            (serie) =>
+              serie.show?.in_chart === false ||
+              serie.invert ||
+              serie.show?.extremas ||
+              serie.show?.datalabels ||
+              serie.color_threshold ||
+              serie.yaxis_id,
+          )
+        ) {
+          throw new Error(t('error.visual.series'));
+        }
+        if (configDup.chart_type === 'rangeArea' && configDup.series.length !== 2) {
+          throw new Error(t('error.visual.pair'));
+        }
+        if (configDup.chart_type === 'heatmap') {
+          const limit = configDup.heatmap?.max_cells ?? DEFAULT_HEATMAP_CELLS;
+          if (!Number.isInteger(limit) || limit < 1 || limit > MAX_HEATMAP_CELLS) {
+            throw new Error(t('error.heatmap.limit'));
+          }
+          if (
+            !configDup.series.length ||
+            configDup.series.some(
+              (serie) => !serie.statistics && (!serie.group_by?.func || serie.group_by.func === 'raw'),
+            )
+          ) {
+            throw new Error(t('error.heatmap.aggregation'));
+          }
+        }
+        configDup.series.forEach((serie) => {
+          serie.extend_to = false;
+        });
+      } else if (configDup.heatmap) {
+        throw new Error(t('error.heatmap.type'));
+      }
       if (configDup.update_interval) {
         this._interval = validateInterval(configDup.update_interval, 'update_interval');
       }
@@ -440,6 +500,14 @@ export class ChartsCard extends LitElement {
       if (configDup.span?.end && configDup.span?.start) {
         throw new Error(t('error.span.startEnd'));
       }
+      if (configDup.navigation?.show) {
+        if (configDup.span) throw new Error(t('error.navigation.span'));
+        if (configDup.chart_type && !['line', 'scatter', 'rangeArea', 'heatmap'].includes(configDup.chart_type)) {
+          throw new Error(t('error.navigation.timeline'));
+        }
+      }
+      this._navigationPeriod = configDup.navigation?.initial ?? 'day';
+      this._navigationAnchor = undefined;
       if (configDup.brush?.selection_span) {
         this._brushSelectionSpan = validateInterval(configDup.brush.selection_span, 'brush.selection_span');
       }
@@ -495,7 +563,10 @@ export class ChartsCard extends LitElement {
             : serie.extend_to !== undefined
               ? serie.extend_to
               : 'end';
-          serie.type = this._config?.chart_type ? undefined : serie.type || DEFAULT_SERIE_TYPE;
+          serie.type =
+            !this._config?.chart_type || this._config.chart_type === 'line'
+              ? serie.type || DEFAULT_SERIE_TYPE
+              : undefined;
           if (!serie.group_by) {
             serie.group_by = {
               duration: DEFAULT_DURATION,
@@ -749,6 +820,7 @@ export class ChartsCard extends LitElement {
               ? this._renderHeader()
               : html``
           }
+          ${this._renderNavigation()}
           <div id="graph-wrapper">
             <div id="graph"></div>
             ${this._config.series_in_brush.length ? html`<div id="brush"></div>` : ``}
@@ -776,6 +848,71 @@ export class ChartsCard extends LitElement {
         </hui-warning>
       </ha-card>
     `;
+  }
+
+  private _renderNavigation(): TemplateResult {
+    if (!this._config?.navigation?.show) return html``;
+    const { start, end } = this._getSpanDates();
+    const formatter = new Intl.DateTimeFormat(getLang(this._config, this._hass), {
+      timeZone: displayTimeZone(this._hass),
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const busy = this._updating || !this._dataLoaded;
+    return html` <nav class="time-navigation" aria-label=${t('navigation.label')}>
+      <div class="time-navigation-buttons">
+        ${(['day', 'week', 'month'] as const).map(
+          (period) => html`
+            <button
+              type="button"
+              aria-pressed=${this._navigationPeriod === period}
+              ?disabled=${busy}
+              @click=${() => this._navigate(period)}
+            >
+              ${t(`common.period.${period}`)}
+            </button>
+          `,
+        )}
+        <button
+          type="button"
+          aria-label=${t('navigation.previous')}
+          ?disabled=${busy}
+          @click=${() => this._navigate(this._navigationPeriod, -1)}
+        >
+          &#x2039;
+        </button>
+        <button type="button" ?disabled=${busy} @click=${() => this._navigate(this._navigationPeriod, 0)}>
+          ${t('navigation.current')}
+        </button>
+        <button
+          type="button"
+          aria-label=${t('navigation.next')}
+          ?disabled=${busy}
+          @click=${() => this._navigate(this._navigationPeriod, 1)}
+        >
+          &#x203a;
+        </button>
+      </div>
+      <div class="time-navigation-range" role="status" aria-live="polite">
+        ${formatter.format(start)} &ndash; ${formatter.format(new Date(end.getTime() - 1))}
+      </div>
+    </nav>`;
+  }
+
+  private async _navigate(period: NavigationPeriod, direction?: number): Promise<void> {
+    if (!this._config?.navigation?.show || this._updating || !this._apexChart) return;
+    const timeZone = displayTimeZone(this._hass);
+    this._navigationAnchor =
+      direction === undefined || direction === 0
+        ? undefined
+        : addPeriods(this._getSpanDates().start.getTime(), this._navigationPeriod, direction, timeZone);
+    this._navigationPeriod = period;
+    this._graphs?.forEach((graph) => graph?.resetHistory());
+    this._brushInit = false;
+    this._updating = true;
+    await this._updateData();
+    this.requestUpdate();
   }
 
   private _renderHeader(): TemplateResult {
@@ -1221,13 +1358,22 @@ export class ChartsCard extends LitElement {
     const now = new Date();
     const editMode = getLovelace()?.editMode;
 
-    const caching = editMode === true ? false : this._config!.cache;
+    const caching = editMode === true || this._config.navigation?.show ? false : this._config!.cache;
     let errorMessage = t('card.warning.refreshFailed');
     try {
       // Reusing GraphEntry while its previous fetch is pending would skip the new refresh.
       await this._historyUpdate;
       if (this._samplingUpdate) await this._samplingUpdate;
       if (!current()) return;
+      if (this._config.chart_type === 'heatmap') {
+        assertHeatmapBudget(
+          this._config.series_in_graph,
+          start.getTime(),
+          end.getTime(),
+          displayTimeZone(this._hass),
+          this._config.heatmap?.max_cells,
+        );
+      }
       const promise = this._graphs.map((graph, index) => {
         if (graph) graph.cache = caching;
         return graph?._updateHistory(
@@ -1252,6 +1398,7 @@ export class ChartsCard extends LitElement {
       let graphData: any = { series: [] };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const brushData: any = { series: [] };
+      let visualEmpty: boolean | undefined;
       if (TIMESERIES_TYPES.includes(this._config.chart_type)) {
         this._graphs.forEach((graph, index) => {
           if (!graph) return [];
@@ -1365,6 +1512,20 @@ export class ChartsCard extends LitElement {
           };
         });
       }
+      if (this._config.chart_type === 'rangeArea') {
+        const [lower, upper] = graphData.series as { data: EntityCachePoints }[];
+        const data = rangeAreaData(lower.data, upper.data);
+        visualEmpty = data.every((point) => point.y[0] === null);
+        graphData.series = [{ data }];
+      } else if (this._config.chart_type === 'heatmap') {
+        const rows = heatmapData(
+          (graphData.series as { data: EntityCachePoints }[]).map((serie) => serie.data),
+          this._config.heatmap?.max_cells,
+        );
+        // Native datetime heatmaps position sparse cells by timestamp. Omit
+        // missing cells: native heatmap shading otherwise treats null as zero.
+        graphData.series = rows.map((data) => ({ data: data.filter((point) => point.y !== null) }));
+      }
       if (this._hasSampling()) {
         this._samplingSeries = { main: graphData.series, brush: brushData.series };
         this._samplingKey = undefined;
@@ -1372,6 +1533,13 @@ export class ChartsCard extends LitElement {
         brushData.series = this._sampleSeries(brushData.series, true);
       }
       graphData.colors = this._computeChartColors(false);
+      if (
+        this._config.chart_type === 'heatmap' &&
+        !this._config.color_list &&
+        !this._config.series.some((serie) => serie.color)
+      ) {
+        graphData.colors = this._config.series.map(() => graphData.colors[0]);
+      }
       if (this._apexBrush) {
         brushData.colors = this._computeChartColors(true);
       }
@@ -1458,14 +1626,18 @@ export class ChartsCard extends LitElement {
       this._lastUpdated = now;
       this._loadError = undefined;
       this._empty =
-        this._config.series_in_graph.length > 0 &&
-        !this._config.series_in_graph.some((serie) =>
-          this._graphs?.[serie.index]?.history.some(([, value]) => value !== null && Number.isFinite(value)),
-        );
+        visualEmpty ??
+        (this._config.series_in_graph.length > 0 &&
+          !this._config.series_in_graph.some((serie) =>
+            this._graphs?.[serie.index]?.history.some(([, value]) => value !== null && Number.isFinite(value)),
+          ));
     } catch (err) {
       if (current()) {
         log(err);
-        this._loadError = errorMessage;
+        this._loadError =
+          this._config.chart_type === 'rangeArea' || this._config.chart_type === 'heatmap'
+            ? `${errorMessage} ${err instanceof Error ? err.message : ''}`
+            : errorMessage;
       }
     } finally {
       if (current()) {
@@ -2026,6 +2198,9 @@ export class ChartsCard extends LitElement {
   }
 
   private _getSpanDates(): { start: Date; end: Date } {
+    if (this._config?.navigation?.show) {
+      return navigationRange(Date.now(), this._navigationPeriod, displayTimeZone(this._hass), this._navigationAnchor);
+    }
     let end = new Date();
     let start = new Date(end.getTime() - this._graphSpan + 1);
     const timeZone = displayTimeZone(this._hass);
