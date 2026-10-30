@@ -2,6 +2,16 @@ export const en: Record<string, string> = {
   // ── Card runtime ──
   'card.loading': 'Loading...',
   'card.warning.entityNotAvailable': 'Entity not available: {entity}',
+  'card.warning.initializationFailed':
+    'Chart could not start. Reload the dashboard to retry; details are in the browser console.',
+  'card.warning.refreshFailed':
+    'Chart refresh failed. Previously displayed data may be out of date; details are in the browser console.',
+  'card.warning.historyFailed':
+    'Could not load data for {entity}. Check the Home Assistant connection, recorder and series configuration; details are in the browser console. Previously displayed data may be out of date.',
+  'card.warning.noHistory':
+    'No numeric data in this time range. Check recorder history, the selected range and series transformations.',
+  'card.warning.noStatistics':
+    'No numeric statistics in this time range. Check the statistic ID, selected statistic type and Home Assistant statistics.',
 
   // ── Config errors (shown in the HA error card) ──
   'error.span.startEnd': "span: Only one of 'start' or 'end' is allowed.",

@@ -61,6 +61,12 @@ export const stylesApex: CSSResultGroup = css`
     isolation: isolate;
   }
 
+  .data-status {
+    padding: 8px 16px;
+    color: var(--secondary-text-color);
+    font-size: 0.875rem;
+  }
+
   /* Fill a fixed-height cell: the header, ha-card title and brush keep their height and #graph
      gets the rest. The host is a block, so it needs a height too for ha-card's 100% to resolve. */
   :host([data-fill-height]) {
@@ -134,10 +140,6 @@ export const stylesApex: CSSResultGroup = css`
   }
   ha-card.section #brush {
     flex: none;
-  }
-
-  #brush {
-    margin-top: -30px;
   }
 
   /* Needed for minimal layout */

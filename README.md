@@ -27,6 +27,7 @@ However, some things might be broken :grin:
 ## Table of Content <!-- omit in toc -->
 
 - [What's different in this fork](#whats-different-in-this-fork)
+- [Reliability and data status](#reliability-and-data-status)
 - [Installation](#installation)
   - [HACS (recommended)](#hacs-recommended)
   - [Manual install](#manual-install)
@@ -66,6 +67,7 @@ However, some things might be broken :grin:
   - [`brush` experimental feature](#brush-experimental-feature)
 - [Known issues](#known-issues)
 - [Roadmap](#roadmap)
+- [License](#license)
 - [Examples](#examples-1)
   - [Simple graph](#simple-graph)
   - [Multiple Types of Graphs](#multiple-types-of-graphs)
@@ -87,6 +89,21 @@ Everything documented below keeps working as before; this fork adds:
 - **Smaller card** (about 1.5 MB instead of 2.1 MB): time zone rules come from the browser instead of a bundled database; `moment.tz()` still works in [`data_generator`](#data_generator-option).
 - **Fixes**: no frozen series after a failed request, correct start of slow sensors with cached history, empty `sum` buckets stay empty, correct labels on yearly and quarterly charts.
 - **Maintenance**: automatic releases, CI, CodeQL, a daily dependency audit (npm audit and OSV-Scanner) and Dependabot updates.
+
+## Reliability and data status
+
+The card shows a small status message when a refresh fails or there is no numeric data for the main chart:
+
+- **Entity not available**: check the configured entity ID and whether the entity exists in Home Assistant.
+- **Could not load data**: the message identifies the series. Check the HA connection, recorder, statistics or custom series configuration; technical details are logged in the browser console.
+- **No numeric data / statistics in this time range**: check the selected range, recorder retention, statistic ID/type and any transformations. The card cannot infer the exact cause of an empty response. Zero is valid data, not an empty result.
+- **Chart could not start**: reload the dashboard to retry initialization; consult the browser console if it persists.
+
+On a failed refresh, the existing chart is retained and may be out of date. `show.last_updated` advances only after a successful chart update; it is not shown before the first successful update. A subsequent successful refresh clears the message. Retries follow normal entity updates or your configured `update_interval`; diagnostics do not introduce extra polling.
+
+Detaching a card cancels queued recorder-delay refreshes and destroys its charts. Pending history requests cannot always be cancelled, but their results cannot update a replacement chart after reconnect. The new card waits for an existing series fetch to settle before refreshing it again.
+
+Development checks include real Chromium rendering with a simulated HA data source, mobile-width resizing, fixed-height Sections-style layouts, disconnection/reconnection, legend/brush behavior and failure recovery. These checks complement, rather than replace, testing in a real Home Assistant dashboard.
 
 ## Installation
 
@@ -1020,7 +1037,40 @@ series:
 
 ## Roadmap
 
-Not ordered by priority:
+Ordered by customer value for Home Assistant: reliable operation first, then fast dashboards, easy navigation and selected visual additions. No feature should add requests when disabled, silently change sensor calculations or introduce unbounded cache growth.
+
+### 1. Trust, diagnostics and regression protection
+
+* [X] Cancel delayed refreshes on detach and prevent stale asynchronous work from updating replacement charts.
+* [X] Prevent the brush from overlapping and intercepting clicks on the main chart legend.
+* [X] Preserve legend visibility choices across refreshes, including initially hidden series without custom axes.
+* [X] Skip redundant main/brush redraws when resize-observer dimensions have not changed.
+* [X] Keep refreshes locked until all series requests settle, including when one fails.
+* [X] Show actionable load/empty-data messages and preserve the last successful update timestamp on failure.
+* [X] Add Chromium regressions for rendering, mobile resizing, Sections-style sizing, reconnects, legend/brush behavior and recovery.
+* [X] Add raw/gzip bundle budgets and a repeatable generated-data rendering benchmark.
+* [ ] Validate the same scenarios in a real HA dashboard and on a representative lower-powered wall tablet. Browser fixtures do not certify every HA version, integration or device.
+
+### 2. Speed on tablets and large histories
+
+* [ ] Measure recorder/statistics requests, rendering and memory before optimizing; extend existing request sharing only where duplicate work is demonstrated.
+* [ ] Add optional width-aware downsampling that preserves spikes, null gaps and endpoints. Header values, aggregation and axis limits must use original data.
+* [ ] Verify bounded cache memory and avoid redundant renders during bursts of HA updates.
+
+### 3. Everyday usability
+
+* [ ] Add optional day/week/month presets and previous/next period controls without requiring YAML edits.
+* [ ] Add a small set of explicit visual-editor presets for temperature, power and consumption; preserve the distinction between history/statistics and power/energy.
+* [ ] Validate touch interactions and long-term-statistics configurations without adding a UI framework.
+
+### 4. Selected visual insights
+
+* [ ] Range-area bands for min/max envelopes, comfort ranges and forecast uncertainty supplied by integrations.
+* [ ] Optional bounded-size heatmaps for hourly/daily energy, temperature and occupancy patterns.
+
+Full ApexCharts.js parity, built-in forecasting and heavyweight analytics are not goals. Optional chart types must justify their data-loading cost, bundle impact and HA use case before being added.
+
+### Previously completed
 
 * [X] ~~Support more types of charts (pie, radial, polar area at least)~~
 * [X] ~~Support for `binary_sensors`~~
@@ -1031,6 +1081,10 @@ Not ordered by priority:
 * [X] ~~Support for state mapping for non-numerical state sensors~~
 * [X] ~~Support for simple color threshold (easier to understand/write than the ones provided natively by ApexCharts)~~
 * [X] ~~Support for graph configuration templates à la [`button-card`](https://github.com/custom-cards/button-card/blob/master/README.md#configuration-templates)~~
+
+## License
+
+This fork retains the [MIT license](LICENSE) and the original copyright notice. Forking does not remove those terms: copies or substantial portions of the upstream software must retain the copyright and permission notice. MIT permits modification, redistribution and commercial use; the software is supplied without warranty.
 
 ## Examples
 
