@@ -53,6 +53,25 @@ describe('apexcharts-card', () => {
       ).not.toThrow();
     });
 
+    it.each(['start', 'middle', 'end'])('accepts group_by.align: %s', (align) => {
+      const card = newCard();
+      card.setConfig({
+        type: 'custom:apexcharts-card',
+        series: [{ entity: 'sensor.temp', type: 'column', group_by: { func: 'sum', align } }],
+      });
+      expect(card._config.series[0].group_by.align).toBe(align);
+    });
+
+    it('rejects invalid group_by alignment instead of silently falling back', () => {
+      const card = newCard();
+      expect(() =>
+        card.setConfig({
+          type: 'custom:apexcharts-card',
+          series: [{ entity: 'sensor.temp', group_by: { align: 'left' } }],
+        }),
+      ).toThrow(/align/);
+    });
+
     it('migrates the legacy `entities` key to `series`', () => {
       const card = newCard();
       expect(() =>

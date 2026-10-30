@@ -55,6 +55,61 @@ function makeEntry(config: AnyRec, graphSpanMs: number, buckets: AnyRec[]): Grap
 const T0 = new Date('2026-07-01T00:00:00').getTime();
 
 describe('statistics span padding (column width fix)', () => {
+  it('fills missing monthly statistics periods using HA calendar boundaries', async () => {
+    const instant = (date: string) => Date.parse(`${date}T00:00:00+01:00`);
+    const janStart = instant('2026-01-01');
+    const febStart = instant('2026-02-01');
+    const aprStart = Date.parse('2026-04-01T00:00:00+02:00');
+    const mayStart = Date.parse('2026-05-01T00:00:00+02:00');
+    const entry = makeEntry(seriesConfig({ statistics: { type: 'change', period: 'month' } }), mayStart - janStart, [
+      statBucket(janStart, febStart, 1),
+      statBucket(aprStart, mayStart, 2),
+    ]);
+
+    await entry._updateHistory(new Date(janStart), new Date(mayStart));
+
+    expect(entry.history).toEqual(
+      [
+        [(febStart + Date.parse('2026-03-01T00:00:00+01:00')) / 2, null],
+        [(Date.parse('2026-03-01T00:00:00+01:00') + aprStart) / 2, null],
+        [(janStart + febStart) / 2, 1],
+        [(aprStart + mayStart) / 2, 2],
+      ].sort(([left], [right]) => left - right),
+    );
+  });
+
+  it('pads monthly column statistics in the Home Assistant time zone', async () => {
+    const instant = (date: string) => Date.parse(`${date}T00:00:00+01:00`);
+    const febStart = instant('2026-02-01');
+    const aprStart = Date.parse('2026-04-01T00:00:00+02:00');
+    const mayStart = Date.parse('2026-05-01T00:00:00+02:00');
+    const entry = makeEntry(
+      seriesConfig({ type: 'column', statistics: { type: 'change', period: 'month' } }),
+      mayStart - febStart,
+      [statBucket(aprStart, mayStart, 2)],
+    );
+
+    await entry._updateHistory(new Date(febStart), new Date(mayStart));
+
+    expect(entry.history).toEqual([
+      [(febStart + Date.parse('2026-02-28T23:00:00Z')) / 2, null],
+      [(Date.parse('2026-02-28T23:00:00Z') + aprStart) / 2, null],
+      [(aprStart + mayStart) / 2, 2],
+    ]);
+  });
+
+  it.each([
+    ['day', Date.parse('2026-10-24T22:00:00Z'), Date.parse('2026-10-25T23:00:00Z')],
+    ['month', Date.parse('2026-02-01T00:00:00Z'), Date.parse('2026-03-01T00:00:00Z')],
+    ['month', Date.parse('2026-07-01T00:00:00Z'), Date.parse('2026-08-01T00:00:00Z')],
+  ])('centers a %s statistic using its actual recorder boundaries', async (period, start, end) => {
+    const entry = makeEntry(seriesConfig({ type: 'column', statistics: { type: 'change', period } }), end - start, [
+      statBucket(start, end, 2),
+    ]);
+    await entry._updateHistory(new Date(start), new Date(end));
+    expect(entry.history).toEqual([[start + (end - start) / 2, 2]]);
+  });
+
   it('a single day bucket on a 14d span is padded to 14 evenly spaced points', async () => {
     const config = seriesConfig({ type: 'column', statistics: { type: 'change', period: 'day' } });
     const start = new Date(T0);

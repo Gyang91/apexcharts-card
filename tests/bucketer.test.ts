@@ -31,7 +31,7 @@ describe('findBucketIndex', () => {
   });
 });
 
-function makeEntry(points: [number, number][]): GraphEntry {
+function makeEntry(points: [number, number][], extra: AnyRec = {}): GraphEntry {
   const config: AnyRec = {
     entity: ENTITY,
     index: 0,
@@ -40,6 +40,7 @@ function makeEntry(points: [number, number][]): GraphEntry {
     show: {},
     ignore_history: false,
     data_generator: 'return window.__points;',
+    ...extra,
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__points = points;
@@ -51,6 +52,35 @@ function makeEntry(points: [number, number][]): GraphEntry {
 }
 
 describe('group_by bucketing', () => {
+  it.each([
+    [undefined, undefined, T0 + HOUR],
+    ['line', undefined, T0 + HOUR],
+    ['area', undefined, T0 + HOUR],
+    ['column', undefined, T0 + 1.5 * HOUR],
+    ['column', 'start', T0 + HOUR],
+    ['column', 'middle', T0 + 1.5 * HOUR],
+    ['column', 'end', T0 + 2 * HOUR],
+  ])('aligns type %s at %s without changing aggregation', async (type, align, timestamp) => {
+    const entry = makeEntry(
+      [
+        [T0 + HOUR + MIN, 2],
+        [T0 + HOUR + 2 * MIN, 3],
+      ],
+      { type, group_by: { duration: '1h', offset: '+0h', func: 'sum', fill: 'null', align } },
+    );
+    await entry._updateHistory(new Date(T0), new Date(T0 + 3 * HOUR));
+    expect(entry.history).toEqual([[timestamp, 5]]);
+  });
+
+  it('does not realign raw columns', async () => {
+    const points: [number, number][] = [[T0 + MIN, 5]];
+    const entry = makeEntry(points, {
+      group_by: { duration: '1h', offset: '+0h', func: 'raw', align: 'middle' },
+    });
+    await entry._updateHistory(new Date(T0), new Date(T0 + HOUR));
+    expect(entry.history).toEqual(points);
+  });
+
   it('gives the same buckets for sorted and unsorted points', async () => {
     const points: [number, number][] = [
       [T0 + 5 * MIN, 1],

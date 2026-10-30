@@ -48,9 +48,13 @@ Recorder unit regressions check concurrent request counts, connection/range/wire
 
 The roadmap scenarios (`npm run test:browser -- roadmap`) cover calendar navigation/reconnects, touch-emulated statistics navigation, explicit editor presets, range-band gaps/crossed-bound recovery, and bounded heatmaps with missing cells. Unit regressions cover DST, ISO weeks, leap months, backward-history cache resets, exact cell budgets and rejection before history requests. These tests use fixtures, not a live HA instance.
 
+The historical-issue scenarios (`npm run test:browser -- known-issues`) inspect actual SVG area fills across null gaps, dense/sparse grouped-column geometry against bucket boundaries, and binary history plus raw/computed headers. Unit regressions protect transform/attribute precedence, shared-statistics transform isolation, unavailable-state filling, stepped-curve sampling exclusions, explicit legacy column alignment, and calendar/statistics gap filling across HA timezone and month boundaries.
+
 To deliberately refresh the four generated-data README screenshots in PowerShell, build first, then run `$env:UPDATE_DOC_IMAGES='1'; npm run test:browser -- roadmap; Remove-Item Env:UPDATE_DOC_IMAGES`. Normal test runs and CI do not rewrite documentation images. Review the pictures before committing them; the screenshots illustrate features, not real HA measurements.
 
 `npm run check:bundle` enforces ceilings of 1,550,000 bytes raw and 450,000 bytes gzip (level 9). These are explicit review budgets, not a claim about HA's HTTP compression. Investigate growth before adjusting them. No additional runtime dependency is needed for either measurement.
+
+The `glob` and `minimatch` overrides in `package.json` select fixed development-tool versions. When changing them, verify both the generated-config build and ESLint, in addition to the test suites; they do not add code to the card bundle.
 
 Before completing a reliability milestone, also test real HA entity/statistics data, dashboard navigation, connection recovery and a representative lower-powered device. Simulated browser tests cannot establish compatibility with every HA version or guarantee the absence of defects.
 

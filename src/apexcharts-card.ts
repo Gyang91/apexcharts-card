@@ -36,6 +36,7 @@ import {
   myFormatNumber,
   offsetData,
   prettyPrintTime,
+  parseNumericState,
   truncateFloat,
   validateInterval,
   validateOffset,
@@ -333,7 +334,9 @@ export class ChartsCard extends LitElement {
         }
         if (serie.show.in_header === 'raw') {
           this._headerState[index] = truncateFloat(
-            serie.attribute ? entityState.attributes[serie.attribute] : entityState.state,
+            serie.attribute
+              ? entityState.attributes[serie.attribute]
+              : parseNumericState(entityState.state, serie.entity.startsWith('binary_sensor.')),
             serie.float_precision,
           ) as number;
           rawHeaderStatesUpdated = true;
@@ -1212,7 +1215,8 @@ export class ChartsCard extends LitElement {
     const config = (brush ? this._config.series_in_brush : this._config.series_in_graph)[index];
     if (!config || config.type === 'column') return false;
     const curves = apex?.stroke?.curve;
-    const curve = config.curve ?? (Array.isArray(curves) ? curves[index] : curves);
+    const curve =
+      typeof curves === 'string' ? curves : (config.curve ?? (Array.isArray(curves) ? curves[index] : curves));
     return curve !== 'stepline' && curve !== 'linestep';
   }
 

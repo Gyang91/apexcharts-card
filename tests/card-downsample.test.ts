@@ -67,6 +67,14 @@ describe('adaptive card downsampling', () => {
     { series: [{ entity: 'sensor.a', curve: 'stepline' as const, extend_to: false as const }] },
     { apex_config: { stroke: { curve: 'stepline' } } },
     { apex_config: { stroke: { curve: 'linestep' } } },
+    {
+      apex_config: { stroke: { curve: 'stepline' } },
+      series: [{ entity: 'sensor.a', curve: 'smooth' as const, extend_to: false as const }],
+    },
+    {
+      apex_config: { stroke: { curve: 'linestep' } },
+      series: [{ entity: 'sensor.a', curve: 'smooth' as const, extend_to: false as const }],
+    },
   ])('retains full detail for excluded configurations: %j', async (extra) => {
     const card = createCard(extra);
     await card._updateData();

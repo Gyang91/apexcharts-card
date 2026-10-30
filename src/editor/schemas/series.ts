@@ -69,6 +69,20 @@ export function getSeriesGroupBySchema(): HaFormSchema[] {
       ],
     },
     {
+      name: 'align',
+      selector: {
+        select: {
+          mode: 'dropdown',
+          options: [
+            { value: '', label: t('common.default') },
+            { value: 'start', label: t('series.align.start') },
+            { value: 'middle', label: t('series.align.middle') },
+            { value: 'end', label: t('series.align.end') },
+          ],
+        },
+      },
+    },
+    {
       name: 'fill',
       selector: {
         select: {

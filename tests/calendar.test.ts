@@ -149,9 +149,18 @@ describe('group_by.period', () => {
     );
 
     expect(entry.history).toEqual([
-      [berlin('2026-10-25T00:00:00', '+02:00'), 3],
-      [berlin('2026-10-26T00:00:00', '+01:00'), 4],
+      [berlin('2026-10-25T11:30:00', '+01:00'), 3],
+      [berlin('2026-10-26T12:00:00', '+01:00'), 4],
     ]);
+  });
+
+  it('uses the actual month midpoint, not a fixed fifteen-day offset', async () => {
+    const entry = makeEntry({ func: 'sum', period: 'month' }, [[berlin('2026-02-02T10:00:00', '+01:00'), 2]]);
+    await entry._updateHistory(
+      new Date(berlin('2026-02-01T00:00:00', '+01:00')),
+      new Date(berlin('2026-03-01T00:00:00', '+01:00')),
+    );
+    expect(entry.history).toEqual([[berlin('2026-02-15T00:00:00', '+01:00'), 2]]);
   });
 });
 
