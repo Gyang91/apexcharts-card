@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.12.0](https://github.com/Gyang91/apexcharts-card/compare/v2.11.0...v2.12.0) (2026-10-30)
+
+
+### Features
+
+* complete HA roadmap with calendar navigation and visual insights ([#18](https://github.com/Gyang91/apexcharts-card/issues/18)) ([568a4ac](https://github.com/Gyang91/apexcharts-card/commit/568a4ac715015ffcd63d0508b6328308a4b0d02e))
+
 ## [2.11.0](https://github.com/Gyang91/apexcharts-card/compare/v2.10.0...v2.11.0) (2026-10-30)
 
 
