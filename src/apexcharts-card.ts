@@ -91,6 +91,12 @@ import parse from 'parse-duration';
 import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
+import { downsample, SamplingRange } from './downsample';
+
+interface SamplingSeries {
+  data: EntityCachePoints;
+  hidden?: boolean;
+}
 
 /* eslint no-console: 0 */
 console.info(
@@ -201,6 +207,16 @@ export class ChartsCard extends LitElement {
   private _heightFilled = false;
 
   private _lastChartSize?: { width: number; height?: number };
+
+  private _samplingSeries?: { main: SamplingSeries[]; brush: SamplingSeries[] };
+
+  private _samplingFrame?: number;
+
+  private _samplingKey?: string;
+
+  private _samplingBrushWidth?: number;
+
+  private _samplingUpdate?: Promise<unknown>;
 
   // Set by HA: 'grid' in a sections view.
   @property({ attribute: false }) public layout?: string;
@@ -359,6 +375,12 @@ export class ChartsCard extends LitElement {
     this._serverTimeOffset = 0;
     this._heightFilled = false;
     this._lastChartSize = undefined;
+    if (this._samplingFrame !== undefined) cancelAnimationFrame(this._samplingFrame);
+    this._samplingFrame = undefined;
+    this._samplingSeries = undefined;
+    this._samplingKey = undefined;
+    this._samplingBrushWidth = undefined;
+    this._samplingUpdate = undefined;
     this._hiddenSeries = undefined;
     if (this._apexChart) {
       this._apexChart.destroy();
@@ -971,6 +993,7 @@ export class ChartsCard extends LitElement {
         }
         chartCfg.chart.redrawOnParentResize = true;
         this._configureSeriesVisibility(chartCfg);
+        this._configureSampling(chartCfg);
         if (this._config.series_in_brush.length) {
           chartCfg.chart.id = Math.random().toString(36).substring(7);
         }
@@ -1030,6 +1053,104 @@ export class ChartsCard extends LitElement {
     };
     Promise.resolve(this._apexChart.updateOptions({ chart }, false, true)).catch(onError);
     Promise.resolve(this._apexBrush?.updateOptions({ chart: { width } }, false, true)).catch(onError);
+    this._queueResample();
+  }
+
+  private _configureSampling(layout: ApexOptions): void {
+    if (!this._hasSampling()) return;
+    layout.chart ??= {};
+    layout.chart.events ??= {};
+    const updated = layout.chart.events.updated;
+    layout.chart.events.updated = (...args) => {
+      updated?.(...args);
+      this._queueResample();
+    };
+  }
+
+  private _canSample(index: number, brush: boolean): boolean {
+    if (!this._config?.downsample || (this._config.chart_type && this._config.chart_type !== 'line')) return false;
+    const apex = brush ? this._config.brush?.apex_config : this._config.apex_config;
+    if (this._config.stacked || apex?.chart?.stacked) return false;
+    if (apex?.chart?.type && !['line', 'area'].includes(apex.chart.type)) return false;
+    const config = (brush ? this._config.series_in_brush : this._config.series_in_graph)[index];
+    if (!config || config.type === 'column') return false;
+    const curves = apex?.stroke?.curve;
+    const curve = config.curve ?? (Array.isArray(curves) ? curves[index] : curves);
+    return curve !== 'stepline' && curve !== 'linestep';
+  }
+
+  private _hasSampling(): boolean {
+    return (
+      !!this._config?.downsample &&
+      (this._config.series_in_graph.some((_, index) => this._canSample(index, false)) ||
+        this._config.series_in_brush.some((_, index) => this._canSample(index, true)))
+    );
+  }
+
+  private _sampleSeries(series: SamplingSeries[], brush: boolean, range?: SamplingRange): SamplingSeries[] {
+    const width = this.shadowRoot?.querySelector<HTMLElement>(brush ? '#brush' : '#graph')?.clientWidth ?? 0;
+    return series.map((entry, index) => {
+      if (!this._canSample(index, brush)) return entry;
+      const data = downsample(entry.data, width, range);
+      return data === entry.data ? entry : { ...entry, data };
+    });
+  }
+
+  private _queueResample(): void {
+    if (!this._samplingSeries || this._samplingFrame !== undefined || !this.isConnected) return;
+    const chart = this._apexChart;
+    const lifecycle = this._lifecycle;
+    this._samplingFrame = requestAnimationFrame(() => {
+      this._samplingFrame = undefined;
+      if (chart !== this._apexChart || lifecycle !== this._lifecycle) return;
+      try {
+        this._resampleCharts();
+      } catch (error) {
+        this._samplingKey = undefined;
+        this._samplingBrushWidth = undefined;
+        this._loadError = t('card.warning.refreshFailed');
+        log(error);
+      }
+    });
+  }
+
+  private _resampleCharts(): void {
+    if (!this._samplingSeries || !this._apexChart || this._updating || this._samplingUpdate) return;
+    const chart = this._apexChart;
+    const range = this._readChartRange(chart);
+    const graphWidth = this.shadowRoot?.querySelector<HTMLElement>('#graph')?.clientWidth ?? 0;
+    const brushWidth = this.shadowRoot?.querySelector<HTMLElement>('#brush')?.clientWidth ?? 0;
+    const key = `${graphWidth}|${brushWidth}|${range?.min}|${range?.max}`;
+    if (this._samplingKey === key) return;
+    this._samplingKey = key;
+    const lifecycle = this._lifecycle;
+    const update = (target: ApexCharts, options: ApexOptions) =>
+      Promise.resolve().then(() => {
+        if (chart !== this._apexChart || lifecycle !== this._lifecycle) return;
+        return target.updateOptions(options, false, false, false);
+      });
+    const main = this._sampleSeries(this._samplingSeries.main, false, range);
+    const updates = [update(chart, { series: main, ...(range ? { xaxis: range } : {}) })];
+    // Redrawing the brush during a drag restores its configured selection.
+    // Its overview depends on width/data, not the main chart's visible range.
+    if (this._apexBrush && this._samplingBrushWidth !== brushWidth) {
+      this._samplingBrushWidth = brushWidth;
+      updates.push(update(this._apexBrush, { series: this._sampleSeries(this._samplingSeries.brush, true) }));
+    }
+    const pending = Promise.allSettled(updates).then((results) => {
+      if (this._samplingUpdate !== pending) return;
+      this._samplingUpdate = undefined;
+      const failure = results.find((result) => result.status === 'rejected');
+      if (failure?.status === 'rejected') {
+        this._samplingKey = undefined;
+        this._samplingBrushWidth = undefined;
+        this._loadError = t('card.warning.refreshFailed');
+        log(failure.reason);
+      } else {
+        this._queueResample();
+      }
+    });
+    this._samplingUpdate = pending;
   }
 
   // A sections cell only has a fixed height when rows is a number. 'auto' rows size to the
@@ -1105,6 +1226,7 @@ export class ChartsCard extends LitElement {
     try {
       // Reusing GraphEntry while its previous fetch is pending would skip the new refresh.
       await this._historyUpdate;
+      if (this._samplingUpdate) await this._samplingUpdate;
       if (!current()) return;
       const promise = this._graphs.map((graph, index) => {
         if (graph) graph.cache = caching;
@@ -1243,6 +1365,12 @@ export class ChartsCard extends LitElement {
           };
         });
       }
+      if (this._hasSampling()) {
+        this._samplingSeries = { main: graphData.series, brush: brushData.series };
+        this._samplingKey = undefined;
+        graphData.series = this._sampleSeries(graphData.series, false, this._readChartRange(chart));
+        brushData.series = this._sampleSeries(brushData.series, true);
+      }
       graphData.colors = this._computeChartColors(false);
       if (this._apexBrush) {
         brushData.colors = this._computeChartColors(true);
@@ -1340,7 +1468,10 @@ export class ChartsCard extends LitElement {
         this._loadError = errorMessage;
       }
     } finally {
-      if (current()) this._updating = false;
+      if (current()) {
+        this._updating = false;
+        this._queueResample();
+      }
     }
   }
 
@@ -1555,6 +1686,11 @@ export class ChartsCard extends LitElement {
       if (!serie || chart !== this._apexChart) return;
       if (this._hiddenSeries!.has(serie.index)) this._hiddenSeries!.delete(serie.index);
       else this._hiddenSeries!.add(serie.index);
+      if (this._samplingSeries) {
+        this._samplingSeries.main.forEach((entry, i) => {
+          entry.hidden = this._hiddenSeries!.has(this._config!.series_in_graph[i].index);
+        });
+      }
       if (!this._yAxisConfig) return;
       window.requestAnimationFrame(() => {
         if (chart !== this._apexChart) return;

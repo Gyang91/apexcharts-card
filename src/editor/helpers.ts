@@ -109,6 +109,7 @@ const LABEL_MAP: Record<string, string> = {
   log_base: 'field.log_base',
   align_to: 'field.align_to',
   cache: 'field.cache',
+  downsample: 'field.downsample',
   selection_span: 'field.selection_span',
   color_threshold: 'field.color_threshold',
   disable_config_validation: 'field.disable_config_validation',

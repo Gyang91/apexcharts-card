@@ -13,6 +13,31 @@ export interface HistoryRequestOptions {
   readonly minimal: boolean;
 }
 
+// Only coalesce identical requests while pending; successful history is not
+// retained here. The connection boundary prevents cross-instance data sharing.
+const pendingRequests = new WeakMap<object, Map<string, Promise<unknown>>>();
+
+function request<T>(hass: HomeAssistant, message: { type: string; [key: string]: unknown }): Promise<T> {
+  const connection = hass.connection ?? hass;
+  let pending = pendingRequests.get(connection);
+  if (!pending) {
+    pending = new Map();
+    pendingRequests.set(connection, pending);
+  }
+  const key = JSON.stringify(message);
+  const existing = pending.get(key);
+  if (existing) return existing as Promise<T>;
+  const result = hass.callWS<T>(message);
+  if (pending.size < 64) {
+    pending.set(key, result);
+    const remove = () => {
+      if (pending.get(key) === result) pending.delete(key);
+    };
+    result.then(remove, remove);
+  }
+  return result;
+}
+
 export async function fetchHistory(
   hass: HomeAssistant | undefined,
   entityId: string,
@@ -21,7 +46,7 @@ export async function fetchHistory(
   options: HistoryRequestOptions,
 ): Promise<HassHistoryEntry[] | undefined> {
   if (!hass) return undefined;
-  const result = await hass.callWS<Record<string, HassCompressedState[]>>({
+  const result = await request<Record<string, HassCompressedState[]>>(hass, {
     type: 'history/history_during_period',
     start_time: start.toISOString(),
     end_time: end.toISOString(),
@@ -41,7 +66,7 @@ function decompressHistory(entityId: string, rows: HassCompressedState[]): HassH
   let attributes: HassHistoryEntry['attributes'];
   return rows.map((row) => {
     // Carry attributes forward should a row omit them
-    if (row.a) attributes = row.a;
+    if (row.a) attributes = structuredClone(row.a);
     return {
       entity_id: entityId,
       state: row.s,
@@ -59,6 +84,8 @@ function decompressHistory(entityId: string, rows: HassCompressedState[]): HassH
 // After the TTL everything is fetched anew, which also picks up statistics
 // imported later for past periods.
 const STATISTICS_CACHE_TTL_MS = 10 * 60 * 1000;
+const STATISTICS_CACHE_MAX_ENTRIES = 64;
+const STATISTICS_CACHE_MAX_ROWS = 32000;
 
 interface StatisticsCacheEntry {
   from: number; // start of the range the rows cover
@@ -77,7 +104,30 @@ function statisticsCacheFor(hass: HomeAssistant): Map<string, StatisticsCacheEnt
     cache = new Map();
     statisticsCaches.set(connection, cache);
   }
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (now - entry.fetchedAt >= STATISTICS_CACHE_TTL_MS) cache.delete(key);
+  }
   return cache;
+}
+
+function cacheStatistics(
+  cache: Map<string, StatisticsCacheEntry> | undefined,
+  key: string,
+  entry: StatisticsCacheEntry,
+): void {
+  if (!cache) return;
+  cache.delete(key);
+  if (entry.rows.length > STATISTICS_CACHE_MAX_ROWS) return;
+  let rows = entry.rows.length;
+  for (const value of cache.values()) rows += value.rows.length;
+  while (cache.size >= STATISTICS_CACHE_MAX_ENTRIES || rows > STATISTICS_CACHE_MAX_ROWS) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    rows -= cache.get(oldest)!.rows.length;
+    cache.delete(oldest);
+  }
+  cache.set(key, entry);
 }
 
 export async function fetchStatistics(
@@ -96,12 +146,13 @@ export async function fetchStatistics(
     cached &&
     cached.rows.length > 0 &&
     cached.from <= start.getTime() &&
+    Number(cached.rows[cached.rows.length - 1].start) < end.getTime() &&
     now - cached.fetchedAt < STATISTICS_CACHE_TTL_MS
       ? cached
       : undefined;
   const from = reusable ? Number(reusable.rows[reusable.rows.length - 1].start) : start.getTime();
 
-  const statistics = await hass.callWS<Statistics>({
+  const statistics = await request<Statistics>(hass, {
     type: 'recorder/statistics_during_period',
     start_time: new Date(from).toISOString(),
     end_time: end.toISOString(),
@@ -114,7 +165,7 @@ export async function fetchStatistics(
   const rows = reusable
     ? [...reusable.rows.filter((row) => Number(row.start) < from), ...fresh.filter((row) => Number(row.start) >= from)]
     : fresh;
-  cache?.set(key, {
+  cacheStatistics(cache, key, {
     from: reusable ? reusable.from : start.getTime(),
     fetchedAt: reusable ? reusable.fetchedAt : now,
     rows,
@@ -122,14 +173,33 @@ export async function fetchStatistics(
   return rows.filter((row) => Number(row.end) > start.getTime() && Number(row.start) < end.getTime());
 }
 
-const statisticsMetadataCache: Map<string, Promise<StatisticsMetadata | undefined>> = new Map();
+const statisticsMetadataCaches = new WeakMap<
+  object,
+  Map<
+    string,
+    {
+      expiresAt: number;
+      promise: Promise<StatisticsMetadata | undefined>;
+    }
+  >
+>();
 
 export function getStatisticsMetadata(
   hass: HomeAssistant | undefined,
   statisticId: string,
 ): Promise<StatisticsMetadata | undefined> {
   if (!hass) return Promise.resolve(undefined);
-  let cached = statisticsMetadataCache.get(statisticId);
+  const connection = hass.connection ?? hass;
+  let cache = statisticsMetadataCaches.get(connection);
+  if (!cache) {
+    cache = new Map();
+    statisticsMetadataCaches.set(connection, cache);
+  }
+  const now = Date.now();
+  for (const [id, entry] of cache) {
+    if (entry.expiresAt <= now) cache.delete(id);
+  }
+  let cached = cache.get(statisticId)?.promise;
   if (!cached) {
     cached = hass
       .callWS<StatisticsMetadata[]>({
@@ -140,10 +210,18 @@ export function getStatisticsMetadata(
         Array.isArray(metadata) ? metadata.find((item) => item.statistic_id === statisticId) : undefined,
       )
       .catch(() => {
-        statisticsMetadataCache.delete(statisticId);
+        if (cache.get(statisticId)?.promise === cached) cache.delete(statisticId);
         return undefined;
       });
-    statisticsMetadataCache.set(statisticId, cached);
+    if (cache.size >= STATISTICS_CACHE_MAX_ENTRIES) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(statisticId, { expiresAt: now + STATISTICS_CACHE_TTL_MS, promise: cached });
+  } else {
+    const entry = cache.get(statisticId)!;
+    cache.delete(statisticId);
+    cache.set(statisticId, entry);
   }
   return cached;
 }

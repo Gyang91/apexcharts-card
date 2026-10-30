@@ -28,6 +28,7 @@ However, some things might be broken :grin:
 
 - [What's different in this fork](#whats-different-in-this-fork)
 - [Reliability and data status](#reliability-and-data-status)
+- [Large-history performance](#large-history-performance)
 - [Installation](#installation)
   - [HACS (recommended)](#hacs-recommended)
   - [Manual install](#manual-install)
@@ -104,6 +105,35 @@ On a failed refresh, the existing chart is retained and may be out of date. `sho
 Detaching a card cancels queued recorder-delay refreshes and destroys its charts. Pending history requests cannot always be cancelled, but their results cannot update a replacement chart after reconnect. The new card waits for an existing series fetch to settle before refreshing it again.
 
 Development checks include real Chromium rendering with a simulated HA data source, mobile-width resizing, fixed-height Sections-style layouts, disconnection/reconnection, legend/brush behavior and failure recovery. These checks complement, rather than replace, testing in a real Home Assistant dashboard.
+
+## Large-history performance
+
+For dense line/area charts, enable **Reduce rendered points** in the visual editor's General tab, or set:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 7d
+downsample: true
+series:
+  - entity: sensor.temperature
+    type: line
+```
+
+`downsample` is **off by default**. It reduces rendered samples, not the history fetched from HA. Each horizontal pixel bucket retains its first/last samples and minimum/maximum in timestamp order. Null/non-finite gaps are retained, including the numeric samples on either side. Header values, grouping, thresholds, extrema annotations and custom axis limits continue to use full history. Automatic axes retain global extrema because sampling retains each bucket's extrema, including offscreen buckets.
+
+Zooming, panning, brush selection and width changes resample from the retained data without requesting history again. The main chart spends its point budget on the visible range; the brush keeps a separately sampled full overview. Narrow enough ranges restore all local samples. Existing advanced chart event callbacks are preserved. ApexCharts' zoom controls still need to be enabled through `apex_config` if desired.
+
+Important trade-offs:
+
+- Unstacked line/area series are supported. Columns, scatter, stacked charts and stepped curves remain full-resolution to preserve totals, distributions and state durations. Mixed charts sample only eligible series.
+- Sampling approximates the drawn curve; it does not preserve every intermediate point or interpolation detail. Hover/tooltips and data exports from ApexCharts see rendered samples, not every original sample. Shared tooltips may have fewer exact timestamp matches between independently sampled series.
+- Custom callbacks using `dataPointIndex` receive an index into the rendered data. Leave sampling disabled if your callback needs original point indices.
+- Gaps take priority over a hard point limit: gap-heavy histories can retain more samples. Unordered or degenerate timestamp domains are left unchanged. Up to four numeric samples per pixel bucket are selected (width capped at 4,096 buckets), plus gap boundaries and offscreen extrema.
+- Full source history is still retained for accurate calculations and adaptive detail, and is released with the card. This is not a hard memory cap for a single very large history. For long periods, prefer suitable `statistics` or `group_by` settings to reduce source data as well.
+
+Recorder requests with identical entity, range and wire options are shared **only while pending**, within one HA connection. Different attribute/minimal-history requirements remain separate. Completed history responses are not added to a global history cache. Statistics caches are bounded to 64 entries and 32,000 total rows per connection with a ten-minute lifetime; oversized responses are returned in full but not retained. Metadata is connection-scoped, bounded to 64 IDs and expires after ten minutes. Eviction can cause a later fetch, never truncated returned data. No cache-cleanup polling is added.
+
+The browser benchmark compares 100,000-point full-detail and sampled charts on the same host and checks point preservation. Local timings are illustrative, not wall-tablet guarantees; use `npm run test:browser -- --grep @performance` to reproduce measurements. There are no additional runtime dependencies.
 
 ## Installation
 
@@ -188,6 +218,7 @@ The card strictly validates all the options available (but not for the `apex_con
 | `show` | object | | v1.0.0 | See [show](#main-show-options) |
 | `hours_12` | boolean | | v1.8.0 | If undefined, it will follow Home-Assistant's user time format. If `true`, it will force time to be displayed in 12h format. If `false` it will force the time to be displayed in 24h format. |
 | `cache` | boolean | `true` | v1.0.0 | Use in-browser data caching to reduce the load on Home Assistant's server |
+| `downsample` | boolean | `false` | v2.11.0 | Optional width-aware line/area sampling with adaptive zoom/brush detail. Calculations retain full history. See [Large-history performance](#large-history-performance) for exclusions and trade-offs. |
 | `stacked` | boolean | `false` | v1.0.0 | Enable if you want the data to be stacked on the graph |
 | `layout` | string | | v1.0.0 | See [layouts](#layouts) |
 | `header` | object | | v1.0.0 | See [header](#header-options) |
@@ -1053,9 +1084,12 @@ Ordered by customer value for Home Assistant: reliable operation first, then fas
 
 ### 2. Speed on tablets and large histories
 
-* [ ] Measure recorder/statistics requests, rendering and memory before optimizing; extend existing request sharing only where duplicate work is demonstrated.
-* [ ] Add optional width-aware downsampling that preserves spikes, null gaps and endpoints. Header values, aggregation and axis limits must use original data.
-* [ ] Verify bounded cache memory and avoid redundant renders during bursts of HA updates.
+* [X] Measure duplicate recorder/statistics requests and share identical pending calls within one HA connection; test wire-option isolation and retries.
+* [X] Add opt-in width-aware downsampling preserving spikes, gaps and endpoints, with adaptive zoom, brush and resize detail. Header values, aggregation and custom axis limits use original data.
+* [X] Add a same-host 100,000-point full-detail versus sampled Chromium benchmark, including displayed-point and source-data assertions.
+* [X] Bound connection-scoped statistics/metadata caches by entry count, statistics row count and lifetime, without truncating returned data.
+* [X] Coalesce adaptive redraws and avoid brush redraws on main-only viewport changes; cover request sharing and cache eviction with regressions.
+* [ ] Validate long-running dashboard memory, HA update bursts and touch/brush interaction on a representative wall tablet. Source history remains full-resolution; bounded shared caches are not a total card-memory guarantee.
 
 ### 3. Everyday usability
 

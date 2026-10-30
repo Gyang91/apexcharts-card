@@ -1,6 +1,9 @@
 export const fr: Record<string, string> = {
   // ── Runtime de la carte ──
   'card.loading': 'Chargement…',
+  'field.downsample': 'Réduire les points affichés',
+  'helper.downsample':
+    'Échantillonnage optionnel des courbes selon la largeur. Les calculs gardent tout l’historique ; le zoom et la brosse rétablissent le détail local.',
   'card.warning.entityNotAvailable': 'Entité indisponible : {entity}',
   'card.warning.initializationFailed':
     'Le graphique n’a pas pu démarrer. Rechargez le tableau de bord ; les détails sont dans la console du navigateur.',

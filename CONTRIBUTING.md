@@ -42,6 +42,10 @@ On Linux, use `playwright install --with-deps chromium --only-shell` when system
 
 The fixture exercises the production bundle, including mobile resizing, Sections-style height, reconnects, brush/legend behavior and visible load-error recovery. The performance scenario renders three cards with 10,000 generated points each, checks that samples were retained, and reports elapsed time in the test output. It does not measure HA network latency or represent a wall-tablet benchmark. Compare timings on the same machine; do not treat different CI runners as equivalent hardware.
 
+The optional-downsampling scenarios also generate 100,000 points, compare full-detail and sampled rendering in alternating runs, and verify extrema, gaps, original history and header values. They exercise native zoom, mobile resizing and actual mouse-driven brush selection without new history requests. Run just these with `npm run test:browser -- downsample`, or use the `@performance` selector above for both benchmarks. Timing includes fixture navigation; it is reported rather than enforced as a flaky absolute threshold. Point-count and data-preservation requirements are enforced.
+
+Recorder unit regressions check concurrent request counts, connection/range/wire-option separation, attribute isolation, retry behavior, ten-minute expiry and cache eviction at 64 entries or 32,000 statistics rows. Eviction must not truncate returned statistics. Adaptive rendering must not alter numerical calculations or install sampling work for unsupported/disabled configurations.
+
 `npm run check:bundle` enforces ceilings of 1,550,000 bytes raw and 450,000 bytes gzip (level 9). These are explicit review budgets, not a claim about HA's HTTP compression. Investigate growth before adjusting them. No additional runtime dependency is needed for either measurement.
 
 Before completing a reliability milestone, also test real HA entity/statistics data, dashboard navigation, connection recovery and a representative lower-powered device. Simulated browser tests cannot establish compatibility with every HA version or guarantee the absence of defects.

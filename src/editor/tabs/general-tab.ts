@@ -168,6 +168,12 @@ export class ApexChartsCardEditorGeneral extends LitElement {
         label: computeLabel({ name: 'stacked' } as HaFormSchema),
         value: this.config.stacked ?? false,
       },
+      {
+        name: 'downsample',
+        label: t('field.downsample'),
+        helper: t('helper.downsample'),
+        value: this.config.downsample ?? false,
+      },
     ];
     return html`
       <div class="section">
