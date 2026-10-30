@@ -171,6 +171,8 @@ export const ChartCardYAxisExternal = t.iface([], {
   "id": t.opt("string"),
   "show": t.opt("boolean"),
   "opposite": t.opt("boolean"),
+  "logarithmic": t.opt("boolean"),
+  "log_base": t.opt("number"),
   "min": t.opt(t.union(t.lit('auto'), "number", "string")),
   "max": t.opt(t.union(t.lit('auto'), "number", "string")),
   "align_to": t.opt("number"),

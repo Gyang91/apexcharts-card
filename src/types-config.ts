@@ -178,6 +178,8 @@ export interface ChartCardYAxisExternal {
   id?: string;
   show?: boolean;
   opposite?: boolean;
+  logarithmic?: boolean;
+  log_base?: number;
   min?: 'auto' | number | string;
   max?: 'auto' | number | string;
   align_to?: number;
