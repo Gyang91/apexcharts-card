@@ -54,6 +54,8 @@ To deliberately refresh the four generated-data README screenshots in PowerShell
 
 `npm run check:bundle` enforces ceilings of 1,550,000 bytes raw and 450,000 bytes gzip (level 9). These are explicit review budgets, not a claim about HA's HTTP compression. Investigate growth before adjusting them. No additional runtime dependency is needed for either measurement.
 
+The `glob` and `minimatch` overrides in `package.json` select fixed development-tool versions. When changing them, verify both the generated-config build and ESLint, in addition to the test suites; they do not add code to the card bundle.
+
 Before completing a reliability milestone, also test real HA entity/statistics data, dashboard navigation, connection recovery and a representative lower-powered device. Simulated browser tests cannot establish compatibility with every HA version or guarantee the absence of defects.
 
 ### Pre-commit hooks

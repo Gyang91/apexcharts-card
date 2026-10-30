@@ -81,8 +81,9 @@
     "vitest": "^5.0.5"
   },
   "overrides": {
+    "minimatch": "^11.0.3",
     "ts-interface-builder": {
-      "glob": "^13.0.6"
+      "glob": "^14.0.3"
     }
   }
 }
