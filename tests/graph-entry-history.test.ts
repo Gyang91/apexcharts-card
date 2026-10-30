@@ -2,6 +2,8 @@
 // with the smallest payload the series needs; user functions are compiled once
 // per series; a failed load never leaves the series locked.
 import GraphEntry from '../src/graphEntry';
+import localForage from 'localforage';
+import * as pjson from '../package.json';
 import { mkHass, mkState } from './fixtures/hass';
 
 const HOUR = 3600 * 1000;
@@ -22,10 +24,10 @@ function seriesConfig(extra: AnyRec = {}): AnyRec {
   };
 }
 
-function makeEntry(config: AnyRec, callWS: (msg: AnyRec) => Promise<unknown>): GraphEntry {
+function makeEntry(config: AnyRec, callWS: (msg: AnyRec) => Promise<unknown>, cache = false): GraphEntry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const entry = new GraphEntry(0, 24 * HOUR, false, config as any, undefined);
-  const hass = mkHass({ [ENTITY]: mkState(ENTITY, '21', { unit_of_measurement: '°C' }) }) as AnyRec;
+  const entry = new GraphEntry(0, 24 * HOUR, cache, config as any, undefined);
+  const hass = mkHass({ [config.entity]: mkState(config.entity, '21', { unit_of_measurement: '°C' }) }) as AnyRec;
   hass.callWS = callWS;
   hass.callApi = async () => {
     throw new Error('REST history must not be used');
@@ -41,7 +43,147 @@ const rows = [
   { s: 'unavailable', lu: (T0 + 2 * HOUR) / 1000 },
 ];
 
+describe('binary sensor states', () => {
+  const binary = 'binary_sensor.heating';
+  const states = ['on', 'off', 'unknown', 'unavailable', 'on'];
+  const binaryRows = states.map((s, i) => ({
+    s,
+    lu: (T0 + i * HOUR) / 1000,
+    a: { battery: '80', mode: 'on' },
+  }));
+
+  it.each([
+    ['previous version', '0.0.0', [null, null], 1],
+    ['current version', pjson.version, [1, 0], 0],
+  ])('handles %s cached history before the asynchronous purge finishes', async (_, version, cached, requests) => {
+    const getItem = vi.spyOn(localForage, 'getItem').mockResolvedValue({
+      span: 24 * HOUR,
+      card_version: version,
+      last_fetched: new Date(),
+      data: [
+        [T0, cached[0]],
+        [T0 + HOUR, cached[1]],
+      ],
+    });
+    const setItem = vi.spyOn(localForage, 'setItem').mockImplementation(async (_key, value) => value);
+    try {
+      const callWS = vi.fn(async () => ({ [binary]: binaryRows.slice(0, 2) }));
+      const entry = makeEntry(seriesConfig({ entity: binary }), callWS, true);
+      const hass = (entry as AnyRec)._hass;
+      hass.states[binary].last_changed = new Date(T0 + HOUR).toISOString();
+      await entry._updateHistory(new Date(T0), new Date(T0 + 2 * HOUR));
+      expect(callWS).toHaveBeenCalledTimes(requests);
+      expect(entry.history).toEqual([
+        [T0, 1],
+        [T0 + HOUR, 0],
+      ]);
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
+  });
+
+  it.each([
+    [undefined, [1, 0, null, null, 1]],
+    ['zero', [1, 0, 0, 0, 1]],
+    ['last', [1, 0, 0, 0, 1]],
+  ])('maps raw on/off and respects fill_raw: %s', async (fill_raw, expected) => {
+    const entry = makeEntry(seriesConfig({ entity: binary, fill_raw }), async () => ({ [binary]: binaryRows }));
+    await entry._updateHistory(new Date(T0), new Date(T0 + 5 * HOUR));
+    expect(entry.history.map(([, value]) => value)).toEqual(expected);
+  });
+
+  it('passes original strings to explicit transforms instead of converting them first', async () => {
+    const entry = makeEntry(
+      seriesConfig({
+        entity: binary,
+        transform: "return x === 'on' ? 0 : x === 'off' ? 1 : null;",
+      }),
+      async () => ({ [binary]: binaryRows }),
+    );
+    await entry._updateHistory(new Date(T0), new Date(T0 + 5 * HOUR));
+    expect(entry.history.map(([, value]) => value)).toEqual([0, 1, null, null, 0]);
+  });
+
+  it('does not convert attributes or other nonnumeric domains', async () => {
+    const attribute = makeEntry(seriesConfig({ entity: binary, attribute: 'battery' }), async () => ({
+      [binary]: binaryRows,
+    }));
+    await attribute._updateHistory(new Date(T0), new Date(T0 + 5 * HOUR));
+    expect(attribute.history.map(([, value]) => value)).toEqual([80, 80, 80, 80, 80]);
+
+    const textAttribute = makeEntry(seriesConfig({ entity: binary, attribute: 'mode' }), async () => ({
+      [binary]: binaryRows,
+    }));
+    await textAttribute._updateHistory(new Date(T0), new Date(T0 + 5 * HOUR));
+    expect(textAttribute.history.map(([, value]) => value)).toEqual([null, null, null, null, null]);
+
+    const sensor = makeEntry(seriesConfig(), async () => ({ [ENTITY]: binaryRows }));
+    await sensor._updateHistory(new Date(T0), new Date(T0 + 5 * HOUR));
+    expect(sensor.history.map(([, value]) => value)).toEqual([null, null, null, null, null]);
+  });
+
+  it.each([
+    ['on', 1],
+    ['off', 0],
+    ['unknown', null],
+    ['unavailable', null],
+  ])('also converts %s when ignore_history is enabled', async (state, expected) => {
+    const entry = makeEntry(seriesConfig({ entity: binary, ignore_history: true }), async () => {
+      throw new Error('ignore_history must not request history');
+    });
+    entry.hass = mkHass({ [binary]: mkState(binary, state) });
+    await entry._updateHistory(new Date(T0), new Date(T0 + HOUR));
+    expect(entry.history.map(([, value]) => value)).toEqual([expected]);
+  });
+});
+
 describe('websocket recent history', () => {
+  it('isolates transforms from the statistics row shared by concurrent series', async () => {
+    const connection = {};
+    const hass = mkHass({ [ENTITY]: mkState(ENTITY, '1') }) as AnyRec;
+    const item = {
+      statistic_id: ENTITY,
+      start: T0,
+      end: T0 + HOUR,
+      last_reset: null,
+      max: 10,
+      mean: 5,
+      min: 1,
+      sum: null,
+      state: null,
+      change: null,
+    };
+    hass.connection = connection;
+    hass.callWS = vi.fn(async () => ({ [ENTITY]: [item] }));
+    const lower = new GraphEntry(
+      0,
+      24 * HOUR,
+      false,
+      seriesConfig({ statistics: { type: 'min', period: 'hour' }, transform: 'entity.max = 999; return x;' }) as never,
+      undefined,
+    );
+    const upper = new GraphEntry(
+      0,
+      24 * HOUR,
+      false,
+      seriesConfig({ statistics: { type: 'max', period: 'hour' } }) as never,
+      undefined,
+    );
+    lower.hass = hass;
+    upper.hass = hass;
+
+    await Promise.all([
+      lower._updateHistory(new Date(T0), new Date(T0 + HOUR)),
+      upper._updateHistory(new Date(T0), new Date(T0 + HOUR)),
+    ]);
+
+    expect(hass.callWS).toHaveBeenCalledOnce();
+    expect(lower.history[0][1]).toBe(1);
+    expect(upper.history[0][1]).toBe(10);
+    expect(item.max).toBe(10);
+  });
+
   it('requests a minimal payload for plain state series and parses compressed rows', async () => {
     const calls: AnyRec[] = [];
     const entry = makeEntry(seriesConfig(), async (msg) => {

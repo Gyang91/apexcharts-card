@@ -119,6 +119,7 @@ export interface ChartCardAllSeriesExternalConfig {
     // Calendar buckets in the dashboard's time zone (DST and month lengths
     // included). Replaces `duration` and `offset` when set.
     period?: CalendarPeriod;
+    align?: 'start' | 'middle' | 'end';
     offset?: string;
     func?: GroupByFunc;
     fill?: GroupByFill;

@@ -113,6 +113,7 @@ export const ChartCardAllSeriesExternalConfig = t.iface([], {
   "group_by": t.opt(t.iface([], {
     "duration": t.opt("string"),
     "period": t.opt("CalendarPeriod"),
+    "align": t.opt(t.union(t.lit('start'), t.lit('middle'), t.lit('end'))),
     "offset": t.opt("string"),
     "func": t.opt("GroupByFunc"),
     "fill": t.opt("GroupByFill"),

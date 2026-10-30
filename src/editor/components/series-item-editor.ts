@@ -129,12 +129,13 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
       duration: g.duration || '',
       func: g.func || '',
       fill: g.fill || '',
+      align: g.align || '',
     };
   }
 
   private _groupByChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
-    const data = ev.detail.value as { duration?: string; func?: string; fill?: string };
+    const data = ev.detail.value as { duration?: string; func?: string; fill?: string; align?: string };
     const g: NonNullable<Series['group_by']> = { ...(this.series?.group_by || {}) };
     if ('duration' in data) {
       if (data.duration) g.duration = data.duration;
@@ -147,6 +148,10 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
     if ('fill' in data) {
       if (data.fill) g.fill = data.fill as NonNullable<Series['group_by']>['fill'];
       else delete g.fill;
+    }
+    if ('align' in data) {
+      if (data.align) g.align = data.align as NonNullable<Series['group_by']>['align'];
+      else delete g.align;
     }
     this._fire({ group_by: Object.keys(g).length > 0 ? g : undefined } as Partial<Series>);
   };

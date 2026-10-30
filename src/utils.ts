@@ -71,6 +71,14 @@ export function isExternalStatisticId(entityId: string | undefined): boolean {
   return !!entityId && /^[a-z0-9_]+:[a-z0-9_]+$/.test(entityId);
 }
 
+export function parseNumericState(value: unknown, binary = false): number | null {
+  if (binary && value === 'on') return 1;
+  if (binary && value === 'off') return 0;
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const parsed = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 // Compile user code from the card config (transform, data_generator) into a
 // strict-mode function. Compile once and reuse: it runs per point/refresh.
 export function compileUserFunction<F extends (...args: never[]) => unknown>(

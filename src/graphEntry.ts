@@ -8,7 +8,7 @@ import {
   HistoryPoint,
   StatisticValue,
 } from './types';
-import { compileUserFunction, compress, decompress, isExternalStatisticId, log } from './utils';
+import { compileUserFunction, compress, decompress, isExternalStatisticId, log, parseNumericState } from './utils';
 import { fetchHistory, fetchStatistics } from './recorder';
 import { addPeriods, displayTimeZone, periodBoundaries } from './calendar';
 import localForage from 'localforage';
@@ -257,7 +257,8 @@ export default class GraphEntry {
     const data: EntityEntryCache | undefined | null = await localForage.getItem(
       `${key}_${this._md5Config}${compressed ? '' : '-raw'}`,
     );
-    return data ? (compressed ? decompress(data) : data) : undefined;
+    const value: EntityEntryCache | undefined = data ? (compressed ? decompress(data) : data) : undefined;
+    return value?.card_version === pjson.version ? value : undefined;
   }
 
   private async _setCache(
@@ -307,11 +308,7 @@ export default class GraphEntry {
       } else {
         currentState = this._entityState.state;
       }
-      if (this._config.transform) {
-        currentState = this._applyTransform(currentState, this._entityState);
-      }
-      let stateParsed: number | null = parseFloat(currentState as string);
-      stateParsed = !Number.isNaN(stateParsed) ? stateParsed : null;
+      const stateParsed = this._parseState(currentState, this._entityState);
       this._computedHistory = [[new Date(this._entityState.last_updated).getTime(), stateParsed]];
       return true;
     }
@@ -381,11 +378,13 @@ export default class GraphEntry {
           const newFilledHistory: StatisticValue[] = [];
           newHistory.forEach((item) => {
             if (prevItem) {
-              const step = Number(item.end) - Number(item.start);
               let currentStart = Number(prevItem.end);
               const targetEnd = Number(item.start);
-              while (currentStart < targetEnd && step > 0) {
-                const currentEnd = Math.min(currentStart + step, targetEnd);
+              const period = this._config.statistics?.period || DEFAULT_STATISTICS_PERIOD;
+              while (currentStart < targetEnd) {
+                const nextStart = addPeriods(currentStart, period, 1, this._hass?.config.time_zone);
+                if (nextStart <= currentStart) break;
+                const currentEnd = Math.min(nextStart, targetEnd);
                 newFilledHistory.push({
                   statistic_id: prevItem.statistic_id,
                   start: currentStart.toString(),
@@ -410,10 +409,11 @@ export default class GraphEntry {
             lastNonNull = history.data[history.data.length - 1][1];
           }
           newStateHistory = newFilledHistory.map((item) => {
+            const isolatedItem = { ...item };
             let stateParsed: number | null;
             [lastNonNull, stateParsed] = this._transformAndFill(
               item[this._config.statistics?.type || DEFAULT_STATISTICS_TYPE],
-              item,
+              isolatedItem,
               lastNonNull,
             );
 
@@ -508,8 +508,15 @@ export default class GraphEntry {
       return false;
     }
     if (this._config.group_by.func !== 'raw') {
+      const align = this._config.group_by.align || (this._config.type === 'column' ? 'middle' : 'start');
       const res: EntityCachePoints = this._dataBucketer(history, boundaries!, start).map((bucket) => {
-        return [bucket.timestamp, this._func!(bucket.data, bucket.timestamp, bucket.end)];
+        const timestamp =
+          align === 'middle'
+            ? bucket.timestamp + (bucket.end - bucket.timestamp) / 2
+            : align === 'end'
+              ? bucket.end
+              : bucket.timestamp;
+        return [timestamp, this._func!(bucket.data, bucket.timestamp, bucket.end)];
       });
       if ([undefined, 'line', 'area'].includes(this._config.type)) {
         while (res.length > 0 && res[0][1] === null) res.shift();
@@ -528,12 +535,7 @@ export default class GraphEntry {
     const align = this._config.statistics?.align || 'middle';
     if (align === 'start') return startMs;
     if (align === 'end') return endMs;
-    const period = this._config.statistics?.period;
-    if (period === '5minute') return startMs + 150000; // 2min30s
-    if (!period || period === 'hour') return startMs + 1800000; // 30min
-    if (period === 'day') return startMs + 43200000; // 12h
-    if (period === 'week') return startMs + 259200000; // 3.5d
-    return startMs + 1296000000; // 15d
+    return startMs + (endMs - startMs) / 2;
   }
 
   // Pad the whole [start, end] span with [ts, null] points at every statistics
@@ -553,12 +555,13 @@ export default class GraphEntry {
     // Safety net against pathological spans (e.g. misconfigured graph_span)
     const MAX_PADDING_POINTS = 5000;
     const padded = [...points];
+    const timeZone = this._hass?.config.time_zone;
 
     // Backward from the first real bucket start down to the graph start
     let curEnd = Number(stats[0].start);
     let guard = 0;
     while (curEnd > start.getTime() && guard++ < MAX_PADDING_POINTS) {
-      const curStart = addPeriods(curEnd, period, -1, undefined);
+      const curStart = addPeriods(curEnd, period, -1, timeZone);
       padded.unshift([this._statDisplayDate(curStart, curEnd), null]);
       curEnd = curStart;
     }
@@ -567,7 +570,7 @@ export default class GraphEntry {
     let curStart = Number(stats[stats.length - 1].end);
     guard = 0;
     while (curStart < end.getTime() && guard++ < MAX_PADDING_POINTS) {
-      const nextEnd = addPeriods(curStart, period, 1, undefined);
+      const nextEnd = addPeriods(curStart, period, 1, timeZone);
       padded.push([this._statDisplayDate(curStart, nextEnd), null]);
       curStart = nextEnd;
     }
@@ -580,11 +583,7 @@ export default class GraphEntry {
     item: HassHistoryEntry | StatisticValue,
     lastNonNull: number | null,
   ): [number | null, number | null] {
-    if (this._config.transform) {
-      currentState = this._applyTransform(currentState, item);
-    }
-    let stateParsed: number | null = parseFloat(currentState as string);
-    stateParsed = !Number.isNaN(stateParsed) ? stateParsed : null;
+    let stateParsed = this._parseState(currentState, item);
     if (stateParsed === null) {
       if (this._config.fill_raw === 'zero') {
         stateParsed = 0;
@@ -595,6 +594,16 @@ export default class GraphEntry {
       lastNonNull = stateParsed;
     }
     return [lastNonNull, stateParsed];
+  }
+
+  private _parseState(currentState: unknown, item: HassHistoryEntry | StatisticValue): number | null {
+    if (this._config.transform) {
+      return parseNumericState(this._applyTransform(currentState, item));
+    }
+    return parseNumericState(
+      currentState,
+      this._entityID.startsWith('binary_sensor.') && !this._config.attribute && !this._config.statistics,
+    );
   }
 
   private _applyTransform(value: unknown, historyItem: HassHistoryEntry | StatisticValue): number | null {

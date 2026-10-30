@@ -513,6 +513,8 @@ series:
 
 Since v2.8.3, statistics fetched by one card are kept for 10 minutes and shared with the others: a card shown again (tabs, visibility conditions) only asks Home Assistant for the current, still open period.
 
+Since v2.13.0, missing statistics periods follow Home Assistant's calendar time zone and actual period boundaries, including daylight-saving changes. Middle alignment uses each period's actual start and end.
+
 #### External statistics
 
 Since v2.6.0, `entity` also accepts external long-term statistic IDs (`source:object_id`, e.g. `veolia:1235075_daily_consumption`, as pushed by integrations like Veolia, GRDF or the energy dashboard imports). These have no entity in Home Assistant (no state, no history), only long-term statistics, so:
@@ -577,8 +579,29 @@ The position of the marker will only update when the card updates (state change 
 | `func` | string | `raw` | v1.0.0 | See [func](#func-options) |
 | `duration` | string | `1h` | v1.0.0 | If `func` is **not** `raw` only. It builds buckets of states over a `duration`. Doesn't work for months (use `period`). Eg of valid values: `2h`, `1d`, `10s`, `25min`, `1h30`, ... |
 | `period` | string | | v2.8.0 | If `func` is **not** `raw` only. Builds calendar buckets instead of fixed `duration` ones: `hour`, `day`, `week` (starting Monday), `month`, `quarter` or `year`, in the time zone the dashboard displays. Buckets follow DST changes and month lengths, and replace `duration` and `offset`. When every series of the chart uses the same `period`, the x axis and the tooltip show the period (`Oct 27`, `Oct 2026`, `Q3 2026`, `2026`) |
+| `align` | string | `middle` for columns, `start` otherwise | v2.13.0 | If `func` is **not** `raw` only. Place each aggregated point at the `start`, `middle` or `end` of its bucket. The midpoint uses the actual bucket boundaries, including DST and different month lengths. Available in the visual editor. |
 | `fill` | string | `last` | v1.0.0 | If `func` is **not** `raw` only. If there is any missing value in the buckets of history data (grouped by duration), `last` will replace them with the last non-empty state, `zero` will fill missing values with `0`, `'null'` will fill missing values with `null` |
 | `start_with_last` | boolean | `false` | v1.8.0 | If `true`, each bucket of data will start with the last value from the previous bucket of data. Mostly useful only with `func: diff` |
+
+**Grouped-column alignment change (v2.13.0):** aggregated columns now use bucket midpoints, so an hourly column is centered at `10:30` for the `10:00–11:00` interval rather than straddling `10:00`. Aggregates, source samples and raw columns are unchanged; the displayed timestamp (including the tooltip) moves. Set `group_by.align: start` to retain the previous placement. Lines and areas retain start alignment unless explicitly configured otherwise.
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 7d
+span:
+  start: day
+  offset: -6d
+series:
+  - entity: sensor.daily_consumption
+    type: column
+    group_by:
+      func: max
+      period: day
+      align: middle
+      fill: 'null'
+```
+
+Use the aggregation appropriate to your sensor; do not sum readings of a cumulative energy counter. Prefer HA statistics `type: change` for counter consumption. Statistics retain their separate `statistics.align` option (default `middle`), now using the actual recorder start/end boundaries rather than a fixed 12-hour/15-day offset. Both modes leave native column width and spacing under `apex_config.plotOptions.bar.columnWidth`: columns are not variable-width interval rectangles, particularly across unequal calendar periods or mixed intervals.
 
 ### `func` Options
 
@@ -665,12 +688,27 @@ Eg:
     end: day
   ```
 
+### Binary sensors
+
+**Since v2.13.0:** `binary_sensor` state history works without a transform: `on` becomes `1`, `off` becomes `0`, and `unknown`/`unavailable` remain gaps. This also applies to `ignore_history` and raw header values. Numeric attributes are still read normally; other nonnumeric domains are not converted automatically.
+
+```yaml
+type: custom:apexcharts-card
+series:
+  - entity: binary_sensor.heating
+    name: Heating active
+    curve: stepline
+    fill_raw: 'null'
+```
+
+An explicit `transform` takes precedence and receives the original state string. `fill_raw: zero` or `fill_raw: last` can intentionally replace gaps; the default preserves them. Step curves suit discrete states better than smoothing. This is a numeric time-series view, not a categorical state timeline.
+
 ### `transform` Option
 
 With transform, you can modify raw data coming from Home-Assistant's history using a javascript function.
 
 Some of the things you can do:
-* Transform any state into a number (for eg. for binary_sensors)
+* Transform nonnumeric states into numbers, or override the built-in binary-sensor mapping
 * Apply a different scale to your data (eg: divide by 1024 to convert bits into Kbits)
 * Do anything that javascript allows with the value
 
@@ -682,14 +720,14 @@ Your javascript code will receive:
 And should return a `number`, a `float` or `null`.
 
 Some examples:
-* Convert `binary_sensor` to numbers (`1` is `on`, `0` is `off`)
+* Explicit binary-state conversion (`1` is `on`, `0` is `off`, missing states remain gaps). Optional with the built-in support above:
   ```yaml
   type: custom:apexcharts-card
   update_delay: 3s
   update_interval: 1min
   series:
     - entity: binary_sensor.heating
-      transform: "return x === 'on' ? 1 : 0;"
+      transform: "return x === 'on' ? 1 : x === 'off' ? 0 : null;"
   ```
 
 * Scale a sensor:
@@ -1223,9 +1261,13 @@ series:
 
 ## Known issues
 
-* Sometimes, if `smoothing` is used alongside `area` and there is missing data in the chart, the background will be glitchy. See [apexcharts.js/#2180](https://github.com/apexcharts/apexcharts.js/issues/2180)
-* `binary_sensor` is not yet supported.
-* Bars will span left and right of the data point. Not so great if you use `func` to aggregate your data. See [apexcharts.js/#1688](https://github.com/apexcharts/apexcharts.js/issues/1688)
+The three historical entries have been reviewed against the current renderer:
+
+* **Smooth areas with gaps:** the old background glitch ([apexcharts/apexcharts.js#2180](https://github.com/apexcharts/apexcharts.js/issues/2180)) is not reproduced with the bundled renderer. A Chromium regression checks the actual filled SVG geometry around leading, consecutive interior and trailing nulls, including refresh and phone-width rendering. No additional workaround or rendering overhead is added. This is not a guarantee for every upstream combination of stacking, fill options or browser.
+* **Binary sensors:** native `on`/`off` conversion with preserved unavailable gaps is available since v2.13.0. Existing explicit transforms continue to work. See [Binary sensors](#binary-sensors).
+* **Grouped columns:** bucket-midpoint placement is available since v2.13.0, with `group_by.align: start` for legacy placement. A Chromium regression checks that fixed-hour columns lie inside their aggregation intervals. Raw columns still center on their sample timestamps, as expected by ApexCharts ([apexcharts/apexcharts.js#1688](https://github.com/apexcharts/apexcharts.js/issues/1688)). Native bar widths remain uniform rather than following unequal calendar bucket lengths.
+
+Live Home Assistant and physical-tablet acceptance checks in the roadmap remain outstanding; automated browser tests use simulated HA data.
 
 ## Roadmap
 
@@ -1273,7 +1315,7 @@ Full ApexCharts.js parity, built-in forecasting and heavyweight analytics are no
 ### Previously completed
 
 * [X] ~~Support more types of charts (pie, radial, polar area at least)~~
-* [X] ~~Support for `binary_sensors`~~
+* [X] ~~Support for `binary_sensors`~~ — explicit transforms are supported; native `on`/`off` mapping with preserved gaps is available since v2.13.0.
 * [X] ~~Support for aggregating data with exact boundaries (ex: aggregating data with `1h` could aggregate from `2:00:00am` to `2:59:59am` then `3:00:00am` to `3:59:59` exactly, etc...)~~
 * [X] ~~Display the graph from the start of the day, week, month, ... with support for "up to now" or until the "end of the period"~~
 * [X] ~~Support for any number of Y-axis~~ — one per displayed series, or shared axes; see [Multi-Y axis](#yaxis-options-multi-y-axis).

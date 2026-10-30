@@ -25,6 +25,7 @@ export interface ChartCardSeriesConfig extends ChartCardSeriesExternalConfig {
   group_by: {
     duration: string;
     period?: CalendarPeriod;
+    align?: 'start' | 'middle' | 'end';
     offset: string;
     func: GroupByFunc;
     fill: GroupByFill;
