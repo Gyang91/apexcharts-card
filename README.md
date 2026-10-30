@@ -571,18 +571,52 @@ Let's take this example:
 
 :warning: If this option is used, you can't define `yaxis` in the main `apex_config` option as it will be overridden.
 
-You can have as many y-axis as there are series defined in your configuration or less.
+You can have as many Y-axes as there are series displayed in the main chart, or fewer. There is no fixed axis-count limit. Assign each axis a unique `id` and each displayed series a matching `yaxis_id` when using multiple axes. Multiple series can share an axis; its automatic limits include all visible series assigned to it. Brush-only series do not consume main-chart axes.
 
 | Name | Type | Default | Since | Description |
 | ---- | :--: | :-----: | :---: | ----------- |
 |`id` | string | | v1.9.0 | **Required** if you define multiple yaxis. The identification name of the y-axis used to map it to a series. Needs to be unique. |
 | `show` | boolean | `true` | v1.9.0 | Whether to show or not the axis on the chart |
 | `opposite` | boolean | `false` | v1.9.0 | If `true`, the axis will be shown on the right side of the chart |
+| `logarithmic` | boolean | `false` | v2.9.0 | Use a logarithmic scale for this axis. Can be combined with linear axes. |
+| `log_base` | number | `10` | v2.9.0 | Logarithm base; must be finite and greater than 1. |
 | `min` | `auto`, number or string | `auto` | v1.9.0 | If undefined or `auto`, the `min` of the y-axis will be automatically calculated based on the min value of all the series associated with this axis. See [below](#minmax-format) for other formats. |
 | `max` | `auto`, number or string | `auto` | v1.9.0 | If undefined or `auto`, the `min` of the y-axis will be automatically calculated based on the max value of all the series associated with this axis. See [below](#minmax-format) for other formats. |
 | `decimals` | number | `1` | v1.10.0 | Number of decimals to show on this y-axis |
 | `apex_config` | object | | v1.9.0 | Any configuration from https://apexcharts.com/docs/options/yaxis/, except `min`, `max`, `show` and `opposite` |
-| `align_to` | number | | v1.10.0 | Aligns the yaxis extremas to the closest multiple of `align_to`. Only valid if `min` or `max` are not fixed values. |
+| `align_to` | number | | v1.10.0 | Aligns the yaxis extremas to the closest multiple of `align_to`. Only valid if `min` or `max` are not fixed values. Ignored for logarithmic axes, where arithmetic rounding could produce an invalid zero limit. |
+
+#### Logarithmic scales
+
+Enable `logarithmic` and optionally set `log_base` in YAML or the visual Y-axis editor. Existing `yaxis[].apex_config.logarithmic` and `logBase` settings remain supported; explicit `logarithmic` / `log_base` options take precedence.
+
+Use **strictly positive data** for logarithmic axes. Zero and negative numbers have no real logarithm; the card does not convert them to positive values or filter them out. Use a series `transform` to return `null` for nonpositive samples if needed. Avoid `invert: true` for positive-valued logarithmic series. Fixed and soft limits must be positive; relative limits must also leave a positive domain. ApexCharts controls logarithmic ticks and may fall back to a linear scale for a narrow or invalid domain. A logarithmic scale therefore does not guarantee a logarithmic rendering for every dataset.
+
+For example, three independent axes, mixing linear and logarithmic scales:
+
+```yaml
+type: custom:apexcharts-card
+series:
+  - entity: sensor.temperature
+    yaxis_id: temperature
+  - entity: sensor.power
+    yaxis_id: power
+    transform: "return Number(x) > 0 ? Number(x) : null;"
+  - entity: sensor.humidity
+    yaxis_id: humidity
+yaxis:
+  - id: temperature
+    decimals: 1
+  - id: power
+    opposite: true
+    logarithmic: true
+    log_base: 10
+    min: 1
+  - id: humidity
+    opposite: true
+    min: 0
+    max: 100
+```
 
 #### Min/Max Format
 
@@ -992,8 +1026,8 @@ Not ordered by priority:
 * [X] ~~Support for `binary_sensors`~~
 * [X] ~~Support for aggregating data with exact boundaries (ex: aggregating data with `1h` could aggregate from `2:00:00am` to `2:59:59am` then `3:00:00am` to `3:59:59` exactly, etc...)~~
 * [X] ~~Display the graph from the start of the day, week, month, ... with support for "up to now" or until the "end of the period"~~
-* [ ] Support for any number of Y-axis
-* [ ] Support for logarithmic
+* [X] ~~Support for any number of Y-axis~~ — one per displayed series, or shared axes; see [Multi-Y axis](#yaxis-options-multi-y-axis).
+* [X] ~~Support for logarithmic~~ — per-axis YAML and visual editor options; see [Logarithmic scales](#logarithmic-scales) for domain requirements and ApexCharts limitations.
 * [X] ~~Support for state mapping for non-numerical state sensors~~
 * [X] ~~Support for simple color threshold (easier to understand/write than the ones provided natively by ApexCharts)~~
 * [X] ~~Support for graph configuration templates à la [`button-card`](https://github.com/custom-cards/button-card/blob/master/README.md#configuration-templates)~~

@@ -9,7 +9,7 @@ import { BoolField } from './bool-grid';
 import { t } from '../localize';
 import './bool-grid';
 
-// `show` boolean rendered via bool-grid; rest stays in ha-form.
+// Boolean options use bool-grid; other fields use ha-form.
 // A function (not a module-level constant) so option labels re-resolve to the current locale
 // on every render.
 function getSchema(): HaFormSchema[] {
@@ -47,6 +47,7 @@ function getSchema(): HaFormSchema[] {
       schema: [
         { name: 'decimals', selector: { number: { min: 0, max: 10, step: 1, mode: 'box' } } },
         { name: 'align_to', selector: { number: { mode: 'box' } } },
+        { name: 'log_base', selector: { number: { mode: 'box' } } },
       ],
     },
   ];
@@ -75,16 +76,21 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
       max: y.max === undefined ? '' : String(y.max),
       decimals: y.decimals,
       align_to: y.align_to,
+      log_base: y.log_base ?? y.apex_config?.logBase,
     };
   }
 
   private _showChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
-    const { value } = ev.detail as { name: string; value: boolean };
+    const { name, value } = ev.detail as { name: string; value: boolean };
     const next: ChartCardYAxisExternal = { ...(this.yaxis || {}) };
-    // show defaults to true; persist only the explicit `false`
-    if (value === false) next.show = false;
-    else delete next.show;
+    if (name === 'logarithmic') {
+      next.logarithmic = value;
+    } else {
+      // show defaults to true; persist only the explicit `false`
+      if (value === false) next.show = false;
+      else delete next.show;
+    }
     this.dispatchEvent(
       new CustomEvent('value-changed', {
         detail: { value: next },
@@ -177,6 +183,10 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
       if (data.align_to === undefined || data.align_to === '') delete next.align_to;
       else next.align_to = Number(data.align_to);
     }
+    if ('log_base' in data) {
+      if (data.log_base === undefined || data.log_base === '' || data.log_base === null) delete next.log_base;
+      else next.log_base = Number(data.log_base);
+    }
     this.dispatchEvent(
       new CustomEvent('value-changed', {
         detail: { value: next },
@@ -196,6 +206,20 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
     if (y.max !== undefined && !isValidYaxisLimit(String(y.max))) {
       errors.push(t('yaxis.validation.max'));
     }
+    const base = y.log_base ?? y.apex_config?.logBase ?? 10;
+    if (typeof base !== 'number' || !Number.isFinite(base) || base <= 1) {
+      errors.push(t('error.yaxis.logBase'));
+    }
+    if (y.logarithmic ?? y.apex_config?.logarithmic ?? false) {
+      for (const limit of [y.min, y.max]) {
+        if (limit === undefined || limit === 'auto' || String(limit).startsWith('|')) continue;
+        const value = Number(String(limit).replace(/^~/, ''));
+        if (!Number.isFinite(value) || value <= 0) {
+          errors.push(t('error.yaxis.logLimit'));
+          break;
+        }
+      }
+    }
     if (errors.length === 0) return nothing;
     return html`<div class="validation-error">${errors.map((e) => html`<div>• ${e}</div>`)}</div>`;
   }
@@ -207,6 +231,11 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
         name: 'show',
         label: computeLabel({ name: 'show' } as HaFormSchema),
         value: this.yaxis?.show ?? true,
+      },
+      {
+        name: 'logarithmic',
+        label: computeLabel({ name: 'logarithmic' } as HaFormSchema),
+        value: this.yaxis?.logarithmic ?? this.yaxis?.apex_config?.logarithmic ?? false,
       },
     ];
     const labelsShowFields: BoolField[] = [

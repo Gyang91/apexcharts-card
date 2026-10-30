@@ -105,6 +105,8 @@ const LABEL_MAP: Record<string, string> = {
   axis: 'field.axis',
   opposite: 'field.opposite',
   decimals: 'field.decimals',
+  logarithmic: 'field.logarithmic',
+  log_base: 'field.log_base',
   align_to: 'field.align_to',
   cache: 'field.cache',
   selection_span: 'field.selection_span',

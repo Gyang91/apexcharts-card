@@ -549,6 +549,30 @@ export class ChartsCard extends LitElement {
           }
         }
         if (this._config.yaxis) {
+          const ids = new Set<string>();
+          this._config.yaxis.forEach((axis) => {
+            if (axis.id) {
+              if (ids.has(axis.id)) throw new Error(t('error.yaxis.duplicateId', { id: axis.id }));
+              ids.add(axis.id);
+            }
+            const logarithmic = axis.logarithmic ?? axis.apex_config?.logarithmic ?? false;
+            const base = axis.log_base ?? axis.apex_config?.logBase ?? 10;
+            if (typeof base !== 'number' || !Number.isFinite(base) || base <= 1) {
+              throw new Error(t('error.yaxis.logBase'));
+            }
+            if (logarithmic) {
+              for (const limit of [axis.min, axis.max]) {
+                if (limit === undefined || limit === 'auto') continue;
+                const [value, type] = this._getTypeOfMinMax(limit);
+                if (
+                  type !== minmax_type.ABSOLUTE &&
+                  (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
+                ) {
+                  throw new Error(t('error.yaxis.logLimit'));
+                }
+              }
+            }
+          });
           const yAxisConfig = this._generateYAxisConfig(this._config);
           if (this._config.apex_config) {
             this._config.apex_config.yaxis = yAxisConfig;
@@ -604,6 +628,9 @@ export class ChartsCard extends LitElement {
         yAxisDup = mergeDeep(yAxisDup, config.yaxis![idx].apex_config);
         delete yAxisDup.apex_config;
       }
+      if (config.yaxis![idx].logarithmic !== undefined) yAxisDup.logarithmic = config.yaxis![idx].logarithmic;
+      if (config.yaxis![idx].log_base !== undefined) yAxisDup.logBase = config.yaxis![idx].log_base;
+      delete yAxisDup.log_base;
       if (typeof yAxisDup.min !== 'number') delete yAxisDup.min;
       if (typeof yAxisDup.max !== 'number') delete yAxisDup.max;
       if (burned[idx]) {
@@ -1468,7 +1495,8 @@ export class ChartsCard extends LitElement {
             max = elt.max[1];
           }
         });
-        if (yaxis.align_to !== undefined) {
+        const logarithmic = yaxis.logarithmic ?? yaxis.apex_config?.logarithmic ?? false;
+        if (yaxis.align_to !== undefined && !logarithmic) {
           if (min !== null && yaxis.min_type !== minmax_type.FIXED) {
             if (min % yaxis.align_to !== 0) {
               min = min >= 0 ? min - (min % yaxis.align_to) : -(yaxis.align_to + (min % yaxis.align_to) - min);
