@@ -865,37 +865,41 @@ export class ChartsCard extends LitElement {
     const busy = this._updating || !this._dataLoaded;
     return html` <nav class="time-navigation" aria-label=${t('navigation.label')}>
       <div class="time-navigation-buttons">
-        ${(['day', 'week', 'month'] as const).map(
-          (period) => html`
-            <button
-              type="button"
-              aria-pressed=${this._navigationPeriod === period}
-              ?disabled=${busy}
-              @click=${() => this._navigate(period)}
-            >
-              ${t(`common.period.${period}`)}
-            </button>
-          `,
-        )}
-        <button
-          type="button"
-          aria-label=${t('navigation.previous')}
-          ?disabled=${busy}
-          @click=${() => this._navigate(this._navigationPeriod, -1)}
-        >
-          &#x2039;
-        </button>
-        <button type="button" ?disabled=${busy} @click=${() => this._navigate(this._navigationPeriod, 0)}>
-          ${t('navigation.current')}
-        </button>
-        <button
-          type="button"
-          aria-label=${t('navigation.next')}
-          ?disabled=${busy}
-          @click=${() => this._navigate(this._navigationPeriod, 1)}
-        >
-          &#x203a;
-        </button>
+        <div class="time-navigation-group">
+          ${(['day', 'week', 'month'] as const).map(
+            (period) => html`
+              <button
+                type="button"
+                aria-pressed=${this._navigationPeriod === period}
+                ?disabled=${busy}
+                @click=${() => this._navigate(period)}
+              >
+                ${t(`common.period.${period}`)}
+              </button>
+            `,
+          )}
+        </div>
+        <div class="time-navigation-group">
+          <button
+            type="button"
+            aria-label=${t('navigation.previous')}
+            ?disabled=${busy}
+            @click=${() => this._navigate(this._navigationPeriod, -1)}
+          >
+            &#x2039;
+          </button>
+          <button type="button" ?disabled=${busy} @click=${() => this._navigate(this._navigationPeriod, 0)}>
+            ${t('navigation.current')}
+          </button>
+          <button
+            type="button"
+            aria-label=${t('navigation.next')}
+            ?disabled=${busy}
+            @click=${() => this._navigate(this._navigationPeriod, 1)}
+          >
+            &#x203a;
+          </button>
+        </div>
       </div>
       <div class="time-navigation-range" role="status" aria-live="polite">
         ${formatter.format(start)} &ndash; ${formatter.format(new Date(end.getTime() - 1))}

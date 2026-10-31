@@ -137,7 +137,7 @@ series:
 - Periods are complete calendar days, ISO weeks (Monday start) or months in the dashboard's display time zone. DST days can be 23/25 hours; months are not fixed 30-day windows.
 - **Previous/next** moves by one selected calendar period. **Current** returns to the current period. Selecting day/week/month also returns to its current period. Future periods are allowed for integration-supplied forecasts.
 - When enabled, navigation determines the requested range instead of `graph_span`. Combining it with `span` is rejected to avoid ambiguous offsets; enabling the editor switch removes existing `span` settings.
-- Works with timeline charts, including statistics, range bands and heatmaps. Buttons have keyboard focus styles, labels, 44px touch targets and busy-state disabling.
+- Works with timeline charts, including statistics, range bands and heatmaps. Buttons have keyboard focus styles, labels, 44px touch targets and busy-state disabling. On narrow cards, the period and navigation controls align in two rows and wrap further if needed.
 - Changing range discards the series' incremental history before loading the new range. Navigation does not retain a growing cache of visited periods or add polling. Shared statistics caches remain bounded. Dense month views should use suitable statistics/grouping and optional sampling.
 - Returning to a dashboard preserves the selected period within the same card instance; a new card/configuration starts at `initial`. Header actions and sensor values retain their documented behavior.
 

@@ -110,6 +110,112 @@ test('calendar controls browse periods, reset current, resize and reconnect', as
   expect(errors).toEqual([]);
 });
 
+test('calendar controls form accessible, aligned rows on narrow cards', async ({ page }) => {
+  await mount(page, {
+    navigation: { show: true, initial: 'week' },
+    series: [
+      {
+        entity: 'sensor.temp',
+        data_generator: 'return [[start.getTime(), 18], [end.getTime(), 20]];',
+      },
+    ],
+  });
+  const geometry = () =>
+    page.locator('.time-navigation-buttons').evaluate((container) => {
+      const bounds = container.getBoundingClientRect();
+      return {
+        bounds: { left: bounds.left, right: bounds.right },
+        buttons: Array.from(container.querySelectorAll('button'), (button) => {
+          const rect = button.getBoundingClientRect();
+          return {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            clientWidth: button.clientWidth,
+            scrollWidth: button.scrollWidth,
+          };
+        }),
+      };
+    });
+  const expectAccessible = ({ bounds, buttons }) => {
+    expect(buttons).toHaveLength(6);
+    for (const button of buttons) {
+      expect(button.width).toBeGreaterThanOrEqual(44);
+      expect(button.height).toBeGreaterThanOrEqual(44);
+      expect(button.left).toBeGreaterThanOrEqual(bounds.left - 1);
+      expect(button.right).toBeLessThanOrEqual(bounds.right + 1);
+      expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth + 1);
+    }
+  };
+  const expectAligned = ({ bounds, buttons }) => {
+    expectAccessible({ bounds, buttons });
+    expect(buttons[0].top).toBeCloseTo(buttons[1].top, 0);
+    expect(buttons[0].top).toBeCloseTo(buttons[2].top, 0);
+    expect(buttons[3].top).toBeGreaterThan(buttons[0].top);
+    expect(buttons[3].top).toBeCloseTo(buttons[4].top, 0);
+    expect(buttons[3].top).toBeCloseTo(buttons[5].top, 0);
+    for (let column = 0; column < 3; column++) {
+      expect(buttons[column].left).toBeCloseTo(buttons[column + 3].left, 0);
+    }
+  };
+
+  for (const width of [100, 150, 164]) {
+    await page.evaluate((cardWidth) => {
+      document.querySelector('#dashboard').style.width = `${cardWidth}px`;
+    }, width);
+    expectAccessible(await geometry());
+  }
+  for (const width of [165, 180, 220, 280, 320, 332, 440, 520]) {
+    await page.evaluate((cardWidth) => {
+      document.querySelector('#dashboard').style.width = `${cardWidth}px`;
+    }, width);
+    expectAligned(await geometry());
+  }
+
+  await page.evaluate(() => {
+    document.querySelector('#dashboard').style.width = '320px';
+    window.card.style.fontSize = '18px';
+    window.card.hass = {
+      ...window.card._hass,
+      language: 'fr',
+      locale: { ...window.card._hass.locale, language: 'fr' },
+    };
+    window.card.requestUpdate();
+  });
+  await expect(page.getByRole('button', { name: 'Semaine', exact: true })).toBeVisible();
+  expectAligned(await geometry());
+
+  await page.evaluate(() => {
+    document.querySelector('#dashboard').style.width = '540px';
+  });
+  const wideFrench = await geometry();
+  expectAccessible(wideFrench);
+  expect(wideFrench.buttons.every((button) => Math.abs(button.top - wideFrench.buttons[0].top) < 1)).toBe(true);
+
+  await page.evaluate(() => {
+    document.querySelector('#dashboard').style.width = '700px';
+    window.card.style.fontSize = '';
+    window.card.hass = {
+      ...window.card._hass,
+      language: 'en',
+      locale: { ...window.card._hass.locale, language: 'en' },
+    };
+    window.card.requestUpdate();
+  });
+  await expect(page.getByRole('button', { name: 'Week', exact: true })).toBeVisible();
+  const wide = await geometry();
+  expectAccessible(wide);
+  expect(wide.buttons.every((button) => Math.abs(button.top - wide.buttons[0].top) < 1)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Week', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Week', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Month', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Previous period' })).toBeFocused();
+});
+
 test('renders integration-supplied range bounds with both headers and missing intervals', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
