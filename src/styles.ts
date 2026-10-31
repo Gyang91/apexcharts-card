@@ -6,13 +6,20 @@ export const stylesApex: CSSResultGroup = css`
     color: var(--secondary-text-color);
   }
   .time-navigation-buttons {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 4px;
+  }
+  .time-navigation-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
   }
   .time-navigation button {
+    box-sizing: border-box;
     min-width: 44px;
     min-height: 44px;
+    overflow-wrap: anywhere;
     padding: 6px 10px;
     cursor: pointer;
     border: 1px solid var(--divider-color);
@@ -37,6 +44,17 @@ export const stylesApex: CSSResultGroup = css`
     margin-top: 6px;
     font-size: 0.85em;
   }
+
+  @container (max-width: 164px) {
+    .time-navigation-group {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .time-navigation-group button {
+      flex: 1 1 44px;
+    }
+  }
+
   :host {
     display: block;
     container-type: inline-size;
