@@ -1574,14 +1574,10 @@ export class ChartsCard extends LitElement {
       const brushRange = this._apexBrush ? this._readChartRange(this._apexBrush) : undefined;
       const brushIsAtEnd = currentRange && brushRange && currentRange.max === brushRange.max;
       this._headerState = [...this._headerState];
-      const chartUpdates: Promise<unknown>[] = [];
-      chartUpdates.push(
-        this._apexChart?.updateOptions(
-          graphData,
-          false,
-          TIMESERIES_TYPES.includes(this._config.chart_type) ? false : true,
-        ),
-      );
+      // With a brush, the main chart shows the brush selection. Work it out
+      // before updating either chart: without an x range of its own, a data
+      // update would reset the main chart to the full graph span.
+      let brushSelection: { min: number; max: number } | undefined;
       if (this._apexBrush) {
         const newMinMax = this._findStartAndEndOfChart(
           new Date(start.getTime() - this._serverTimeOffset),
@@ -1596,34 +1592,40 @@ export class ChartsCard extends LitElement {
           log('Brush selection bounds are unavailable or invalid; resetting to the latest range.');
         }
         if (brushIsAtEnd || !this._brushInit || !currentRange) {
-          brushData.chart = {
-            selection: {
-              enabled: true,
-              xaxis: {
-                min: Math.max(
-                  newMinMax.start,
-                  newMinMax.end - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
-                ),
-                max: brushData.xaxis.max,
-              },
-            },
+          brushSelection = {
+            min: Math.max(
+              newMinMax.start,
+              newMinMax.end - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
+            ),
+            max: newMinMax.end,
           };
         } else {
           const selectionWidth = Math.min(currentRange.max - currentRange.min, newMinMax.end - newMinMax.start);
           const selectionStart = Math.max(newMinMax.start, Math.min(currentRange.min, newMinMax.end - selectionWidth));
-          brushData.chart = {
-            selection: {
-              enabled: true,
-              xaxis: {
-                min: selectionStart,
-                max: selectionStart + selectionWidth,
-              },
-            },
-          };
+          brushSelection = { min: selectionStart, max: selectionStart + selectionWidth };
         }
+        if (TIMESERIES_TYPES.includes(this._config.chart_type)) {
+          graphData.xaxis = { ...graphData.xaxis, min: brushSelection.min, max: brushSelection.max };
+        }
+      }
+      const chartUpdates: Promise<unknown>[] = [];
+      chartUpdates.push(
+        this._apexChart?.updateOptions(
+          graphData,
+          false,
+          TIMESERIES_TYPES.includes(this._config.chart_type) ? false : true,
+        ),
+      );
+      if (this._apexBrush && brushSelection) {
         const selectionColor = computeColor('var(--primary-text-color)');
-        brushData.chart.selection.stroke = { color: selectionColor };
-        brushData.chart.selection.fill = { color: selectionColor, opacity: 0.1 };
+        brushData.chart = {
+          selection: {
+            enabled: true,
+            xaxis: { ...brushSelection },
+            stroke: { color: selectionColor },
+            fill: { color: selectionColor, opacity: 0.1 },
+          },
+        };
         this._brushInit = true;
         chartUpdates.push(this._apexBrush?.updateOptions(brushData, false, false));
       }

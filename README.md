@@ -508,7 +508,7 @@ series:
 | Name | Type | Default | Since | Description |
 | ---- | :--: | :-----: | :---: | ----------- |
 | `type` | string | `mean` | v2.0.0 | Type of long term statistic to pull. Can be one of `min`, `max`, `mean`, `sum` `state` or `change` |
-| `period` | string | `hour` | v2.0.0 | Period of statistics to pull. Can be one of `5minute`, `hour`, `day`, `week` or `month` |
+| `period` | string | `hour` | v2.0.0 | Period of statistics to pull. Can be one of `5minute`, `hour`, `day`, `week`, `month` or `year` (`year` since v2.13.2, needs a Home Assistant version with yearly statistics) |
 | `align` | string | `middle` | v2.0.0 | Align the data points to the `start`, `end` or `middle` of the period of the statistics |
 
 Since v2.8.3, statistics fetched by one card are kept for 10 minutes and shared with the others: a card shown again (tabs, visibility conditions) only asks Home Assistant for the current, still open period.

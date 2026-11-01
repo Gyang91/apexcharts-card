@@ -211,6 +211,34 @@ describe('card lifecycle and diagnostics', () => {
     expect(card._loaded).toBe(false);
   });
 
+  it('keeps the main chart on the brush selection across data refreshes (RomRider#1113)', async () => {
+    const card = cardWithData();
+    card.setConfig({
+      type: 'custom:apexcharts-card',
+      graph_span: '24h',
+      experimental: { brush: true },
+      series: [{ entity: 'sensor.temp', show: { in_brush: true } }],
+    });
+    card._graphs = [graph()];
+    const withRange = (min: number, max: number) => ({
+      ...chart(),
+      axes: { w: { globals: { minX: min, maxX: max } } },
+    });
+    const { end } = card._getSpanDates();
+    const hour = 3600 * 1000;
+    // The user moved the brush to an earlier 6 h window; the brush shows the full span
+    card._apexChart = withRange(end.getTime() - 10 * hour, end.getTime() - 4 * hour);
+    card._apexBrush = withRange(end.getTime() - 24 * hour, end.getTime());
+    card._brushInit = true;
+
+    await card._updateData();
+
+    const main = card._apexChart.updateOptions.mock.calls[0][0];
+    const brush = card._apexBrush.updateOptions.mock.calls[0][0];
+    expect(main.xaxis).toMatchObject({ min: end.getTime() - 10 * hour, max: end.getTime() - 4 * hour });
+    expect(brush.chart.selection.xaxis).toEqual({ min: main.xaxis.min, max: main.xaxis.max });
+  });
+
   it('persists legend choices across data updates without custom axes and leaves the brush visible', async () => {
     const card = cardWithData();
     card.setConfig({

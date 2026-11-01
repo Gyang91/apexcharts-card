@@ -139,6 +139,7 @@ export function getSeriesDataProcessingSchema(): HaFormSchema[] {
                     { value: 'day', label: t('common.period.day') },
                     { value: 'week', label: t('common.period.week') },
                     { value: 'month', label: t('common.period.month') },
+                    { value: 'year', label: t('common.period.year') },
                   ],
                 },
               },

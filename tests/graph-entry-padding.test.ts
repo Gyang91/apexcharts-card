@@ -263,3 +263,18 @@ describe('statistics span padding (column width fix)', () => {
     }
   });
 });
+
+describe('yearly statistics (RomRider#1079)', () => {
+  it('loads year buckets and pads missing years', async () => {
+    const y = (year: number) => new Date(`${year}-01-01T00:00:00`).getTime();
+    const config = seriesConfig({ type: 'column', statistics: { type: 'change', period: 'year' } });
+    const entry = makeEntry(config, y(2027) - y(2024), [
+      statBucket(y(2025), y(2026), 2034),
+      statBucket(y(2026), y(2027), 3006),
+    ]);
+    await entry._updateHistory(new Date(y(2024)), new Date(y(2027)));
+    const values = entry.history.map(([, v]) => v);
+    expect(values).toEqual([null, 2034, 3006]);
+    expect(new Date(entry.history[1][0]).getFullYear()).toBe(2025);
+  });
+});
