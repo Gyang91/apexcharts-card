@@ -22,8 +22,6 @@ It is based on [ApexCharts.js](https://apexcharts.com), with Home Assistant hist
 It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/mini-graph-card) by [@kalkih](https://github.com/kalkih)
 
 
-New features are optional. Automated regression and real-browser checks protect existing configurations; real HA/device validation remains important.
-
 ## Table of Content <!-- omit in toc -->
 
 - [What's different in this fork](#whats-different-in-this-fork)
@@ -72,7 +70,6 @@ New features are optional. Automated regression and real-browser checks protect 
   - [`hidden_by_default` experimental feature](#hidden_by_default-experimental-feature)
   - [`brush` experimental feature](#brush-experimental-feature)
 - [Known issues](#known-issues)
-- [Roadmap](#roadmap)
 - [License](#license)
 - [Examples](#examples-1)
   - [Simple graph](#simple-graph)
@@ -93,7 +90,6 @@ Everything documented below keeps working as before; this fork adds:
 - **Time-weighted average**: [`func: time_avg`](#func-options) weighs each value by how long it was held, like Home Assistant's statistics.
 - **Theme-aware defaults**: labels in `--secondary-text-color` with the theme font, grid and axis lines in `--divider-color`.
 - **Smaller card** (about 1.5 MB instead of 2.1 MB): time zone rules come from the browser instead of a bundled database; `moment.tz()` still works in [`data_generator`](#data_generator-option).
-- **Fixes**: no frozen series after a failed request, correct start of slow sensors with cached history, empty `sum` buckets stay empty, correct labels on yearly and quarterly charts.
 - **Maintenance**: automatic releases, CI, CodeQL, a daily dependency audit (npm audit and OSV-Scanner) and Dependabot updates.
 - **Adaptive large-history rendering**: opt-in [`downsample`](#large-history-performance) retains spikes/gaps and restores local detail on zoom, brush selection and resize without fetching history again.
 - **Calendar navigation**: optional day/week/month, previous/next and current-period controls, following the dashboard time zone.
@@ -261,8 +257,6 @@ On a failed refresh, the existing chart is retained and may be out of date. `sho
 
 Detaching a card cancels queued recorder-delay refreshes and destroys its charts. Pending history requests cannot always be cancelled, but their results cannot update a replacement chart after reconnect. The new card waits for an existing series fetch to settle before refreshing it again.
 
-Development checks include real Chromium rendering with a simulated HA data source, mobile-width resizing, fixed-height Sections-style layouts, disconnection/reconnection, legend/brush behavior and failure recovery. These checks complement, rather than replace, testing in a real Home Assistant dashboard.
-
 ## Large-history performance
 
 For dense line/area charts, enable **Reduce rendered points** in the visual editor's General tab, or set:
@@ -289,8 +283,6 @@ Important trade-offs:
 - Full source history is still retained for accurate calculations and adaptive detail, and is released with the card. This is not a hard memory cap for a single very large history. For long periods, prefer suitable `statistics` or `group_by` settings to reduce source data as well.
 
 Recorder requests with identical entity, range and wire options are shared **only while pending**, within one HA connection. Different attribute/minimal-history requirements remain separate. Completed history responses are not added to a global history cache. Statistics caches are bounded to 64 entries and 32,000 total rows per connection with a ten-minute lifetime; oversized responses are returned in full but not retained. Metadata is connection-scoped, bounded to 64 IDs and expires after ten minutes. Eviction can cause a later fetch, never truncated returned data. No cache-cleanup polling is added.
-
-The browser benchmark compares 100,000-point full-detail and sampled charts on the same host and checks point preservation. Local timings are illustrative, not wall-tablet guarantees; use `npm run test:browser -- --grep @performance` to reproduce measurements. There are no additional runtime dependencies.
 
 ## Installation
 
@@ -425,6 +417,15 @@ The card strictly validates all the options available (but not for the `apex_con
 | `show` | object | | v1.3.0 | See [serie's show options](#series-show-options) |
 | `header_actions` | object | | v1.10.0 | See [header_actions](#header_actions-or-title_actions-options) |
 
+Example: always show one decimal (`13.0` instead of `13`) in the header, legend and tooltip:
+
+```yaml
+series:
+  - entity: sensor.power
+    float_precision: 1
+    fixed_decimals: true
+```
+
 ### series' `show` Options
 
 | Name | Type | Default | Since | Description |
@@ -509,16 +510,31 @@ series:
 | Name | Type | Default | Since | Description |
 | ---- | :--: | :-----: | :---: | ----------- |
 | `type` | string | `mean` | v2.0.0 | Type of long term statistic to pull. Can be one of `min`, `max`, `mean`, `sum` `state` or `change` |
-| `period` | string | `hour` | v2.0.0 | Period of statistics to pull. Can be one of `5minute`, `hour`, `day`, `week`, `month` or `year` (`year` since v2.13.2, needs a Home Assistant version with yearly statistics) |
+| `period` | string | `hour` | v2.0.0 | Period of statistics to pull. Can be one of `5minute`, `hour`, `day`, `week`, `month` or `year` (`year` needs a Home Assistant version with yearly statistics) |
 | `align` | string | `middle` | v2.0.0 | Align the data points to the `start`, `end` or `middle` of the period of the statistics |
 
-Since v2.8.3, statistics fetched by one card are kept for 10 minutes and shared with the others: a card shown again (tabs, visibility conditions) only asks Home Assistant for the current, still open period.
+Example: energy used per year, from an energy counter with sum statistics:
 
-Since v2.13.0, missing statistics periods follow Home Assistant's calendar time zone and actual period boundaries, including daylight-saving changes. Middle alignment uses each period's actual start and end.
+```yaml
+type: custom:apexcharts-card
+graph_span: 5y
+span:
+  end: year
+series:
+  - entity: sensor.energy_total
+    type: column
+    statistics:
+      type: change
+      period: year
+```
+
+Statistics fetched by one card are kept for 10 minutes and shared with the others: a card shown again (tabs, visibility conditions) only asks Home Assistant for the current, still open period.
+
+Missing statistics periods follow Home Assistant's calendar time zone and actual period boundaries, including daylight-saving changes. Middle alignment uses each period's actual start and end.
 
 #### External statistics
 
-Since v2.6.0, `entity` also accepts external long-term statistic IDs (`source:object_id`, e.g. `veolia:1235075_daily_consumption`, as pushed by integrations like Veolia, GRDF or the energy dashboard imports). These have no entity in Home Assistant (no state, no history), only long-term statistics, so:
+`entity` also accepts external long-term statistic IDs (`source:object_id`, e.g. `veolia:1235075_daily_consumption`, as pushed by integrations like Veolia, GRDF or the energy dashboard imports). These have no entity in Home Assistant (no state, no history), only long-term statistics, so:
 
 - the `statistics` option is **required** (there is nothing else to plot),
 - the name and unit default to the statistic's metadata from the recorder (fallback: the raw ID), and can be overridden with `name`/`unit`,
@@ -691,7 +707,7 @@ Eg:
 
 ### Binary sensors
 
-**Since v2.13.0:** `binary_sensor` state history works without a transform: `on` becomes `1`, `off` becomes `0`, and `unknown`/`unavailable` remain gaps. This also applies to `ignore_history` and raw header values. Numeric attributes are still read normally; other nonnumeric domains are not converted automatically.
+`binary_sensor` state history works without a transform: `on` becomes `1`, `off` becomes `0`, and `unknown`/`unavailable` remain gaps. This also applies to `ignore_history` and raw header values. Numeric attributes are still read normally; other nonnumeric domains are not converted automatically.
 
 ```yaml
 type: custom:apexcharts-card
@@ -1262,68 +1278,8 @@ series:
 
 ## Known issues
 
-The three historical entries have been reviewed against the current renderer:
-
-* **Smooth areas with gaps:** the old background glitch ([apexcharts/apexcharts.js#2180](https://github.com/apexcharts/apexcharts.js/issues/2180)) is not reproduced with the bundled renderer. A Chromium regression checks the actual filled SVG geometry around leading, consecutive interior and trailing nulls, including refresh and phone-width rendering. No additional workaround or rendering overhead is added. This is not a guarantee for every upstream combination of stacking, fill options or browser.
-* **Binary sensors:** native `on`/`off` conversion with preserved unavailable gaps is available since v2.13.0. Existing explicit transforms continue to work. See [Binary sensors](#binary-sensors).
-* **Grouped columns:** bucket-midpoint placement is available since v2.13.0, with `group_by.align: start` for legacy placement. A Chromium regression checks that fixed-hour columns lie inside their aggregation intervals. Raw columns still center on their sample timestamps, as expected by ApexCharts ([apexcharts/apexcharts.js#1688](https://github.com/apexcharts/apexcharts.js/issues/1688)). Native bar widths remain uniform rather than following unequal calendar bucket lengths.
-
-Live Home Assistant and physical-tablet acceptance checks in the roadmap remain outstanding; automated browser tests use simulated HA data.
-
-## Roadmap
-
-Ordered by customer value for Home Assistant: reliable operation first, then fast dashboards, easy navigation and selected visual additions. No feature should add requests when disabled, silently change sensor calculations or introduce unbounded cache growth.
-
-### 1. Trust, diagnostics and regression protection
-
-* [X] Cancel delayed refreshes on detach and prevent stale asynchronous work from updating replacement charts.
-* [X] Prevent the brush from overlapping and intercepting clicks on the main chart legend.
-* [X] Preserve legend visibility choices across refreshes, including initially hidden series without custom axes.
-* [X] Skip redundant main/brush redraws when resize-observer dimensions have not changed.
-* [X] Keep refreshes locked until all series requests settle, including when one fails.
-* [X] Show actionable load/empty-data messages and preserve the last successful update timestamp on failure.
-* [X] Add Chromium regressions for rendering, mobile resizing, Sections-style sizing, reconnects, legend/brush behavior and recovery.
-* [X] Add raw/gzip bundle budgets and a repeatable generated-data rendering benchmark.
-* [ ] Validate the same scenarios in a real HA dashboard and on a representative lower-powered wall tablet. Browser fixtures do not certify every HA version, integration or device.
-
-### 2. Speed on tablets and large histories
-
-* [X] Measure duplicate recorder/statistics requests and share identical pending calls within one HA connection; test wire-option isolation and retries.
-* [X] Add opt-in width-aware downsampling preserving spikes, gaps and endpoints, with adaptive zoom, brush and resize detail. Header values, aggregation and custom axis limits use original data.
-* [X] Add a same-host 100,000-point full-detail versus sampled Chromium benchmark, including displayed-point and source-data assertions.
-* [X] Bound connection-scoped statistics/metadata caches by entry count, statistics row count and lifetime, without truncating returned data.
-* [X] Coalesce adaptive redraws and avoid brush redraws on main-only viewport changes; cover request sharing and cache eviction with regressions.
-* [ ] Validate long-running dashboard memory, HA update bursts and touch/brush interaction on a representative wall tablet. Source history remains full-resolution; bounded shared caches are not a total card-memory guarantee.
-
-### 3. Everyday usability
-
-* [X] Add optional day/week/month presets, previous/next and current-period controls without requiring YAML edits.
-* [X] Add explicit visual-editor presets for temperature, power and consumption; preserve source identities and distinguish history/statistics and power/energy.
-* [X] Add touch-emulated Chromium checks and statistics-request regressions without adding a UI framework. Physical-device validation remains separate.
-
-### 4. Selected visual insights
-
-* [X] Dedicated range-area bands for min/max envelopes, comfort ranges and forecast uncertainty supplied by integrations, with timestamp pairing, gaps and invalid-bound checks.
-* [X] Optional bounded-size entity-by-time heatmaps for aggregated energy, temperature and occupancy patterns, including pre-fetch budget checks and missing-cell handling.
-* [X] Illustrated feature guide, YAML examples, source requirements and performance/compatibility trade-offs.
-
-### Remaining acceptance work—not missing features
-
-The planned feature implementation is delivered. The unchecked real-HA/tablet items above remain intentionally open: generated fixtures and touch emulation do not establish live integration compatibility, physical touch behavior or long-running wall-tablet memory stability. Test your own entities, statistics, DST dates, dashboard navigation and representative device before treating those checks as complete.
-
-Full ApexCharts.js parity, built-in forecasting and heavyweight analytics are not goals. Optional chart types must justify their data-loading cost, bundle impact and HA use case before being added.
-
-### Previously completed
-
-* [X] ~~Support more types of charts (pie, radial, polar area at least)~~
-* [X] ~~Support for `binary_sensors`~~ — explicit transforms are supported; native `on`/`off` mapping with preserved gaps is available since v2.13.0.
-* [X] ~~Support for aggregating data with exact boundaries (ex: aggregating data with `1h` could aggregate from `2:00:00am` to `2:59:59am` then `3:00:00am` to `3:59:59` exactly, etc...)~~
-* [X] ~~Display the graph from the start of the day, week, month, ... with support for "up to now" or until the "end of the period"~~
-* [X] ~~Support for any number of Y-axis~~ — one per displayed series, or shared axes; see [Multi-Y axis](#yaxis-options-multi-y-axis).
-* [X] ~~Support for logarithmic~~ — per-axis YAML and visual editor options; see [Logarithmic scales](#logarithmic-scales) for domain requirements and ApexCharts limitations.
-* [X] ~~Support for state mapping for non-numerical state sensors~~
-* [X] ~~Support for simple color threshold (easier to understand/write than the ones provided natively by ApexCharts)~~
-* [X] ~~Support for graph configuration templates à la [`button-card`](https://github.com/custom-cards/button-card/blob/master/README.md#configuration-templates)~~
+* **Grouped columns:** columns sit in the middle of their bucket; use `group_by.align: start` to put them at the start. Raw columns center on their sample timestamps, as expected by ApexCharts ([apexcharts/apexcharts.js#1688](https://github.com/apexcharts/apexcharts.js/issues/1688)). All bars have the same width, even when calendar buckets differ in length (for example months).
+* **Smooth areas with gaps:** older ApexCharts versions drew a background glitch around `null` values ([apexcharts/apexcharts.js#2180](https://github.com/apexcharts/apexcharts.js/issues/2180)). The bundled version does not; if you still see it with a specific stacking or fill option, use `curve: straight`.
 
 ## License
 
