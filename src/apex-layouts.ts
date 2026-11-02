@@ -106,7 +106,7 @@ export function getLayoutConfig(
 
   if (config.chart_type === 'rangeArea' || config.chart_type === 'heatmap') {
     const names = config.series_in_graph.map((serie, index) =>
-      computeName(index, config.series_in_graph, undefined, hass?.states[serie.entity]),
+      computeName(hass, index, config.series_in_graph, undefined, hass?.states[serie.entity]),
     );
     const visual: Record<string, unknown> = {
       series:
@@ -182,6 +182,7 @@ export function getBrushLayoutConfig(
     yaxis: {
       tickAmount: 2,
       decimalsInFloat: DEFAULT_FLOAT_PRECISION,
+      labels: { formatter: yAxisLabelFormatter(DEFAULT_FLOAT_PRECISION) },
     },
     tooltip: {
       enabled: false,
@@ -225,7 +226,7 @@ function getSeries(config: ChartCardConfig, hass: HomeAssistant | undefined, bru
   if (TIMESERIES_TYPES.includes(config.chart_type)) {
     return series.map((serie, index) => {
       return {
-        name: computeName(index, series, undefined, hass?.states[serie.entity]),
+        name: computeName(hass, index, series, undefined, hass?.states[serie.entity]),
         group: config.stacked && serie.type === 'column' ? serie.stack_group : undefined,
         type: serie.type,
         ...(!brush && config.experimental?.hidden_by_default && serie.show.hidden_by_default ? { hidden: true } : {}),
@@ -242,7 +243,7 @@ function getLabels(config: ChartCardConfig, hass: HomeAssistant | undefined) {
     return [];
   } else {
     return config.series_in_graph.map((serie, index) => {
-      return computeName(index, config.series_in_graph, undefined, hass?.states[serie.entity]);
+      return computeName(hass, index, config.series_in_graph, undefined, hass?.states[serie.entity]);
     });
   }
 }
@@ -291,7 +292,26 @@ function getYAxis(config: ChartCardConfig) {
     ? undefined
     : {
         decimalsInFloat: DEFAULT_FLOAT_PRECISION,
+        labels: { formatter: yAxisLabelFormatter(DEFAULT_FLOAT_PRECISION) },
       };
+}
+
+/**
+ * ApexCharts' default y-axis label format, except that a tick rounding to zero
+ * shows as 0 instead of -0.0 (ticks like -1e-17 come from floating-point steps).
+ */
+export function yAxisLabelFormatter(decimals: number) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (val: any, _index?: number, w?: { globals?: { xyCharts?: boolean; yValueDecimal?: number } }): any => {
+    if (typeof val !== 'number' || !Number.isFinite(val) || w?.globals?.xyCharts === false) return val;
+    const value = Number(val.toFixed(decimals)) === 0 ? 0 : val;
+    if (w?.globals?.yValueDecimal === 0) {
+      // Integer data: like ApexCharts, add one decimal only when a tick is not an integer
+      const integer = value.toFixed(0);
+      return Number(integer) === value ? integer : value.toFixed(1);
+    }
+    return value.toFixed(decimals);
+  };
 }
 
 function getDateTimeFormatter(hours12: boolean | undefined): unknown {
@@ -457,13 +477,17 @@ function getPlotOptions_radialBar(config: ChartCardConfig, hass: HomeAssistant |
 }
 
 function getLegendFormatter(config: ChartCardConfig, hass: HomeAssistant | undefined) {
-  return function (_: string, opts: ApexFormatterOpts, conf = config, hass2 = hass) {
-    const name = computeName(
-      opts.seriesIndex,
-      conf.series_in_graph,
-      undefined,
-      hass2?.states[conf.series_in_graph[opts.seriesIndex].entity],
-    );
+  return function (seriesName: string, opts: ApexFormatterOpts, conf = config, hass2 = hass) {
+    // ApexCharts passes the current series name, which follows renames
+    const name =
+      seriesName ||
+      computeName(
+        hass2,
+        opts.seriesIndex,
+        conf.series_in_graph,
+        undefined,
+        hass2?.states[conf.series_in_graph[opts.seriesIndex].entity],
+      );
     if (!conf.series_in_graph[opts.seriesIndex].show.in_legend) {
       return [];
     }

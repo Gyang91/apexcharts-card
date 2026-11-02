@@ -173,3 +173,50 @@ test('binary history, gaps, computed and raw headers render without a transform'
   });
   expect(await page.evaluate(() => window.card._headerState[1])).toBeNull();
 });
+
+test('color_threshold gradients map one value to one color across gaps (RomRider#1111)', async ({ page }) => {
+  await page.evaluate(() => {
+    window.card = window.makeCard({
+      graph_span: '6h',
+      experimental: { color_threshold: true },
+      apex_config: { yaxis: { min: 0, max: 40 } },
+      series: [
+        {
+          entity: 'sensor.temp',
+          type: 'line',
+          extend_to: false,
+          color_threshold: [
+            { value: 10, color: 'blue' },
+            { value: 30, color: 'red' },
+          ],
+          data_generator: `
+            return [10, 30, null, 20, 25, null, 15].map((value, i) => [start.getTime() + i * 3600000, value]);
+          `,
+        },
+      ],
+    });
+    document.querySelector('#dashboard').appendChild(window.card);
+  });
+  await settle(page);
+  const gradients = await page.evaluate(() => {
+    const root = window.card.shadowRoot;
+    const { gridHeight } = window.card._apexChart.w.layout;
+    const ids = [...root.querySelectorAll('.apexcharts-series path.apexcharts-line')]
+      .map((path) => /#([^"')]+)/.exec(path.getAttribute('stroke') ?? '')?.[1])
+      .filter(Boolean);
+    return {
+      gridHeight,
+      list: ids.map((id) => {
+        const g = root.querySelector(`linearGradient[id="${id}"]`);
+        return [g.getAttribute('gradientUnits'), Number(g.getAttribute('y1')), Number(g.getAttribute('y2'))];
+      }),
+    };
+  });
+  expect(gradients.list.length).toBeGreaterThan(0);
+  for (const [units, y1, y2] of gradients.list) {
+    expect(units).toBe('userSpaceOnUse');
+    // series max 30 and min 10 on the fixed 0..40 axis
+    expect(y1).toBeCloseTo(gradients.gridHeight * 0.25, 1);
+    expect(y2).toBeCloseTo(gradients.gridHeight * 0.75, 1);
+  }
+});

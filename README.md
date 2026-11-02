@@ -389,7 +389,7 @@ The card strictly validates all the options available (but not for the `apex_con
 | ---- | :--: | :-----: | :---: | ----------- |
 | :white_check_mark: `entity` | string | | v1.0.0 | The `entity_id` of the sensor to display, or an external statistic ID (`source:object_id`, e.g. `veolia:1235075_daily_consumption`). External statistic IDs require the [`statistics`](#statistics-options) option |
 | `attribute` | string | | v1.4.0 | Instead of retrieving the state, it will retrieve an `attribute` of the entity. Make sure you increase `update_delay` if the chart doesn't reflect the last value of the attribute |
-| `name` | string | | v1.0.0 | Override the name of the entity |
+| `name` | string or list | | v1.0.0 | Override the name of the entity. Without `name`, the series uses the name Home Assistant shows for the entity, like the built-in cards. A list composes the name from its parts, see [Structured names](#structured-names) |
 | `stack_group` | string | | v2.1.0 | When `stacked` is `true`, groups the different series with the name `stack_group` together. Only works for `type: column`. All series' names need to be be unique because of a bug in apexcharts.js |
 | `color` | string | | v1.1.0 | Color of the serie. Supported formats: `yellow`, `#aabbcc`, `rgb(128, 128, 128)` or `var(--css-color-variable)` |
 | `opacity` | number | `0.7` for `area`<br/>else `1` | v1.6.0 | The opacity of the line or filled area, between `0` and `1` |
@@ -417,6 +417,24 @@ The card strictly validates all the options available (but not for the `apex_con
 | `show` | object | | v1.3.0 | See [serie's show options](#series-show-options) |
 | `header_actions` | object | | v1.10.0 | See [header_actions](#header_actions-or-title_actions-options) |
 
+#### Structured names
+
+On Home Assistant 2026.4 and later, a series' `name` can be a list of parts that Home Assistant fills in: `entity`, `device`, `area`, `floor`, or a fixed `text`. The name follows renames of the entity, device or area. Parts without a value are left out. On older versions, a list falls back to the entity's friendly name.
+
+```yaml
+series:
+  - entity: sensor.living_room_thermostat_temperature
+    name: # shows "Living room Temperature"
+      - type: area
+      - type: entity
+  - entity: sensor.outdoor_temperature
+    name:
+      - type: text
+        text: Outside
+```
+
+The visual editor edits plain text names only. It keeps a list name until you type a new name.
+
 Example: always show one decimal (`13.0` instead of `13`) in the header, legend and tooltip:
 
 ```yaml
@@ -443,6 +461,7 @@ series:
 | `extremas` | boolean or string | `false` | v1.7.0 | If `true`, will show the min and the max of the series in the chart.  If the value is `time`, it will display also the time of the min/max value on top of the value. From v2.0.0, `min` or `max` will display the min or the max only and `min+time` or `max+time` will display the time of the min or the max. Displaying the time doesn't work with `stacked: true`. |
 | `in_brush` | boolean | `false` | v1.8.0 | See [brush](#brush-experimental-feature) |
 | `offset_in_name` | boolean | `true` | v1.8.0 | If `true`, it appends the offset information to the name of the series. If `false`, it doesn't |
+| `in_legend` | boolean | `true` | v2.1.0 | If `false`, hides the series from the legend. Use it in `all_series_config` to hide every series from the legend |
 
 ### `header_actions` or `title_actions` options
 
@@ -596,9 +615,10 @@ The position of the marker will only update when the card updates (state change 
 | `func` | string | `raw` | v1.0.0 | See [func](#func-options) |
 | `duration` | string | `1h` | v1.0.0 | If `func` is **not** `raw` only. It builds buckets of states over a `duration`. Doesn't work for months (use `period`). Eg of valid values: `2h`, `1d`, `10s`, `25min`, `1h30`, ... |
 | `period` | string | | v2.8.0 | If `func` is **not** `raw` only. Builds calendar buckets instead of fixed `duration` ones: `hour`, `day`, `week` (starting Monday), `month`, `quarter` or `year`, in the time zone the dashboard displays. Buckets follow DST changes and month lengths, and replace `duration` and `offset`. When every series of the chart uses the same `period`, the x axis and the tooltip show the period (`Oct 27`, `Oct 2026`, `Q3 2026`, `2026`) |
+| `offset` | string | `+0h` | v2.4.0 | If `func` is **not** `raw` only. Shifts the bucket boundaries of `duration`. With `duration: 1h` and `offset: 30min`, the buckets run from `0:30` to `1:30`, `1:30` to `2:30`, ... |
 | `align` | string | `middle` for columns, `start` otherwise | v2.13.0 | If `func` is **not** `raw` only. Place each aggregated point at the `start`, `middle` or `end` of its bucket. The midpoint uses the actual bucket boundaries, including DST and different month lengths. Available in the visual editor. |
 | `fill` | string | `last` | v1.0.0 | If `func` is **not** `raw` only. If there is any missing value in the buckets of history data (grouped by duration), `last` will replace them with the last non-empty state, `zero` will fill missing values with `0`, `'null'` will fill missing values with `null` |
-| `start_with_last` | boolean | `false` | v1.8.0 | If `true`, each bucket of data will start with the last value from the previous bucket of data. Mostly useful only with `func: diff` |
+| `start_with_last` | boolean | `false` | v1.8.0 | If `true`, each bucket of data will start with the last value from the previous bucket of data. Mostly useful only with `func: diff` and `func: diff_inc` |
 
 **Grouped-column alignment change (v2.13.0):** aggregated columns now use bucket midpoints, so an hourly column is centered at `10:30` for the `10:00–11:00` interval rather than straddling `10:00`. Aggregates, source samples and raw columns are unchanged; the displayed timestamp (including the tooltip) moves. Set `group_by.align: start` to retain the previous placement. Lines and areas retain start alignment unless explicitly configured otherwise.
 
@@ -635,6 +655,19 @@ Use the aggregation appropriate to your sensor; do not sum readings of a cumulat
 | `median` | v1.0.0 | Will return the median of all the states in each bucket |
 | `delta` | v1.0.0 | Will return the delta between the biggest and smallest state in each bucket |
 | `diff` | v1.4.0 | Will return the difference between the last and the first entry in the bucket |
+| `diff_inc` | v2.15.0 | Will return how much a counter increased in the bucket, also when it resets. A drop counts as a reset to `0` (like Home Assistant's `total_increasing` sensors): `100, 120, 5, 30` gives `20 + 5 + 25 = 50` |
+
+Example: hourly consumption of a meter that resets every day. `start_with_last` also counts the increase between the last value of one hour and the first of the next:
+
+```yaml
+series:
+  - entity: sensor.daily_energy
+    type: column
+    group_by:
+      duration: 1h
+      func: diff_inc
+      start_with_last: true
+```
 
 ### `chart_type` Options
 
@@ -731,7 +764,7 @@ Some of the things you can do:
 
 Your javascript code will receive:
 * `x`: a state or a value of the attribute if you defined one (it can be a `string`, `null` or a `number` depending on the entity type you've assigned)
-* `hass`: the full `hass` object (`hass.states['other.entity']` to get the state object of another entity for eg.)
+* `hass`: the full `hass` object (e.g. `hass.states['sensor.other'].state` for the state of another entity)
 * `entity`: the full state object of the entity from the history entry currently being transformed
 
 And should return a `number`, a `float` or `null`.
@@ -771,7 +804,7 @@ Inside your javascript code, you'll have access to those variables:
 * `entity`: the entity object
 * `start` (Date object): the start Date object of the graph currently displayed
 * `end` (Date object): the end Date object of the graph currently displayed
-* `hass`: the complete `hass` object
+* `hass`: the complete `hass` object (e.g. `hass.states['sensor.other'].state` for the state of another entity)
 * `moment`: the [Moment.JS](https://momentjs.com/) object to help you manipulate time and dates, including [`moment.tz()`](https://momentjs.com/timezone/docs/) (time zone rules from the browser, names from the IANA database)
 
 Let's take this example:
@@ -845,10 +878,21 @@ You can have as many Y-axes as there are series displayed in the main chart, or 
 | `logarithmic` | boolean | `false` | v2.9.0 | Use a logarithmic scale for this axis. Can be combined with linear axes. |
 | `log_base` | number | `10` | v2.9.0 | Logarithm base; must be finite and greater than 1. |
 | `min` | `auto`, number or string | `auto` | v1.9.0 | If undefined or `auto`, the `min` of the y-axis will be automatically calculated based on the min value of all the series associated with this axis. See [below](#minmax-format) for other formats. |
-| `max` | `auto`, number or string | `auto` | v1.9.0 | If undefined or `auto`, the `min` of the y-axis will be automatically calculated based on the max value of all the series associated with this axis. See [below](#minmax-format) for other formats. |
+| `max` | `auto`, number or string | `auto` | v1.9.0 | If undefined or `auto`, the `max` of the y-axis will be automatically calculated based on the max value of all the series associated with this axis. In a `stacked` chart, `min` and `max` use the stack totals; when the chart mixes columns and lines, only the columns stack. See [below](#minmax-format) for other formats. |
 | `decimals` | number | `1` | v1.10.0 | Number of decimals to show on this y-axis |
 | `apex_config` | object | | v1.9.0 | Any configuration from https://apexcharts.com/docs/options/yaxis/, except `min`, `max`, `show` and `opposite` |
 | `align_to` | number | | v1.10.0 | Aligns the yaxis extremas to the closest multiple of `align_to`. Only valid if `min` or `max` are not fixed values. Ignored for logarithmic axes, where arithmetic rounding could produce an invalid zero limit. |
+| `tick_step` | number | | v2.15.0 | Puts a tick and a label every `tick_step` units, e.g. `1` for `0, 1, 2, 3, ...`. Non-fixed `min` and `max` move outwards to a multiple of `tick_step`, so the axis still follows the data, zoom and pan. Overrides `apex_config.tickAmount`. Ignored for logarithmic axes and when more than 50 ticks would be needed |
+
+Example: a power axis that starts at 0, grows with the data and has a label every 1 kW:
+
+```yaml
+yaxis:
+  - min: 0
+    max: auto
+    decimals: 0
+    tick_step: 1
+```
 
 #### Logarithmic scales
 

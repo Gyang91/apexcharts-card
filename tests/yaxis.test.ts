@@ -181,3 +181,95 @@ describe('Y-axis logarithmic editor', () => {
     expect(changed.mock.calls[2][0].detail.value).not.toHaveProperty('log_base');
   });
 });
+
+describe('yaxis tick_step', () => {
+  const axesFor = (yaxis: ChartCardExternalConfig['yaxis'], min: number, max: number) => {
+    const card = createCard({ yaxis });
+    card._graphs = [{ minMaxWithTimestampForYAxis: () => ({ min: [0, min], max: [1, max] }) }];
+    return card._computeYAxisAutoMinMax(new Date(0), new Date(1000));
+  };
+
+  it('puts a tick every step while the auto max follows the data', () => {
+    const [axis] = axesFor([{ min: 0, max: 'auto', tick_step: 1 }], 0.4, 11.1);
+    expect(axis).toMatchObject({ min: 0, max: 12, tickAmount: 12 });
+    expect(axis).not.toHaveProperty('tick_step');
+  });
+
+  it('aligns soft and absolute bounds after they are applied', () => {
+    const [axis] = axesFor([{ min: '|-0.5|', max: '|+0.5|', tick_step: 0.2 }], 1.05, 2.05);
+    expect(axis.min).toBeCloseTo(0.4, 9);
+    expect(axis.max).toBeCloseTo(2.6, 9);
+    expect(axis.tickAmount).toBe(11);
+  });
+
+  it('works with fixed bounds and keeps ApexCharts ticks past 50 intervals', () => {
+    expect(axesFor([{ min: 0, max: 10, tick_step: 2 }], 3, 4)[0]).toMatchObject({ min: 0, max: 10, tickAmount: 5 });
+    expect(axesFor([{ min: 0, max: 'auto', tick_step: 1 }], 0, 500)[0].tickAmount).toBeUndefined();
+  });
+});
+
+describe('stacked y-axis extremas (RomRider#333, #92)', () => {
+  const graphOf = (history: [number, number | null][]) => {
+    const values = history.map(([, v]) => v).filter((v): v is number => v !== null);
+    return {
+      history,
+      minMaxWithTimestampForYAxis: () => ({ min: [0, Math.min(...values)], max: [0, Math.max(...values)] }),
+    };
+  };
+  const axisFor = (extra: Partial<ChartCardExternalConfig>, histories: [number, number | null][][]) => {
+    const card = createCard({ yaxis: [{ min: 'auto', max: 'auto' }], ...extra });
+    card._graphs = histories.map(graphOf);
+    return card._computeYAxisAutoMinMax(new Date(0), new Date(1000))[0];
+  };
+  const columns = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ entity: `sensor.${i}`, type: 'column' as const }));
+
+  it('uses the highest stack total, not the highest single series', () => {
+    const axis = axisFor({ stacked: true, series: columns(2) }, [
+      [
+        [100, 3],
+        [200, 5],
+      ],
+      [
+        [100, 4],
+        [200, 1],
+      ],
+    ]);
+    expect(axis.max).toBe(7);
+  });
+
+  it('stacks negative values separately and leaves non-stacked charts alone', () => {
+    const histories: [number, number | null][][] = [
+      [
+        [100, 3],
+        [200, -2],
+      ],
+      [
+        [100, 4],
+        [200, -5],
+      ],
+    ];
+    expect(axisFor({ stacked: true, series: columns(2) }, histories)).toMatchObject({ min: -7, max: 7 });
+    expect(axisFor({ series: columns(2) }, histories)).toMatchObject({ min: -5, max: 4 });
+  });
+
+  it('does not add lines to the stack of a mixed chart, and keeps stack groups apart', () => {
+    const mixed = axisFor({ stacked: true, series: [...columns(2), { entity: 'sensor.total', type: 'line' }] }, [
+      [[100, 2]],
+      [[100, 3]],
+      [[100, 10]],
+    ]);
+    expect(mixed.max).toBe(10);
+    const grouped = axisFor(
+      {
+        stacked: true,
+        series: [
+          { entity: 'sensor.a', type: 'column', stack_group: 'a' },
+          { entity: 'sensor.b', type: 'column', stack_group: 'b' },
+        ],
+      },
+      [[[100, 2]], [[100, 3]]],
+    );
+    expect(grouped.max).toBe(3);
+  });
+});

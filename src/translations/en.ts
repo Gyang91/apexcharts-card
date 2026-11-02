@@ -274,6 +274,8 @@ export const en: Record<string, string> = {
   'series.func.median': 'Median',
   'series.func.delta': 'Delta',
   'series.func.diff': 'Diff',
+  'series.func.diff_inc': 'Diff (counter with resets)',
+  'series.func.time_avg': 'Time-weighted average',
   'series.fill.last': 'Last',
   'series.fill.null': 'Null',
   'series.fill.zero': 'Zero',

@@ -101,39 +101,39 @@ describe('utils.ts', () => {
     const series: any[] = [{ name: undefined, show: {} }];
 
     it('returns empty string when series or entities/entity missing', () => {
-      expect(computeName(0, undefined, undefined, undefined)).toBe('');
-      expect(computeName(0, series, undefined, undefined)).toBe('');
+      expect(computeName(undefined, 0, undefined, undefined, undefined)).toBe('');
+      expect(computeName(undefined, 0, series, undefined, undefined)).toBe('');
     });
 
     it('prefers series.name over entity attributes', () => {
       const entity = mkState('sensor.x', '1', { friendly_name: 'Friendly' });
       const s = [{ name: 'Custom Name', show: {} }];
-      expect(computeName(0, s, undefined, entity)).toBe('Custom Name');
+      expect(computeName(undefined, 0, s, undefined, entity)).toBe('Custom Name');
     });
 
     it('falls back to friendly_name then entity_id', () => {
       const entityWithFriendly = mkState('sensor.x', '1', { friendly_name: 'Friendly' });
-      expect(computeName(0, series, undefined, entityWithFriendly)).toBe('Friendly');
+      expect(computeName(undefined, 0, series, undefined, entityWithFriendly)).toBe('Friendly');
 
       const entityNoFriendly = mkState('sensor.y', '1', {});
-      expect(computeName(0, series, undefined, entityNoFriendly)).toBe('sensor.y');
+      expect(computeName(undefined, 0, series, undefined, entityNoFriendly)).toBe('sensor.y');
     });
 
     it('reads from entities array when entity is not provided', () => {
       const entities = [mkState('sensor.z', '1', { friendly_name: 'From Array' })];
-      expect(computeName(0, series, entities, undefined)).toBe('From Array');
+      expect(computeName(undefined, 0, series, entities, undefined)).toBe('From Array');
     });
 
     it('appends the offset when show.offset_in_name and offset are set', () => {
       const entity = mkState('sensor.x', '1', { friendly_name: 'Friendly' });
       const s = [{ name: 'N', offset: '-1d', show: { offset_in_name: true } }];
-      expect(computeName(0, s, undefined, entity)).toBe('N (-1d)');
+      expect(computeName(undefined, 0, s, undefined, entity)).toBe('N (-1d)');
     });
 
     it('does not append offset when show.offset_in_name is false', () => {
       const entity = mkState('sensor.x', '1', { friendly_name: 'Friendly' });
       const s = [{ name: 'N', offset: '-1d', show: { offset_in_name: false } }];
-      expect(computeName(0, s, undefined, entity)).toBe('N');
+      expect(computeName(undefined, 0, s, undefined, entity)).toBe('N');
     });
   });
 

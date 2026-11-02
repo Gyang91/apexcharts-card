@@ -51,7 +51,8 @@ import type { ApexOptions, ApexYAxis } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
 import { stylesApex } from './styles';
 import { HassEntity } from 'home-assistant-js-websocket';
-import { getBrushLayoutConfig, getLayoutConfig } from './apex-layouts';
+import { getBrushLayoutConfig, getLayoutConfig, yAxisLabelFormatter } from './apex-layouts';
+import { entityNamesChanged } from './entity-name';
 import GraphEntry from './graphEntry';
 import { createCheckers } from 'ts-interface-checker';
 import {
@@ -75,6 +76,7 @@ import {
   DEFAULT_SHOW_ZERO_IN_HEADER,
   DEFAULT_SHOW_OFFSET_IN_NAME,
   DEFAULT_UPDATE_DELAY,
+  MAX_TICK_STEPS,
   NO_VALUE,
   PLAIN_COLOR_TYPES,
   TIMESERIES_TYPES,
@@ -293,7 +295,7 @@ export class ChartsCard extends LitElement {
       if (this._config?.experimental?.hidden_by_default && !TIMESERIES_TYPES.includes(this._config.chart_type)) {
         this._config.series_in_graph.forEach((serie, index) => {
           if (serie.show.hidden_by_default) {
-            const name = computeName(index, this._config?.series_in_graph, this._entities);
+            const name = computeName(this._hass, index, this._config?.series_in_graph, this._entities);
             this._apexChart?.hideSeries(name);
           }
         });
@@ -302,10 +304,15 @@ export class ChartsCard extends LitElement {
   }
 
   public set hass(hass: HomeAssistant) {
+    const oldHass = this._hass;
     this._hass = hass;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setLocale((hass as any)?.locale?.language || hass?.language);
     if (!this._config || !this._graphs || !hass) return;
+
+    // A device or area rename changes names but no entity state: redraw the
+    // header now, the chart takes the new names on its next refresh
+    if (entityNamesChanged(oldHass, hass)) this.requestUpdate();
 
     this._graphs.map((graph) => {
       if (graph) graph.hass = hass;
@@ -739,8 +746,10 @@ export class ChartsCard extends LitElement {
       let yAxisDup: any = JSON.parse(JSON.stringify(config.yaxis![idx]));
       delete yAxisDup.apex_config;
       delete yAxisDup.decimals;
+      delete yAxisDup.tick_step;
       yAxisDup.decimalsInFloat =
         config.yaxis![idx].decimals === undefined ? DEFAULT_FLOAT_PRECISION : config.yaxis![idx].decimals;
+      yAxisDup.labels = { formatter: yAxisLabelFormatter(yAxisDup.decimalsInFloat) };
       if (this._yAxisConfig?.[idx].series_id) {
         this._yAxisConfig?.[idx].series_id?.push(serieIndex);
       } else {
@@ -1016,7 +1025,9 @@ export class ChartsCard extends LitElement {
                 role=${ifDefined(stateClasses === 'actions' ? 'button' : undefined)}
                 tabindex=${ifDefined(stateClasses === 'actions' ? '0' : undefined)}
                 aria-label=${ifDefined(
-                  stateClasses === 'actions' ? computeName(index, this._config?.series, this._entities) : undefined,
+                  stateClasses === 'actions'
+                    ? computeName(this._hass, index, this._config?.series, this._entities)
+                    : undefined,
                 )}
                 @action=${(ev: Event) => {
                   this._handleAction(ev, serie);
@@ -1068,7 +1079,9 @@ export class ChartsCard extends LitElement {
                 </div>
                 ${
                   serie.show.name_in_header
-                    ? html`<div id="state__name">${computeName(index, this._config?.series, this._entities)}</div>`
+                    ? html`<div id="state__name">
+                        ${computeName(this._hass, index, this._config?.series, this._entities)}
+                      </div>`
                     : ''
                 }
                 <mwc-ripple unbounded id="ripple-${index}" aria-hidden="true"></mwc-ripple>
@@ -1138,6 +1151,7 @@ export class ChartsCard extends LitElement {
         chartCfg.chart.redrawOnParentResize = true;
         this._configureSeriesVisibility(chartCfg);
         this._configureSampling(chartCfg);
+        this._configureThresholdGradients(chartCfg, false);
         if (this._config.series_in_brush.length) {
           chartCfg.chart.id = Math.random().toString(36).substring(7);
         }
@@ -1148,6 +1162,7 @@ export class ChartsCard extends LitElement {
           const brushCfg = getBrushLayoutConfig(this._config, this._hass, chartCfg.chart.id);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (brushCfg as any).chart.redrawOnParentResize = true;
+          this._configureThresholdGradients(brushCfg as ApexOptions, true);
           this._apexBrush = new ApexCharts(brush, brushCfg as ApexOptions);
           promises.push(this._apexBrush.render());
         }
@@ -1209,6 +1224,70 @@ export class ChartsCard extends LitElement {
       updated?.(...args);
       this._queueResample();
     };
+  }
+
+  // color_threshold stops span each series' min..max. ApexCharts sizes a vertical
+  // gradient to each path's own bounding box, so a line split by null values gave
+  // the same value different colors in each piece (RomRider#1111). After every
+  // draw, span each threshold gradient over the series' min..max in plot
+  // coordinates instead: the same as before for a line without gaps.
+  private _configureThresholdGradients(layout: ApexOptions, brush: boolean): void {
+    if (!this._thresholdGradientSeries(brush).length) return;
+    layout.chart ??= {};
+    layout.chart.events ??= {};
+    const events = layout.chart.events;
+    (['mounted', 'updated'] as const).forEach((name) => {
+      const custom = events[name];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      events[name] = (chart: any, options?: any) => {
+        custom?.(chart, options);
+        this._anchorThresholdGradients(chart, brush);
+      };
+    });
+  }
+
+  private _thresholdGradientSeries(brush: boolean): { serie: ChartCardSeriesConfig; index: number }[] {
+    if (!this._config?.experimental?.color_threshold) return [];
+    if ((brush ? this._config.brush?.apex_config : this._config.apex_config)?.fill !== undefined) return [];
+    return (brush ? this._config.series_in_brush : this._config.series_in_graph)
+      .map((serie, index) => ({ serie, index }))
+      .filter(({ serie }) => serie.color_threshold?.length && [undefined, 'area', 'line'].includes(serie.type));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _anchorThresholdGradients(chart: any, brush: boolean): void {
+    const w = chart?.w;
+    const root: ParentNode | undefined = chart?.el;
+    if (!w?.globals || !w.layout || !root) return;
+    this._thresholdGradientSeries(brush).forEach(({ serie, index }) => {
+      const graph = this._graphs?.[serie.index];
+      const axisMin = w.globals.minYArr?.[index];
+      const axisMax = w.globals.maxYArr?.[index];
+      const axis = w.config?.yaxis?.[w.globals.seriesYAxisReverseMap?.[index] ?? 0];
+      if (graph?.min === undefined || graph?.max === undefined || graph.min === graph.max) return;
+      if (typeof axisMin !== 'number' || typeof axisMax !== 'number' || axisMax <= axisMin) return;
+      if (axis?.logarithmic || axis?.reversed) return;
+      // Offset 0 of the stops is the highest value drawn, 100 the lowest
+      const top = serie.invert ? -graph.min : graph.max;
+      const bottom = serie.invert ? -graph.max : graph.min;
+      const toY = (value: number) => (w.layout.gridHeight * (axisMax - value)) / (axisMax - axisMin);
+      const ids = new Set<string>();
+      root.querySelectorAll(`.apexcharts-series[data\\:realIndex="${index}"] path`).forEach((path) => {
+        ['fill', 'stroke'].forEach((attribute) => {
+          const id = /^url\(["']?#([^"')]+)["']?\)$/.exec(path.getAttribute(attribute) ?? '')?.[1];
+          if (id) ids.add(id);
+        });
+      });
+      ids.forEach((id) => {
+        const gradient = root.querySelector(`linearGradient[id="${id}"]`);
+        if (!gradient) return;
+        gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+        gradient.setAttribute('x1', '0');
+        gradient.setAttribute('x2', '0');
+        gradient.setAttribute('y1', String(toY(top)));
+        gradient.setAttribute('y2', String(toY(bottom)));
+      });
+    });
   }
 
   private _canSample(index: number, brush: boolean): boolean {
@@ -1430,9 +1509,11 @@ export class ChartsCard extends LitElement {
           if (!this._config?.series[index].show.in_chart && !this._config?.series[index].show.in_brush) {
             return;
           }
+          // Names go with every refresh so a renamed entity, device or area shows up
+          const name = computeName(this._hass, index, this._config?.series, this._entities);
           if (graph.history.length === 0) {
-            if (this._config?.series[index].show.in_chart) graphData.series.push({ data: [] });
-            if (this._config?.series[index].show.in_brush) brushData.series.push({ data: [] });
+            if (this._config?.series[index].show.in_chart) graphData.series.push({ name, data: [] });
+            if (this._config?.series[index].show.in_brush) brushData.series.push({ name, data: [] });
             return;
           }
           let data: EntityCachePoints;
@@ -1457,7 +1538,7 @@ export class ChartsCard extends LitElement {
               data.push([now.getTime() - this._serverTimeOffset, lastPoint[1]]);
             }
           }
-          const result = this._config?.series[index].invert ? { data: this._invertData(data) } : { data };
+          const result = { name, data: this._config?.series[index].invert ? this._invertData(data) : data };
           if (this._config?.series[index].show.in_chart) graphData.series.push(result);
           if (this._config?.series[index].show.in_brush) brushData.series.push(result);
           return;
@@ -1508,6 +1589,10 @@ export class ChartsCard extends LitElement {
               return [data];
             }
           }),
+          // Names go with every refresh so a renamed entity, device or area shows up
+          labels: this._config.series_in_graph.map((serie, index) =>
+            computeName(this._hass, index, this._config!.series_in_graph, undefined, this._hass?.states[serie.entity]),
+          ),
         };
       }
       if (TIMESERIES_TYPES.includes(this._config.chart_type) && this._config.experimental?.hidden_by_default) {
@@ -1521,18 +1606,22 @@ export class ChartsCard extends LitElement {
         });
       }
       if (this._config.chart_type === 'rangeArea') {
-        const [lower, upper] = graphData.series as { data: EntityCachePoints }[];
+        const [lower, upper] = graphData.series as { name: string; data: EntityCachePoints }[];
         const data = rangeAreaData(lower.data, upper.data);
         visualEmpty = data.every((point) => point.y[0] === null);
-        graphData.series = [{ data }];
+        graphData.series = [{ name: `${lower.name} - ${upper.name}`, data }];
       } else if (this._config.chart_type === 'heatmap') {
+        const series = graphData.series as { name: string; data: EntityCachePoints }[];
         const rows = heatmapData(
-          (graphData.series as { data: EntityCachePoints }[]).map((serie) => serie.data),
+          series.map((serie) => serie.data),
           this._config.heatmap?.max_cells,
         );
         // Native datetime heatmaps position sparse cells by timestamp. Omit
         // missing cells: native heatmap shading otherwise treats null as zero.
-        graphData.series = rows.map((data) => ({ data: data.filter((point) => point.y !== null) }));
+        graphData.series = rows.map((data, row) => ({
+          name: series[row].name,
+          data: data.filter((point) => point.y !== null),
+        }));
       }
       if (this._hasSampling()) {
         this._samplingSeries = { main: graphData.series, brush: brushData.series };
@@ -1889,10 +1978,7 @@ export class ChartsCard extends LitElement {
       if (yaxis.min_type !== minmax_type.FIXED || yaxis.max_type !== minmax_type.FIXED) {
         const minMax = yaxis.series_id?.map((id) => {
           const serie = this._config!.series_in_graph[id];
-          const hidden = this._hiddenSeries
-            ? this._hiddenSeries.has(serie.index)
-            : this._config?.experimental?.hidden_by_default && serie.show.hidden_by_default;
-          if (hidden) return undefined;
+          if (this._isHiddenInChart(serie)) return undefined;
           const graphIndex = serie.index;
           const lMinMax = this._graphs![graphIndex]?.minMaxWithTimestampForYAxis(
             start.getTime() + (this._seriesOffset[graphIndex] || 0),
@@ -1926,6 +2012,9 @@ export class ChartsCard extends LitElement {
             max = elt.max[1];
           }
         });
+        const stacked = this._stackTotals(yaxis.series_id, start, end);
+        if (stacked.max !== undefined && (max === null || stacked.max > max)) max = stacked.max;
+        if (stacked.min !== undefined && (min === null || stacked.min < min)) min = stacked.min;
         const logarithmic = yaxis.logarithmic ?? yaxis.apex_config?.logarithmic ?? false;
         if (yaxis.align_to !== undefined && !logarithmic) {
           if (min !== null && yaxis.min_type !== minmax_type.FIXED) {
@@ -1960,7 +2049,66 @@ export class ChartsCard extends LitElement {
         });
       }
     });
+    this._yAxisConfig?.forEach((yaxis) => this._applyTickStep(yaxis));
     return this._config?.apex_config?.yaxis;
+  }
+
+  private _isHiddenInChart(serie: ChartCardSeriesConfig): boolean {
+    return this._hiddenSeries
+      ? this._hiddenSeries.has(serie.index)
+      : !!(this._config?.experimental?.hidden_by_default && serie.show.hidden_by_default);
+  }
+
+  // Highest positive and lowest negative stack total of the visible range, as
+  // ApexCharts stacks them: per timestamp and stack group; when a chart mixes
+  // series types, only columns stack (`chart.stackOnlyBar`, on by default).
+  private _stackTotals(seriesIds: number[] | undefined, start: Date, end: Date): { min?: number; max?: number } {
+    const config = this._config!;
+    if (!seriesIds || !(config.stacked || config.apex_config?.chart?.stacked)) return {};
+    const onlyColumns =
+      new Set(config.series_in_graph.map((serie) => serie.type)).size > 1 &&
+      config.apex_config?.chart?.stackOnlyBar !== false;
+    const totals = new Map<string, [number, number]>();
+    seriesIds.forEach((id) => {
+      const serie = config.series_in_graph[id];
+      if (this._isHiddenInChart(serie) || (onlyColumns && serie.type !== 'column')) return;
+      const offset = this._seriesOffset[serie.index] || 0;
+      const from = start.getTime() + offset;
+      const to = end.getTime() + offset;
+      const group = serie.type === 'column' ? (serie.stack_group ?? '') : '';
+      this._graphs?.[serie.index]?.history.forEach(([timestamp, raw]) => {
+        if (timestamp < from || timestamp > to || raw === null || !Number.isFinite(raw)) return;
+        const value = serie.invert ? -raw : raw;
+        const key = `${group}|${timestamp - offset}`;
+        const total = totals.get(key) ?? [0, 0];
+        total[value > 0 ? 0 : 1] += value;
+        totals.set(key, total);
+      });
+    });
+    const result: { min?: number; max?: number } = {};
+    totals.forEach(([positive, negative]) => {
+      if (positive > 0 && (result.max === undefined || positive > result.max)) result.max = positive;
+      if (negative < 0 && (result.min === undefined || negative < result.min)) result.min = negative;
+    });
+    return result;
+  }
+
+  // `tick_step`: a tick every N units. Moves the non-fixed extremas outwards to a
+  // multiple of N, then derives ApexCharts' tickAmount from the final range.
+  private _applyTickStep(yaxis: ChartCardYAxis): void {
+    const step = yaxis.tick_step;
+    if (!step || step <= 0 || (yaxis.logarithmic ?? yaxis.apex_config?.logarithmic)) return;
+    yaxis.series_id?.forEach((id) => {
+      const apexYAxis = (this._config!.apex_config!.yaxis as ApexYAxis[])[id];
+      if (typeof apexYAxis.min !== 'number' || typeof apexYAxis.max !== 'number') return;
+      // Rounding guards against floating-point noise (0.30000000000000004 / 0.1)
+      const steps = (value: number) => Math.round((value / step) * 1e9) / 1e9;
+      if (yaxis.min_type !== minmax_type.FIXED) apexYAxis.min = Math.floor(steps(apexYAxis.min)) * step;
+      if (yaxis.max_type !== minmax_type.FIXED) apexYAxis.max = Math.ceil(steps(apexYAxis.max)) * step;
+      const tickAmount = Math.round((apexYAxis.max - apexYAxis.min) / step);
+      // Past MAX_TICK_STEPS labels overlap: keep ApexCharts' own tick count
+      if (tickAmount >= 1 && tickAmount <= MAX_TICK_STEPS) apexYAxis.tickAmount = tickAmount;
+    });
   }
 
   private _getMinMaxBasedOnType(isMin: boolean, value: number, configMinMax: number, type: minmax_type): number {

@@ -216,7 +216,7 @@ describe('card with external statistic series', () => {
     expect(card._config.series[0].name).toBe('Consommation eau');
     expect(card._config.series[0].unit).toBe('m³');
     expect(card._entities[0].attributes.friendly_name).toBe('Consommation eau');
-    expect(computeName(0, card._config.series, card._entities)).toBe('Consommation eau');
+    expect(computeName(undefined, 0, card._config.series, card._entities)).toBe('Consommation eau');
     expect(computeUom(0, card._config.series, card._entities)).toBe('m³');
   });
 
@@ -231,7 +231,7 @@ describe('card with external statistic series', () => {
 
     expect(card._config.series[0].name).toBeUndefined();
     expect(card._entities[0].attributes.friendly_name).toBe(id);
-    expect(computeName(0, card._config.series, card._entities)).toBe(id);
+    expect(computeName(undefined, 0, card._config.series, card._entities)).toBe(id);
   });
 
   it('show.in_header: raw displays the latest statistic value', async () => {
@@ -284,13 +284,13 @@ describe('getStatisticsMetadata', () => {
 describe('name/unit fallbacks for external statistics', () => {
   it('computeName falls back to the raw statistic ID without any entity', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(computeName(0, [{ entity: EXT_ID }] as any)).toBe(EXT_ID);
+    expect(computeName(undefined, 0, [{ entity: EXT_ID }] as any)).toBe(EXT_ID);
   });
 
   it('series name/unit overrides still win', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const series = [{ entity: EXT_ID, name: 'Eau', unit: 'L' }] as any;
-    expect(computeName(0, series)).toBe('Eau');
+    expect(computeName(undefined, 0, series)).toBe('Eau');
     expect(computeUom(0, series)).toBe('L');
   });
 });

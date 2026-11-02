@@ -29,6 +29,8 @@ export const DEFAULT_STATISTICS_TYPE = 'mean';
 export const DEFAULT_STATISTICS_PERIOD = 'hour';
 
 export const DEFAULT_FLOAT_PRECISION = 1;
+// Most y-axis intervals `tick_step` may create before labels overlap
+export const MAX_TICK_STEPS = 50;
 
 export const DEFAULT_COLORS = [
   'var(--accent-color)',

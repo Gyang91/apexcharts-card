@@ -54,6 +54,7 @@ export function getSeriesGroupBySchema(): HaFormSchema[] {
               options: [
                 { value: 'raw', label: t('series.func.raw') },
                 { value: 'avg', label: t('series.func.avg') },
+                { value: 'time_avg', label: t('series.func.time_avg') },
                 { value: 'min', label: t('series.func.min') },
                 { value: 'max', label: t('series.func.max') },
                 { value: 'last', label: t('series.func.last') },
@@ -62,6 +63,7 @@ export function getSeriesGroupBySchema(): HaFormSchema[] {
                 { value: 'median', label: t('series.func.median') },
                 { value: 'delta', label: t('series.func.delta') },
                 { value: 'diff', label: t('series.func.diff') },
+                { value: 'diff_inc', label: t('series.func.diff_inc') },
               ],
             },
           },

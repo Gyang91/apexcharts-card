@@ -83,10 +83,23 @@ export const ChartCardStartEnd = t.union(t.lit('minute'), t.lit('hour'), t.lit('
 
 export const StatisticsPeriod = t.union(t.lit('5minute'), t.lit('hour'), t.lit('day'), t.lit('week'), t.lit('month'), t.lit('year'));
 
+export const EntityName = t.union("string", "EntityNameItem", t.array("EntityNameItem"));
+
+export const EntityNameItem = t.union("EntityNameContextItem", "EntityNameTextItem");
+
+export const EntityNameContextItem = t.iface([], {
+  "type": t.union(t.lit('entity'), t.lit('device'), t.lit('area'), t.lit('floor')),
+});
+
+export const EntityNameTextItem = t.iface([], {
+  "type": t.lit('text'),
+  "text": "string",
+});
+
 export const ChartCardAllSeriesExternalConfig = t.iface([], {
   "entity": t.opt("string"),
   "attribute": t.opt("string"),
-  "name": t.opt("string"),
+  "name": t.opt("EntityName"),
   "type": t.opt(t.union(t.lit('line'), t.lit('column'), t.lit('area'))),
   "stack_group": t.opt("string"),
   "color": t.opt("string"),
@@ -158,7 +171,7 @@ export const ChartCardPrettyTime = t.union(t.lit('millisecond'), t.lit('second')
 
 export const GroupByFill = t.union(t.lit('null'), t.lit('last'), t.lit('zero'));
 
-export const GroupByFunc = t.union(t.lit('raw'), t.lit('avg'), t.lit('time_avg'), t.lit('min'), t.lit('max'), t.lit('last'), t.lit('first'), t.lit('sum'), t.lit('median'), t.lit('delta'), t.lit('diff'));
+export const GroupByFunc = t.union(t.lit('raw'), t.lit('avg'), t.lit('time_avg'), t.lit('min'), t.lit('max'), t.lit('last'), t.lit('first'), t.lit('sum'), t.lit('median'), t.lit('delta'), t.lit('diff'), t.lit('diff_inc'));
 
 export const CalendarPeriod = t.union(t.lit('hour'), t.lit('day'), t.lit('week'), t.lit('month'), t.lit('quarter'), t.lit('year'));
 
@@ -188,6 +201,7 @@ export const ChartCardYAxisExternal = t.iface([], {
   "min": t.opt(t.union(t.lit('auto'), "number", "string")),
   "max": t.opt(t.union(t.lit('auto'), "number", "string")),
   "align_to": t.opt("number"),
+  "tick_step": t.opt("number"),
   "decimals": t.opt("number"),
   "apex_config": t.opt("any"),
 });
@@ -263,6 +277,10 @@ const exportedTypeSuite: t.ITypeSuite = {
   ChartCardSpanExtConfig,
   ChartCardStartEnd,
   StatisticsPeriod,
+  EntityName,
+  EntityNameItem,
+  EntityNameContextItem,
+  EntityNameTextItem,
   ChartCardAllSeriesExternalConfig,
   ActionsConfig,
   ChartCardSeriesShowConfigExt,

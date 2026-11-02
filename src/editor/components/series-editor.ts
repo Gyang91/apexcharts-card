@@ -7,6 +7,7 @@ import {
   ChartCardSeriesExternalConfig,
 } from '../../types-config';
 import { computeColor } from '../../utils';
+import { computeEntityName } from '../../entity-name';
 import { DEFAULT_COLORS } from '../../const';
 import { editorStyles } from '../styles';
 import { t } from '../localize';
@@ -65,11 +66,8 @@ export class ApexChartsCardSeriesEditor extends LitElement {
   }
 
   private _displayName(s: ChartCardSeriesExternalConfig): string {
-    if (s.name) return s.name;
-    if (s.entity) {
-      const stateObj = this.hass?.states[s.entity];
-      return stateObj?.attributes?.friendly_name || s.entity;
-    }
+    if (typeof s.name === 'string' && s.name) return s.name;
+    if (s.entity) return computeEntityName(this.hass, this.hass?.states[s.entity], s.name) || s.entity;
     return t('series.newSeries');
   }
 

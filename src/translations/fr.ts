@@ -274,6 +274,8 @@ export const fr: Record<string, string> = {
   'series.func.median': 'Médiane',
   'series.func.delta': 'Delta',
   'series.func.diff': 'Différence',
+  'series.func.diff_inc': 'Différence (compteur avec remises à zéro)',
+  'series.func.time_avg': 'Moyenne pondérée par le temps',
   'series.fill.last': 'Dernier',
   'series.fill.null': 'Nul',
   'series.fill.zero': 'Zéro',

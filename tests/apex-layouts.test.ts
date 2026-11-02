@@ -1,4 +1,4 @@
-import { getLayoutConfig, getBrushLayoutConfig } from '../src/apex-layouts';
+import { getLayoutConfig, getBrushLayoutConfig, yAxisLabelFormatter } from '../src/apex-layouts';
 import { mkHass } from './fixtures/hass';
 import '../src/apexcharts-card';
 
@@ -213,5 +213,25 @@ describe('getBrushLayoutConfig', () => {
     const layout = getBrushLayoutConfig(config, mkHass(), 'main-id') as AnyRec;
     expect(layout.fill.type).toEqual(['pattern']);
     expect(layout.fill.opacity).toBe(0.3);
+  });
+});
+
+describe('yAxisLabelFormatter (RomRider#126)', () => {
+  const w = (yValueDecimal: number) => ({ globals: { xyCharts: true, yValueDecimal } });
+  it('shows a tick that rounds to zero as 0, never -0.0', () => {
+    expect(yAxisLabelFormatter(1)(-1e-17, 0, w(1))).toBe('0.0');
+    expect(yAxisLabelFormatter(1)(-0.04, 0, w(1))).toBe('0.0');
+    expect(yAxisLabelFormatter(0)(-0.2, 0, w(0))).toBe('0');
+  });
+  it('keeps ApexCharts formatting otherwise', () => {
+    expect(yAxisLabelFormatter(1)(-1.25, 0, w(2))).toBe('-1.3');
+    expect(yAxisLabelFormatter(1)(10, 0, w(0))).toBe('10');
+    expect(yAxisLabelFormatter(1)(2.5, 0, w(0))).toBe('2.5');
+    expect(yAxisLabelFormatter(1)('label', 0, w(1))).toBe('label');
+    expect(yAxisLabelFormatter(1)(5, 0, { globals: { xyCharts: false } })).toBe(5);
+  });
+  it('is set on the default and per-axis y axes', () => {
+    const layout = getLayoutConfig(internalConfig() as never, mkHass()) as AnyRec;
+    expect(layout.yaxis.labels.formatter(-1e-17, 0, w(1))).toBe('0.0');
   });
 });

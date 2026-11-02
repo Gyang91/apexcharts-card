@@ -85,11 +85,17 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
     this._fire({ entity: data.entity || '' } as Partial<ChartCardSeriesExternalConfig>);
   };
 
+  private _textName(): string {
+    const name = this.series?.name;
+    return typeof name === 'string' ? name : '';
+  }
+
   private _coreChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
     const data = ev.detail.value as { name?: string; type?: string };
     const updates: Partial<Series> = {};
-    if ('name' in data) updates.name = data.name || undefined;
+    // A structured name (YAML only) shows as empty and stays until a name is typed
+    if ('name' in data && (data.name || '') !== this._textName()) updates.name = data.name || undefined;
     if ('type' in data) {
       updates.type = (data.type || undefined) as Series['type'];
     }
@@ -424,7 +430,7 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
         <ha-form
           .hass=${this.hass}
-          .data=${{ name: s.name || '', type: s.type || '' }}
+          .data=${{ name: this._textName(), type: s.type || '' }}
           .schema=${getSeriesCoreSchema()}
           .computeLabel=${computeLabel}
           .computeHelper=${computeHelper}

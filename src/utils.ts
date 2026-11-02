@@ -13,6 +13,7 @@ import { DEFAULT_FLOAT_PRECISION, DEFAULT_MAX, DEFAULT_MIN, moment, NO_VALUE } f
 import { formatNumber, FrontendLocaleData, HomeAssistant } from 'custom-card-helpers';
 import { OverrideFrontendLocaleData } from './types-ha';
 import { t } from './localize';
+import { computeEntityName } from './entity-name';
 
 export function compress(data: unknown): string {
   return lzStringCompress(JSON.stringify(data));
@@ -98,19 +99,15 @@ export function compileUserFunction<F extends (...args: never[]) => unknown>(
 }
 
 export function computeName(
+  hass: HomeAssistant | undefined,
   index: number,
   series: ChartCardSeriesExternalConfig[] | undefined,
   entities: (HassEntity | undefined)[] | HassEntities | undefined = undefined,
   entity: HassEntity | undefined = undefined,
 ): string {
   if (!series || !series[index]) return '';
-  let name = series[index].name || '';
-  if (!name && entity) {
-    name = entity.attributes?.friendly_name || entity.entity_id || '';
-  } else if (!name && entities) {
-    const entry = (entities as Record<number, HassEntity | undefined>)[index];
-    name = entry?.attributes?.friendly_name || entry?.entity_id || '';
-  }
+  const stateObj = entity ?? (entities as Record<number, HassEntity | undefined> | undefined)?.[index];
+  let name = computeEntityName(hass, stateObj, series[index].name);
   if (!name && isExternalStatisticId(series[index].entity)) {
     name = series[index].entity;
   }

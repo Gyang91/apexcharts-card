@@ -207,3 +207,33 @@ describe('group_by.func time_avg', () => {
     expect(entry.history.map(([, v]) => v)).toEqual([10, 25]);
   });
 });
+
+describe('group_by.func diff_inc', () => {
+  it('counts a drop as a counter reset, also several in one bucket', async () => {
+    const t0 = berlin('2026-07-01T10:00:00', '+02:00');
+    const entry = makeEntry({ func: 'diff_inc', duration: '1h' }, [
+      [t0, 100],
+      [t0 + 10 * MIN, 120],
+      [t0 + 20 * MIN, 5], // reset
+      [t0 + 30 * MIN, 30],
+      [t0 + 40 * MIN, 2], // reset
+      [t0 + 50 * MIN, 4],
+    ]);
+    await entry._updateHistory(new Date(t0 - HOUR), new Date(t0 + HOUR));
+    expect(entry.history.map(([, v]) => v)).toEqual([20 + 5 + 25 + 2 + 2]);
+  });
+
+  it('equals diff for a counter without resets', async () => {
+    const t0 = berlin('2026-07-01T10:00:00', '+02:00');
+    const points: [number, number][] = [
+      [t0, 10],
+      [t0 + 30 * MIN, 15],
+      [t0 + 50 * MIN, 18],
+    ];
+    const inc = makeEntry({ func: 'diff_inc', duration: '1h' }, points);
+    const diff = makeEntry({ func: 'diff', duration: '1h' }, points);
+    await inc._updateHistory(new Date(t0 - HOUR), new Date(t0 + HOUR));
+    await diff._updateHistory(new Date(t0 - HOUR), new Date(t0 + HOUR));
+    expect(inc.history).toEqual(diff.history);
+  });
+});

@@ -116,6 +116,7 @@ export default class GraphEntry {
       median: this._median,
       delta: this._delta,
       diff: this._diff,
+      diff_inc: this._diffIncreasing,
     };
     this._index = index;
     this._cache = config.statistics ? false : cache;
@@ -796,6 +797,20 @@ export default class GraphEntry {
       return null;
     }
     return last - first;
+  }
+
+  // Increase of a counter that can reset (Home Assistant's `total_increasing`):
+  // a drop starts a new cycle from 0, so its new value counts as increase.
+  private _diffIncreasing(items: EntityCachePoints): number | null {
+    const noNulls = this._filterNulls(items);
+    if (noNulls.length === 0) return null;
+    let increase = 0;
+    for (let i = 1; i < noNulls.length; i++) {
+      const previous = noNulls[i - 1][1] as number;
+      const current = noNulls[i][1] as number;
+      increase += current >= previous ? current - previous : current;
+    }
+    return increase;
   }
 
   private _filterNulls(items: EntityCachePoints): EntityCachePoints {

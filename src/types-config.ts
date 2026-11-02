@@ -87,10 +87,24 @@ export type ChartCardStartEnd = 'minute' | 'hour' | 'day' | 'week' | 'month' | '
 
 export type StatisticsPeriod = '5minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
 
+/** A `name` option: a plain string, or name parts resolved by Home Assistant. */
+export type EntityName = string | EntityNameItem | EntityNameItem[];
+
+export type EntityNameItem = EntityNameContextItem | EntityNameTextItem;
+
+export interface EntityNameContextItem {
+  type: 'entity' | 'device' | 'area' | 'floor';
+}
+
+export interface EntityNameTextItem {
+  type: 'text';
+  text: string;
+}
+
 export interface ChartCardAllSeriesExternalConfig {
   entity?: string;
   attribute?: string;
-  name?: string;
+  name?: EntityName;
   type?: 'line' | 'column' | 'area';
   stack_group?: string;
   color?: string;
@@ -165,7 +179,7 @@ export type ChartCardPrettyTime = 'millisecond' | 'second' | 'minute' | 'hour' |
 export type GroupByFill = 'null' | 'last' | 'zero';
 
 export type GroupByFunc =
-  'raw' | 'avg' | 'time_avg' | 'min' | 'max' | 'last' | 'first' | 'sum' | 'median' | 'delta' | 'diff';
+  'raw' | 'avg' | 'time_avg' | 'min' | 'max' | 'last' | 'first' | 'sum' | 'median' | 'delta' | 'diff' | 'diff_inc';
 
 export type CalendarPeriod = 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 
@@ -195,6 +209,7 @@ export interface ChartCardYAxisExternal {
   min?: 'auto' | number | string;
   max?: 'auto' | number | string;
   align_to?: number;
+  tick_step?: number;
   decimals?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   apex_config?: any;
