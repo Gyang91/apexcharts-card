@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.16.1](https://github.com/Gyang91/apexcharts-card/compare/v2.16.0...v2.16.1) (2026-11-02)
+
+
+### Documentation
+
+* computed series in data processing and all_series_config sections ([b8944ac](https://github.com/Gyang91/apexcharts-card/commit/b8944ac72b316388c66ef8122dbaea70450027f0))
+
 ## [2.16.0](https://github.com/Gyang91/apexcharts-card/compare/v2.15.0...v2.16.0) (2026-11-02)
 
 
