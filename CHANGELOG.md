@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.15.0](https://github.com/Gyang91/apexcharts-card/compare/v2.14.1...v2.15.0) (2026-11-02)
+
+
+### Features
+
+* Home Assistant entity names, diff_inc, tick_step and threshold and stacking fixes ([7a60483](https://github.com/Gyang91/apexcharts-card/commit/7a604831044ccd6a4df34179a6af32eff5150ee8))
+
 ## [2.14.1](https://github.com/Gyang91/apexcharts-card/compare/v2.14.0...v2.14.1) (2026-11-02)
 
 
