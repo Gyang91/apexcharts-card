@@ -14,6 +14,7 @@ export interface HaFormSchema {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   selector?: Record<string, any>;
   default?: unknown;
+  label?: string;
   helper?: string;
 }
 

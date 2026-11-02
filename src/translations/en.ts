@@ -41,6 +41,8 @@ export const en: Record<string, string> = {
     'Chart refresh failed. Previously displayed data may be out of date; details are in the browser console.',
   'card.warning.historyFailed':
     'Could not load data for {entity}. Check the Home Assistant connection, recorder and series configuration; details are in the browser console. Previously displayed data may be out of date.',
+  'card.warning.computeFailed':
+    'Could not compute {series}. Check its compute function; details are in the browser console. Previously displayed data may be out of date.',
   'card.warning.noHistory':
     'No numeric data in this time range. Check recorder history, the selected range and series transformations.',
   'card.warning.noStatistics':
@@ -58,6 +60,9 @@ export const en: Record<string, string> = {
   'error.interval.invalid': "'{prefix}: {interval}' is not a valid range of time",
   'error.offset.invalidSign': "'{prefix}: {interval}' should start with a '+' or a '-'",
   'error.template.missing': "apexcharts-card template '{template}' is missing from your config!",
+  'error.series.entityRequired': "series[{index}]: 'entity' is required, unless the series uses 'compute'.",
+  'error.series.computeOptions': "series[{index}]: a computed series can't use '{option}'.",
+  'error.series.duplicateId': 'Series IDs must be unique: {id}.',
   'error.statistics.externalRequired':
     "External statistic ID '{entity}' requires the 'statistics' option: it has no state history, only long-term statistics.",
 
@@ -112,6 +117,9 @@ export const en: Record<string, string> = {
   'field.section_mode': 'Section Mode',
   'field.locale': 'Locale',
   'field.hours_12': '12-Hour Format',
+  'field.compute': 'Compute',
+  'field.source': 'Source',
+  'field.series_id': 'Series ID',
   'field.entity': 'Entity',
   'field.name': 'Name',
   'field.type': 'Type',
@@ -212,6 +220,9 @@ export const en: Record<string, string> = {
   'helper.time_delta': 'e.g. -30min, +2h',
   'helper.duration': 'e.g. 1h, 30min, 1d',
   'helper.transform': 'JS expression. Use `x` for the value (e.g. `return x / 1000;`)',
+  'helper.compute':
+    'JS function body, run for each timestamp. Available: values (by series ID), x, hass. Return a number or null.',
+  'helper.series_id': 'Key of this series in the values of a computed series.',
   'helper.data_generator': 'JS function body. Available: entity, start, end, hass',
   'helper.stroke_dash': 'Number or comma-separated (e.g. 5,3,2)',
   'helper.selection_span': 'e.g. 6h. Default: 1/4 of graph_span',
@@ -252,6 +263,8 @@ export const en: Record<string, string> = {
   'series.newSeries': '(new series)',
   'series.allSeriesConfig': 'All Series Config',
   'series.color.placeholder': 'e.g. #ff0000, red, var(--my-color)',
+  'series.source.entity': 'Entity',
+  'series.source.compute': 'Computed from other series',
   'series.validation.entityRequired': 'Entity is required.',
   'series.yaxisId.missing': '(missing)',
   'series.panel.appearance': 'Appearance',

@@ -41,6 +41,8 @@ export const fr: Record<string, string> = {
     'Échec de l’actualisation. Les données affichées peuvent être anciennes ; les détails sont dans la console du navigateur.',
   'card.warning.historyFailed':
     'Impossible de charger les données de {entity}. Vérifiez la connexion à Home Assistant, recorder et la configuration de la série ; les détails sont dans la console du navigateur. Les données affichées peuvent être anciennes.',
+  'card.warning.computeFailed':
+    'Impossible de calculer {series}. Vérifiez sa fonction compute ; les détails sont dans la console du navigateur. Les données affichées peuvent être anciennes.',
   'card.warning.noHistory':
     'Aucune donnée numérique sur cette période. Vérifiez l’historique recorder, la période et les transformations.',
   'card.warning.noStatistics':
@@ -58,6 +60,9 @@ export const fr: Record<string, string> = {
   'error.interval.invalid': "'{prefix} : {interval}' n'est pas un intervalle de temps valide",
   'error.offset.invalidSign': "'{prefix} : {interval}' doit commencer par '+' ou '-'",
   'error.template.missing': "Le modèle apexcharts-card '{template}' est absent de votre configuration !",
+  'error.series.entityRequired': "series[{index}] : 'entity' est obligatoire, sauf si la série utilise 'compute'.",
+  'error.series.computeOptions': "series[{index}] : une série calculée ne peut pas utiliser '{option}'.",
+  'error.series.duplicateId': 'Les identifiants des séries doivent être uniques : {id}.',
   'error.statistics.externalRequired':
     "L'ID de statistique externe '{entity}' nécessite l'option 'statistics' : il n'a pas d'historique d'état, uniquement des statistiques long terme.",
 
@@ -112,6 +117,9 @@ export const fr: Record<string, string> = {
   'field.section_mode': 'Mode section',
   'field.locale': 'Langue',
   'field.hours_12': 'Format 12 heures',
+  'field.compute': 'Calcul',
+  'field.source': 'Source',
+  'field.series_id': 'ID de série',
   'field.entity': 'Entité',
   'field.name': 'Nom',
   'field.type': 'Type',
@@ -212,6 +220,9 @@ export const fr: Record<string, string> = {
   'helper.time_delta': 'Ex. : -30min, +2h',
   'helper.duration': 'Ex. : 1h, 30min, 1d',
   'helper.transform': 'Expression JS. Utilisez `x` pour la valeur (ex. : `return x / 1000;`).',
+  'helper.compute':
+    'Corps de fonction JS, exécuté pour chaque horodatage. Disponibles : values (par ID de série), x, hass. Renvoie un nombre ou null.',
+  'helper.series_id': 'Clé de cette série dans les values d’une série calculée.',
   'helper.data_generator': 'Corps de fonction JS. Disponibles : entity, start, end, hass.',
   'helper.stroke_dash': 'Nombre ou liste séparée par des virgules (ex. : 5,3,2).',
   'helper.selection_span': 'Ex. : 6h. Par défaut : 1/4 de graph_span.',
@@ -252,6 +263,8 @@ export const fr: Record<string, string> = {
   'series.newSeries': '(nouvelle série)',
   'series.allSeriesConfig': 'Configuration commune à toutes les séries',
   'series.color.placeholder': 'ex. : #ff0000, red, var(--my-color)',
+  'series.source.entity': 'Entité',
+  'series.source.compute': 'Calculée à partir d’autres séries',
   'series.validation.entityRequired': 'L’entité est requise.',
   'series.yaxisId.missing': '(manquant)',
   'series.panel.appearance': 'Apparence',

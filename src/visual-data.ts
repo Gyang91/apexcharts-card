@@ -1,5 +1,6 @@
 import type { EntityCachePoints } from './types';
 import { t } from './localize';
+import { alignSeries } from './align';
 import type { ChartCardSeriesExternalConfig } from './types-config';
 import { addPeriods, startOfPeriod } from './calendar';
 import parse from 'parse-duration';
@@ -35,25 +36,21 @@ export function assertHeatmapBudget(
   }
 }
 
-function indexed(data: EntityCachePoints): Map<number, number | null> {
-  const result = new Map<number, number | null>();
+// Range and heatmap points come from one series each: timestamps must be finite
+// and strictly increasing.
+function assertTimeline(data: EntityCachePoints): void {
   let previous = -Infinity;
-  for (const [time, value] of data) {
+  for (const [time] of data) {
     if (!Number.isFinite(time) || time <= previous) throw new Error(t('error.visual.timestamps'));
     previous = time;
-    result.set(time, value !== null && Number.isFinite(value) ? value : null);
   }
-  return result;
 }
 
 export function rangeAreaData(lower: EntityCachePoints, upper: EntityCachePoints) {
-  const low = indexed(lower);
-  const high = indexed(upper);
-  const times = Array.from(new Set([...low.keys(), ...high.keys()])).sort((a, b) => a - b);
-  return times.map((x) => {
-    const min = low.get(x);
-    const max = high.get(x);
-    if (min == null || max == null) return { x, y: [null, null] };
+  assertTimeline(lower);
+  assertTimeline(upper);
+  return alignSeries([lower, upper]).map(([x, [min, max]]) => {
+    if (min === null || max === null) return { x, y: [null, null] };
     if (min > max) throw new Error(t('error.visual.bounds'));
     return { x, y: [min, max] };
   });
@@ -63,16 +60,8 @@ export function heatmapData(rows: EntityCachePoints[], limit = DEFAULT_HEATMAP_C
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_HEATMAP_CELLS) {
     throw new Error(t('error.heatmap.limit'));
   }
-  const times = new Set<number>();
-  for (const row of rows) {
-    for (const [time] of row) {
-      times.add(time);
-      if (times.size * rows.length > limit) throw new Error(t('error.heatmap.budget', { limit }));
-    }
-  }
-  const columns = Array.from(times).sort((a, b) => a - b);
-  return rows.map((row) => {
-    const values = indexed(row);
-    return columns.map((x) => ({ x, y: values.get(x) ?? null }));
-  });
+  rows.forEach(assertTimeline);
+  const columns = alignSeries(rows);
+  if (columns.length * rows.length > limit) throw new Error(t('error.heatmap.budget', { limit }));
+  return rows.map((_, row) => columns.map(([x, values]) => ({ x, y: values[row] })));
 }

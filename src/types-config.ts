@@ -171,7 +171,12 @@ export interface ChartCardSeriesShowConfigExt {
 }
 
 export interface ChartCardSeriesExternalConfig extends ChartCardAllSeriesExternalConfig {
-  entity: string;
+  // Required, except on a computed series, which has no entity
+  entity?: string;
+  // Key of this series in the `values` of a computed series
+  id?: string;
+  // JS function body: (values, x, hass) => number | null, called for each timestamp
+  compute?: string;
 }
 
 export type ChartCardPrettyTime = 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';

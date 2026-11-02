@@ -20,6 +20,8 @@ import {
   computeColor,
   computeColors,
   computeName,
+  isComputedSeries,
+  seriesState,
   computeTextColor,
   computeUom,
   decompress,
@@ -59,11 +61,13 @@ import {
   ActionsConfig,
   ChartCardColorThreshold,
   ChartCardExternalConfig,
+  ChartCardAllSeriesExternalConfig,
   ChartCardSeriesExternalConfig,
   NavigationPeriod,
 } from './types-config';
 import exportedTypeSuite from './types-config-ti';
 import {
+  COMPUTE_EXCLUDED_OPTIONS,
   DEFAULT_AREA_OPACITY,
   DEFAULT_FILL_RAW,
   DEFAULT_FLOAT_PRECISION,
@@ -96,6 +100,7 @@ import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import { downsample, SamplingRange } from './downsample';
+import { alignSeries } from './align';
 import {
   DEFAULT_HEATMAP_CELLS,
   MAX_HEATMAP_CELLS,
@@ -164,7 +169,7 @@ export class ChartsCard extends LitElement {
 
   @property({ attribute: false }) private _config?: ChartCardConfig;
 
-  private _entities: HassEntity[] = [];
+  private _entities: (HassEntity | undefined)[] = [];
 
   private _interval?: number;
 
@@ -293,9 +298,9 @@ export class ChartsCard extends LitElement {
     this._updateData().then(() => {
       if (this._apexChart !== chart) return;
       if (this._config?.experimental?.hidden_by_default && !TIMESERIES_TYPES.includes(this._config.chart_type)) {
-        this._config.series_in_graph.forEach((serie, index) => {
+        this._config.series_in_graph.forEach((serie) => {
           if (serie.show.hidden_by_default) {
-            const name = computeName(this._hass, index, this._config?.series_in_graph, this._entities);
+            const name = computeName(this._hass, serie.index, this._config?.series, this._entities);
             this._apexChart?.hideSeries(name);
           }
         });
@@ -321,6 +326,8 @@ export class ChartsCard extends LitElement {
     let updated = false;
     let rawHeaderStatesUpdated = false;
     this._config.series.forEach((serie, index) => {
+      // A computed series has no entity: it follows the series it is computed from
+      if (isComputedSeries(serie)) return;
       if (isExternalStatisticId(serie.entity)) {
         // No state object exists for external statistic IDs: keep a stable
         // synthetic entity (enriched with recorder metadata once fetched) so
@@ -330,7 +337,7 @@ export class ChartsCard extends LitElement {
         }
         return;
       }
-      const entityState = (hass && hass.states[serie.entity]) || undefined;
+      const entityState = seriesState(hass, serie);
       if (!entityState) {
         this._entities[index] = entityState;
       } else if (entityState && this._entities[index] !== entityState) {
@@ -343,7 +350,7 @@ export class ChartsCard extends LitElement {
           this._headerState[index] = truncateFloat(
             serie.attribute
               ? entityState.attributes[serie.attribute]
-              : parseNumericState(entityState.state, serie.entity.startsWith('binary_sensor.')),
+              : parseNumericState(entityState.state, entityState.entity_id.startsWith('binary_sensor.')),
             serie.float_precision,
           ) as number;
           rawHeaderStatesUpdated = true;
@@ -353,7 +360,7 @@ export class ChartsCard extends LitElement {
     if (rawHeaderStatesUpdated) {
       this._headerState = [...this._headerState];
     }
-    if (this._config.series.some((_, index) => this._entities[index] === undefined)) {
+    if (this._hasMissingEntity()) {
       this._warning = true;
       return;
     } else if (this._warning) {
@@ -446,7 +453,8 @@ export class ChartsCard extends LitElement {
       }
       if (configDup.all_series_config) {
         configDup.series.forEach((serie, index) => {
-          const allDup = JSON.parse(JSON.stringify(configDup.all_series_config));
+          const allDup: ChartCardAllSeriesExternalConfig = JSON.parse(JSON.stringify(configDup.all_series_config));
+          if (isComputedSeries(serie)) COMPUTE_EXCLUDED_OPTIONS.forEach((key) => delete allDup[key]);
           configDup.series[index] = mergeDeepConfig(allDup, serie);
         });
       }
@@ -521,7 +529,18 @@ export class ChartsCard extends LitElement {
       if (configDup.brush?.selection_span) {
         this._brushSelectionSpan = validateInterval(configDup.brush.selection_span, 'brush.selection_span');
       }
+      const seriesIds = new Set<string>();
       configDup.series.forEach((serie, index) => {
+        if (isComputedSeries(serie)) {
+          const option = COMPUTE_EXCLUDED_OPTIONS.find((key) => serie[key] !== undefined);
+          if (option) throw new Error(t('error.series.computeOptions', { index, option }));
+        } else if (!serie.entity) {
+          throw new Error(t('error.series.entityRequired', { index }));
+        }
+        if (serie.id !== undefined) {
+          if (seriesIds.has(serie.id)) throw new Error(t('error.series.duplicateId', { id: serie.id }));
+          seriesIds.add(serie.id);
+        }
         if (isExternalStatisticId(serie.entity) && !serie.statistics) {
           // External statistic IDs have no recorder history: without the
           // statistics option there is nothing to plot.
@@ -557,6 +576,7 @@ export class ChartsCard extends LitElement {
             ['donut', 'pie', 'radialBar'].includes(this._config?.chart_type) &&
             (!serie.group_by || serie.group_by?.func === 'raw') &&
             !serie.data_generator &&
+            !isComputedSeries(serie) &&
             !serie.statistics &&
             !serie.offset
           );
@@ -629,7 +649,7 @@ export class ChartsCard extends LitElement {
             serie.color_threshold = sorted;
           }
 
-          if (serie.entity) {
+          if (serie.entity || isComputedSeries(serie)) {
             const editMode = getLovelace()?.editMode;
             // disable caching for editor
 
@@ -782,7 +802,7 @@ export class ChartsCard extends LitElement {
 
   protected render(): TemplateResult {
     if (!this._config || !this._hass) return html``;
-    if (this._warning || this._config.series.some((_, index) => this._entities[index] === undefined)) {
+    if (this._warning || this._hasMissingEntity()) {
       return this._renderWarnings();
     }
 
@@ -849,7 +869,7 @@ export class ChartsCard extends LitElement {
         <hui-warning>
           <div style="font-weight: bold;">apexcharts-card</div>
           ${this._config?.series.map((_, index) =>
-            !this._entities[index]
+            this._isEntityMissing(index)
               ? html`
                   <div>
                     ${t('card.warning.entityNotAvailable', { entity: this._config?.series[index].entity ?? '' })}
@@ -1011,7 +1031,7 @@ export class ChartsCard extends LitElement {
             const stateClasses =
               this._config?.header?.disable_actions ||
               // Default tap action is more-info: meaningless without an entity
-              (this._isExternalStatSerie(index) && !serie.header_actions) ||
+              (this._hasNoEntityState(index) && !serie.header_actions) ||
               (serie.header_actions?.tap_action?.action === 'none' &&
                 (!serie.header_actions?.hold_action?.action || serie.header_actions?.hold_action?.action === 'none') &&
                 (!serie.header_actions?.double_tap_action?.action ||
@@ -1392,8 +1412,20 @@ export class ChartsCard extends LitElement {
     return graph.clientHeight > 50 ? graph.clientHeight : undefined;
   }
 
-  private _isExternalStatSerie(index: number): boolean {
-    return isExternalStatisticId(this._config?.series[index]?.entity);
+  // A series whose entity isn't in Home Assistant (computed series have none)
+  private _isEntityMissing(index: number): boolean {
+    return !isComputedSeries(this._config?.series[index]) && this._entities[index] === undefined;
+  }
+
+  private _hasMissingEntity(): boolean {
+    return !!this._config?.series.some((_, index) => this._isEntityMissing(index));
+  }
+
+  // External statistics and computed series have no entity state: no live
+  // value, no more-info dialog.
+  private _hasNoEntityState(index: number): boolean {
+    const serie = this._config?.series[index];
+    return isComputedSeries(serie) || isExternalStatisticId(serie?.entity);
   }
 
   private _buildExternalStatisticEntity(statisticId: string, metadata?: StatisticsMetadata): HassEntity {
@@ -1461,14 +1493,7 @@ export class ChartsCard extends LitElement {
           this._config.heatmap?.max_cells,
         );
       }
-      const promise = this._graphs.map((graph, index) => {
-        if (graph) graph.cache = caching;
-        return graph?._updateHistory(
-          this._seriesOffset[index] ? new Date(start.getTime() + this._seriesOffset[index]) : start,
-          this._seriesOffset[index] ? new Date(end.getTime() + this._seriesOffset[index]) : end,
-        );
-      });
-      const historyUpdate = Promise.allSettled(promise);
+      const historyUpdate = this._updateHistories(start, end, caching);
       this._historyUpdate = historyUpdate;
       const results = await historyUpdate;
       if (this._historyUpdate === historyUpdate) this._historyUpdate = undefined;
@@ -1477,7 +1502,10 @@ export class ChartsCard extends LitElement {
       if (!current()) return;
       const failedIndex = results.findIndex((result) => result.status === 'rejected');
       if (failedIndex !== -1) {
-        errorMessage = t('card.warning.historyFailed', { entity: this._config.series[failedIndex].entity });
+        const failed = this._config.series[failedIndex];
+        errorMessage = isComputedSeries(failed)
+          ? t('card.warning.computeFailed', { series: computeName(this._hass, failedIndex, this._config.series) })
+          : t('card.warning.historyFailed', { entity: failed.entity ?? '' });
         const failure = results[failedIndex];
         if (failure.status === 'rejected') throw failure.reason;
       }
@@ -1501,9 +1529,8 @@ export class ChartsCard extends LitElement {
               // not raw
               this._headerState[index] = graph.lastState;
             }
-          } else if (inHeader === 'raw' && this._isExternalStatSerie(index)) {
-            // External statistics have no entity state: `raw` shows the
-            // latest statistic value instead.
+          } else if (inHeader === 'raw' && this._hasNoEntityState(index)) {
+            // Without an entity state, `raw` shows the latest value instead.
             this._headerState[index] = graph.lastState;
           }
           if (!this._config?.series[index].show.in_chart && !this._config?.series[index].show.in_brush) {
@@ -1564,10 +1591,9 @@ export class ChartsCard extends LitElement {
           series: this._graphs.flatMap((graph, index) => {
             if (!graph) return [];
             let data: number;
-            // For external statistics, `raw` also resolves to the latest
-            // statistic value (there is no entity state to read from).
+            // Without an entity state, `raw` also resolves to the latest value.
             const computedHeader =
-              this._config?.series[index].show.in_header !== 'raw' || this._isExternalStatSerie(index);
+              this._config?.series[index].show.in_header !== 'raw' || this._hasNoEntityState(index);
             if (graph.history.length === 0) {
               if (computedHeader) {
                 this._headerState[index] = null;
@@ -1591,7 +1617,7 @@ export class ChartsCard extends LitElement {
           }),
           // Names go with every refresh so a renamed entity, device or area shows up
           labels: this._config.series_in_graph.map((serie, index) =>
-            computeName(this._hass, index, this._config!.series_in_graph, undefined, this._hass?.states[serie.entity]),
+            computeName(this._hass, index, this._config!.series_in_graph, undefined, seriesState(this._hass, serie)),
           ),
         };
       }
@@ -1744,6 +1770,47 @@ export class ChartsCard extends LitElement {
         this._queueResample();
       }
     }
+  }
+
+  // Loads every series. Computed series come last, in config order: each one
+  // reads the series above it and every non-computed series.
+  private async _updateHistories(
+    start: Date,
+    end: Date,
+    caching: boolean,
+  ): Promise<PromiseSettledResult<boolean | undefined>[]> {
+    const series = this._config!.series;
+    const update = (index: number) => {
+      const graph = this._graphs?.[index];
+      if (!graph) return undefined;
+      graph.cache = caching;
+      const offset = this._seriesOffset[index] || 0;
+      return graph._updateHistory(
+        new Date(start.getTime() + offset),
+        new Date(end.getTime() + offset),
+        isComputedSeries(series[index]) ? this._computeInputs(index) : undefined,
+      );
+    };
+    const results = await Promise.allSettled(
+      series.map((serie, index) => (isComputedSeries(serie) ? undefined : update(index))),
+    );
+    for (const [index, serie] of series.entries()) {
+      if (isComputedSeries(serie)) [results[index]] = await Promise.allSettled([update(index)]);
+    }
+    return results;
+  }
+
+  // Inputs of a computed series, by series `id`, on the chart's time axis (each
+  // source's own `offset` and `time_delta` applied): every non-computed series
+  // and every computed series above it.
+  private _computeInputs(index: number): Record<string, EntityCachePoints> {
+    const inputs: Record<string, EntityCachePoints> = {};
+    this._config!.series.forEach((serie, source) => {
+      if (serie.id === undefined || source === index || (isComputedSeries(serie) && source > index)) return;
+      const shift = (this._seriesOffset[source] || 0) - (this._seriesTimeDelta[source] || 0);
+      inputs[serie.id] = offsetData(this._graphs?.[source]?.history ?? [], shift);
+    });
+    return inputs;
   }
 
   private _readChartRange(chart: ApexCharts): { min: number; max: number } | undefined {
@@ -2068,7 +2135,8 @@ export class ChartsCard extends LitElement {
     const onlyColumns =
       new Set(config.series_in_graph.map((serie) => serie.type)).size > 1 &&
       config.apex_config?.chart?.stackOnlyBar !== false;
-    const totals = new Map<string, [number, number]>();
+    // Visible points of each stacked series, on the chart's time axis, per stack group
+    const groups = new Map<string, EntityCachePoints[]>();
     seriesIds.forEach((id) => {
       const serie = config.series_in_graph[id];
       if (this._isHiddenInChart(serie) || (onlyColumns && serie.type !== 'column')) return;
@@ -2076,13 +2144,19 @@ export class ChartsCard extends LitElement {
       const from = start.getTime() + offset;
       const to = end.getTime() + offset;
       const group = serie.type === 'column' ? (serie.stack_group ?? '') : '';
-      this._graphs?.[serie.index]?.history.forEach(([timestamp, raw]) => {
-        if (timestamp < from || timestamp > to || raw === null || !Number.isFinite(raw)) return;
-        const value = serie.invert ? -raw : raw;
-        const key = `${group}|${timestamp - offset}`;
-        const total = totals.get(key) ?? [0, 0];
-        total[value > 0 ? 0 : 1] += value;
-        totals.set(key, total);
+      const points: EntityCachePoints = (this._graphs?.[serie.index]?.history ?? [])
+        .filter(([timestamp]) => timestamp >= from && timestamp <= to)
+        .map(([timestamp, value]) => [timestamp - offset, value !== null && serie.invert ? -value : value]);
+      groups.set(group, [...(groups.get(group) ?? []), points]);
+    });
+    const totals: [number, number][] = [];
+    groups.forEach((members) => {
+      alignSeries(members).forEach(([, values]) => {
+        const total: [number, number] = [0, 0];
+        values.forEach((value) => {
+          if (value !== null) total[value > 0 ? 0 : 1] += value;
+        });
+        totals.push(total);
       });
     });
     const result: { min?: number; max?: number } = {};

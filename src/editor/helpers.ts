@@ -75,6 +75,8 @@ const LABEL_MAP: Record<string, string> = {
   fill_raw: 'field.fill_raw',
   transform: 'field.transform',
   data_generator: 'field.data_generator',
+  compute: 'field.compute',
+  source: 'field.source',
   float_precision: 'field.float_precision',
   fixed_decimals: 'field.fixed_decimals',
   attribute: 'field.attribute',
@@ -155,6 +157,7 @@ const LABEL_MAP: Record<string, string> = {
 };
 
 export function computeLabel(schema: HaFormSchema): string {
+  if (schema.label) return schema.label;
   const key = LABEL_MAP[schema.name];
   if (key) return t(key);
   return schema.name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -170,6 +173,7 @@ const HELPER_MAP: Record<string, string> = {
   duration: 'helper.duration',
   transform: 'helper.transform',
   data_generator: 'helper.data_generator',
+  compute: 'helper.compute',
   stroke_dash: 'helper.stroke_dash',
   selection_span: 'helper.selection_span',
   color: 'helper.color',

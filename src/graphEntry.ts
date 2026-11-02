@@ -8,8 +8,17 @@ import {
   HistoryPoint,
   StatisticValue,
 } from './types';
-import { compileUserFunction, compress, decompress, isExternalStatisticId, log, parseNumericState } from './utils';
+import {
+  compileUserFunction,
+  compress,
+  decompress,
+  isComputedSeries,
+  isExternalStatisticId,
+  log,
+  parseNumericState,
+} from './utils';
 import { fetchHistory, fetchStatistics } from './recorder';
+import { alignSeries } from './align';
 import { addPeriods, displayTimeZone, periodBoundaries } from './calendar';
 import localForage from 'localforage';
 import { HassEntity } from 'home-assistant-js-websocket';
@@ -28,6 +37,17 @@ type DataGeneratorFn = (
   hass: HomeAssistant | undefined,
   momentLib: typeof moment,
 ) => Promise<EntityCachePoints>;
+type ComputeFn = (values: Record<string, number | null>, x: number, hass: HomeAssistant | undefined) => unknown;
+
+// Points a user function error at the function, shortened to 100 characters
+function userFunctionError(error: unknown, body: string): Error {
+  const err = error instanceof Error ? error : new Error(String(error));
+  const trimmed = body.trim();
+  const excerpt = trimmed.length <= 100 ? trimmed : `${trimmed.substring(0, 98)}...`;
+  err.message = `${err.name}: ${err.message} in '${excerpt}'`;
+  err.name = 'Error';
+  return err;
+}
 
 // Aggregates the points of one bucket covering [start, end)
 type AggregateFn = (items: EntityCachePoints, start: number, end: number) => number | null;
@@ -98,6 +118,8 @@ export default class GraphEntry {
 
   private _dataGeneratorFn?: DataGeneratorFn;
 
+  private _computeFn?: ComputeFn;
+
   constructor(
     index: number,
     graphSpan: number,
@@ -119,8 +141,9 @@ export default class GraphEntry {
       diff_inc: this._diffIncreasing,
     };
     this._index = index;
-    this._cache = config.statistics ? false : cache;
-    this._entityID = config.entity;
+    // Statistics are fetched whole; computed series are rebuilt from their inputs
+    this._cache = config.statistics || isComputedSeries(config) ? false : cache;
+    this._entityID = config.entity ?? '';
     this._isExternalStat = isExternalStatisticId(config.entity);
     this._graphSpan = graphSpan;
     this._config = config;
@@ -272,13 +295,19 @@ export default class GraphEntry {
       : localForage.setItem(`${key}_${this._md5Config}-raw`, data);
   }
 
-  public async _updateHistory(start: Date, end: Date): Promise<boolean> {
-    if ((!this._entityState && !this._isExternalStat) || this._updating) return false;
+  // `inputs`: the series a computed series reads, by `id` (see _computeData)
+  public async _updateHistory(
+    start: Date,
+    end: Date,
+    inputs: Record<string, EntityCachePoints> = {},
+  ): Promise<boolean> {
+    if ((!this._entityState && !this._isExternalStat && !isComputedSeries(this._config)) || this._updating)
+      return false;
     this._updating = true;
     // Always release the lock: a failed fetch must not freeze this series
     // until the page is reloaded.
     try {
-      return await this._computeHistory(start, end);
+      return await this._computeHistory(start, end, inputs);
     } finally {
       this._updating = false;
     }
@@ -295,7 +324,7 @@ export default class GraphEntry {
     return Array.from({ length: nbBuckets + 1 }, (_, i) => last - (nbBuckets - i) * this._groupByDurationMs);
   }
 
-  private async _computeHistory(start: Date, end: Date): Promise<boolean> {
+  private async _computeHistory(start: Date, end: Date, inputs: Record<string, EntityCachePoints>): Promise<boolean> {
     const boundaries = this._config.group_by.func !== 'raw' ? this._bucketBoundaries(start, end) : undefined;
     const startHistory = new Date(boundaries ? boundaries[0] : start);
     this._lastRealState = undefined;
@@ -316,7 +345,9 @@ export default class GraphEntry {
 
     let history: EntityEntryCache | undefined;
 
-    if (this._config.data_generator) {
+    if (isComputedSeries(this._config)) {
+      history = this._computeData(inputs);
+    } else if (this._config.data_generator) {
       history = await this._generateData(start, end);
     } else {
       this._realStart = new Date(start);
@@ -621,15 +652,8 @@ export default class GraphEntry {
         true,
       );
       data = await this._dataGeneratorFn(this._entityState, start, end, this._hass, moment);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      const funcTrimmed =
-        this._config.data_generator!.length <= 100
-          ? this._config.data_generator!.trim()
-          : `${this._config.data_generator!.trim().substring(0, 98)}...`;
-      e.message = `${e.name}: ${e.message} in '${funcTrimmed}'`;
-      e.name = 'Error';
-      throw e;
+    } catch (e) {
+      throw userFunctionError(e, this._config.data_generator!);
     }
     return {
       span: 0,
@@ -637,6 +661,28 @@ export default class GraphEntry {
       last_fetched: new Date(),
       data,
     };
+  }
+
+  // A computed series: the `compute` function applied at every timestamp of its
+  // inputs, each input holding its last value until its next point.
+  private _computeData(inputs: Record<string, EntityCachePoints>): EntityEntryCache {
+    const ids = Object.keys(inputs);
+    const data: EntityCachePoints = [];
+    try {
+      this._computeFn ??= compileUserFunction<ComputeFn>(['values', 'x', 'hass'], this._config.compute!);
+      for (const [x, row] of alignSeries(
+        ids.map((id) => inputs[id]),
+        true,
+      )) {
+        const values = Object.fromEntries(ids.map((id, index) => [id, row[index]]));
+        const value = parseNumericState(this._computeFn(values, x, this._hass));
+        // Division by zero and the like: no value, not an infinite one
+        data.push([x, value !== null && Number.isFinite(value) ? value : null]);
+      }
+    } catch (e) {
+      throw userFunctionError(e, this._config.compute!);
+    }
+    return { span: 0, card_version: pjson.version, last_fetched: new Date(), data };
   }
 
   private _dataBucketer(history: EntityEntryCache, boundaries: number[], start: Date): HistoryBuckets {

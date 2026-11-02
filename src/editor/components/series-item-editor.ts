@@ -7,7 +7,8 @@ import {
   ChartCardExternalConfig,
   ChartCardSeriesExternalConfig,
 } from '../../types-config';
-import { computeColor, isExternalStatisticId } from '../../utils';
+import { computeColor, isComputedSeries, isExternalStatisticId } from '../../utils';
+import { COMPUTE_EXCLUDED_OPTIONS } from '../../const';
 import { HaFormSchema } from '../types';
 import {
   computeHelper,
@@ -22,7 +23,8 @@ import {
   getSeriesAppearanceSchema,
   getSeriesCoreSchema,
   getSeriesDataProcessingSchema,
-  getSeriesEntitySchema,
+  getSeriesSourceSchema,
+  SeriesSource,
   getSeriesGroupBySchema,
   getSeriesVisibilitySelectSchema,
   SERIES_VISIBILITY_BOOL_FIELDS,
@@ -34,6 +36,9 @@ import './actions-editor';
 import './bool-grid';
 
 type Series = ChartCardSeriesExternalConfig | ChartCardAllSeriesExternalConfig;
+
+// Body a new computed series starts with: valid, and shows where the values are
+const COMPUTE_STARTER = 'return null; // e.g. return values.import - values.export;';
 
 @customElement('apexcharts-card-series-item-editor')
 export class ApexChartsCardSeriesItemEditor extends LitElement {
@@ -79,10 +84,29 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
   // ── Field handlers ──
 
-  private _entityChanged = (ev: CustomEvent): void => {
+  private _source(): SeriesSource {
+    return isComputedSeries(this.series as ChartCardSeriesExternalConfig | undefined) ? 'compute' : 'entity';
+  }
+
+  private _sourceChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
-    const data = ev.detail.value as { entity?: string };
-    this._fire({ entity: data.entity || '' } as Partial<ChartCardSeriesExternalConfig>);
+    const data = ev.detail.value as { source?: SeriesSource; entity?: string; compute?: string; id?: string };
+    const updates: Partial<ChartCardSeriesExternalConfig> = {};
+    if (data.source && data.source !== this._source()) {
+      if (data.source === 'compute') {
+        // A computed series reads other series: drop the options that pick an entity's data
+        COMPUTE_EXCLUDED_OPTIONS.forEach((key) => (updates[key] = undefined));
+        updates.compute = COMPUTE_STARTER;
+      } else {
+        Object.assign(updates, { compute: undefined, entity: '' });
+      }
+    } else if (this._source() === 'compute') {
+      if ('compute' in data) updates.compute = data.compute ?? '';
+    } else if ('entity' in data) {
+      updates.entity = data.entity || '';
+    }
+    if ('id' in data) updates.id = data.id || undefined;
+    this._fire(updates);
   };
 
   private _textName(): string {
@@ -419,12 +443,17 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
             : html`
                 <ha-form
                   .hass=${this.hass}
-                  .data=${{ entity: s.entity || '' }}
-                  .schema=${getSeriesEntitySchema(!!s.statistics || isExternalStatisticId(s.entity))}
+                  .data=${{ source: this._source(), entity: s.entity || '', compute: s.compute ?? '', id: s.id || '' }}
+                  .schema=${getSeriesSourceSchema(this._source(), !!s.statistics || isExternalStatisticId(s.entity))}
                   .computeLabel=${computeLabel}
-                  @value-changed=${this._entityChanged}
+                  .computeHelper=${computeHelper}
+                  @value-changed=${this._sourceChanged}
                 ></ha-form>
-                ${!s.entity ? html`<div class="validation-error">${t('series.validation.entityRequired')}</div>` : nothing}
+                ${
+                  this._source() === 'entity' && !s.entity
+                    ? html`<div class="validation-error">${t('series.validation.entityRequired')}</div>`
+                    : nothing
+                }
               `
         }
 
@@ -532,14 +561,18 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
                 ></apexcharts-card-bool-grid>
               </div>
             </ha-expansion-panel>
-            <ha-form
-              .hass=${this.hass}
-              .data=${this._dataProcessingData()}
-              .schema=${getSeriesDataProcessingSchema()}
-              .computeLabel=${computeLabel}
-              .computeHelper=${computeHelper}
-              @value-changed=${this._dataProcessingChanged}
-            ></ha-form>
+            ${
+              this._source() === 'compute'
+                ? nothing
+                : html`<ha-form
+                    .hass=${this.hass}
+                    .data=${this._dataProcessingData()}
+                    .schema=${getSeriesDataProcessingSchema()}
+                    .computeLabel=${computeLabel}
+                    .computeHelper=${computeHelper}
+                    @value-changed=${this._dataProcessingChanged}
+                  ></ha-form>`
+            }
           </div>
         </ha-expansion-panel>
 

@@ -3,6 +3,7 @@ import Moment from 'moment';
 import MomentTz from 'moment-timezone/moment-timezone';
 import momentDurationFormatSetup from 'moment-duration-format';
 import { useBrowserTimeZones } from './moment-timezones';
+import type { ChartCardSeriesExternalConfig } from './types-config';
 momentDurationFormatSetup(Moment);
 useBrowserTimeZones(MomentTz);
 // Passed to user code (data_generator): moment with moment.tz() available
@@ -58,3 +59,15 @@ export const DEFAULT_MAX = 100;
 export const DEFAULT_UPDATE_DELAY = 1500;
 export const DEFAULT_AREA_OPACITY = 0.7;
 export const DEFAULT_LEGEND_MARKER_WIDTH = 6;
+
+// Options that choose where a series' data comes from. A computed series takes
+// its data from other series, so it can't set them and doesn't inherit them
+// from `all_series_config`.
+export const COMPUTE_EXCLUDED_OPTIONS = [
+  'entity',
+  'attribute',
+  'statistics',
+  'data_generator',
+  'transform',
+  'offset',
+] as const satisfies readonly (keyof ChartCardSeriesExternalConfig)[];

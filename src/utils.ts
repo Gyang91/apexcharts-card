@@ -73,8 +73,13 @@ export function mergeDeep(target: any, source: any): any {
 // External long-term statistics use a `source:object_id` ID (e.g.
 // `veolia:1235075_daily_consumption`) instead of an `entity_id`: they have no
 // state object in `hass.states` and no recorder history, only LTS data.
-export function isExternalStatisticId(entityId: string | undefined): boolean {
+export function isExternalStatisticId(entityId: string | undefined): entityId is string {
   return !!entityId && /^[a-z0-9_]+:[a-z0-9_]+$/.test(entityId);
+}
+
+// A series computed from other series (`compute`) instead of read from an entity
+export function isComputedSeries(serie: Pick<ChartCardSeriesExternalConfig, 'compute'> | undefined): boolean {
+  return serie?.compute !== undefined;
 }
 
 export function parseNumericState(value: unknown, binary = false): number | null {
@@ -85,7 +90,7 @@ export function parseNumericState(value: unknown, binary = false): number | null
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-// Compile user code from the card config (transform, data_generator) into a
+// Compile user code from the card config (transform, data_generator, compute) into a
 // strict-mode function. Compile once and reuse: it runs per point/refresh.
 export function compileUserFunction<F extends (...args: never[]) => unknown>(
   params: string[],
@@ -96,6 +101,14 @@ export function compileUserFunction<F extends (...args: never[]) => unknown>(
     ? Object.getPrototypeOf(async function () {}).constructor
     : Function;
   return new FunctionCtor(...params, `'use strict'; ${body}`) as F;
+}
+
+// State object of a series' entity; a computed series has none
+export function seriesState(
+  hass: HomeAssistant | undefined,
+  serie: Pick<ChartCardSeriesExternalConfig, 'entity'>,
+): HassEntity | undefined {
+  return serie.entity ? hass?.states[serie.entity] : undefined;
 }
 
 export function computeName(
@@ -111,13 +124,14 @@ export function computeName(
   if (!name && isExternalStatisticId(series[index].entity)) {
     name = series[index].entity;
   }
+  if (!name && isComputedSeries(series[index])) name = series[index].id ?? '';
   return name + (series[index].show?.offset_in_name && series[index].offset ? ` (${series[index].offset})` : '');
 }
 
 export function computeUom(
   index: number,
   series: ChartCardSeriesExternalConfig[] | undefined,
-  entities: HassEntity[] | undefined[] | undefined = undefined,
+  entities: (HassEntity | undefined)[] | undefined = undefined,
   entity: HassEntity | undefined = undefined,
 ): string {
   if (!series || !series[index]) return '';

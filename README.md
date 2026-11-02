@@ -55,6 +55,7 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
   - [`span` Options](#span-options)
   - [`transform` Option](#transform-option)
   - [`data_generator` Option](#data_generator-option)
+  - [`compute` Option](#compute-option)
   - [`yaxis` Options. Multi-Y axis](#yaxis-options-multi-y-axis)
     - [Min/Max Format](#minmax-format)
     - [Examples](#examples)
@@ -94,6 +95,7 @@ Everything documented below keeps working as before; this fork adds:
 - **Adaptive large-history rendering**: opt-in [`downsample`](#large-history-performance) retains spikes/gaps and restores local detail on zoom, brush selection and resize without fetching history again.
 - **Calendar navigation**: optional day/week/month, previous/next and current-period controls, following the dashboard time zone.
 - **Explicit editor presets**: temperature, power and consumption starters without replacing your entity IDs.
+- **Computed series**: [`compute`](#compute-option) calculates a series from other series of the card (net power, totals, ratios), without a template sensor.
 - **Selected visual insights**: paired range-area bands and aggregated heatmaps with enforced cell budgets, using the existing ApexCharts runtime.
 
 ## Feature guide
@@ -105,6 +107,7 @@ Everything documented below keeps working as before; this fork adds:
 | Compare different units | [Multiple Y axes](#yaxis-options-multi-y-axis), optional log scale | Keep units explicit; logarithmic domains must be positive. |
 | Explore previous days or months | [Calendar navigation](#calendar-navigation) | Fetches only on normal refresh or explicit navigation; does not add polling. |
 | Configure common charts quickly | [Editor starter presets](#visual-editor-starter-presets) | Explicit action; review the aggregation and source requirements before saving. |
+| Net power, totals or ratios of several sensors | [Computed series](#compute-option) | Calculated from the series the card already loads; no extra requests and no helper entity. |
 | See a min/max or forecast envelope | [Range-area bands](#range-area-bands) | Two supplied bounds with matching timestamps; no forecasting engine. |
 | Spot hourly/daily patterns across rooms | [Bounded heatmaps](#bounded-heatmaps) | Aggregate first; default 512 cells, hard maximum 2,048. Missing cells are not zero. |
 
@@ -387,7 +390,9 @@ The card strictly validates all the options available (but not for the `apex_con
 
 | Name | Type | Default | Since | Description |
 | ---- | :--: | :-----: | :---: | ----------- |
-| :white_check_mark: `entity` | string | | v1.0.0 | The `entity_id` of the sensor to display, or an external statistic ID (`source:object_id`, e.g. `veolia:1235075_daily_consumption`). External statistic IDs require the [`statistics`](#statistics-options) option |
+| :white_check_mark: `entity` | string | | v1.0.0 | The `entity_id` of the sensor to display, or an external statistic ID (`source:object_id`, e.g. `veolia:1235075_daily_consumption`). External statistic IDs require the [`statistics`](#statistics-options) option. Required, except on a series that uses `compute` |
+| `id` | string | | v2.16.0 | Names this series in the `values` of a [computed series](#compute-option). Must be unique |
+| `compute` | string | | v2.16.0 | Calculates this series from other series instead of an entity. See [compute](#compute-option) |
 | `attribute` | string | | v1.4.0 | Instead of retrieving the state, it will retrieve an `attribute` of the entity. Make sure you increase `update_delay` if the chart doesn't reflect the last value of the attribute |
 | `name` | string or list | | v1.0.0 | Override the name of the entity. Without `name`, the series uses the name Home Assistant shows for the entity, like the built-in cards. A list composes the name from its parts, see [Structured names](#structured-names) |
 | `stack_group` | string | | v2.1.0 | When `stacked` is `true`, groups the different series with the name `stack_group` together. Only works for `type: column`. All series' names need to be be unique because of a bug in apexcharts.js |
@@ -863,6 +868,106 @@ Let's take this example:
   `[[1611718980000, 4.99], [1611743040000, 1.41], [1611763320000, 4.96], ...]`
 
 * And this is all you need :tada:
+
+### `compute` Option
+
+A computed series is calculated from other series of the same card: net power, a total of several sensors, a ratio or a difference. It needs no template sensor in Home Assistant and works on the history already loaded, so it covers the whole graph span from the start and makes no extra requests.
+
+1. Give each series you want to use an `id`.
+2. Add a series with `compute` and no `entity`. `compute` is the body of a javascript function that returns a number or `null`.
+
+The function runs once for every timestamp of its inputs and receives:
+
+| Variable | Content |
+| -------- | ------- |
+| `values` | The value of each input series at that time, by `id`. An input holds its last value until its next point, like a Home Assistant state. Before its first point, its value is `null` |
+| `x` | The timestamp, in ms |
+| `hass` | The Home Assistant object |
+
+Its inputs are all series with an `id` that aren't computed, plus the computed series above it in the list. They are lined up as they are drawn: each input's own `offset`, `time_delta`, `group_by`, `statistics` and `transform` are already applied. A result that isn't a finite number (division by zero, text) is no value. Check for `null` when an input can be missing: in javascript, `5 - null` is `5`.
+
+A computed series is a series like any other: `name`, `unit`, `type`, `color`, `group_by`, `yaxis_id`, `show`, `color_threshold` and the header all work. It can't use `entity`, `attribute`, `statistics`, `data_generator`, `transform` or `offset`, and doesn't inherit them from `all_series_config`. Without `name`, it is named after its `id`. To show only the result, hide the inputs with `show.in_chart: false`.
+
+In the visual editor, choose **Computed from other series** as the series' source.
+
+* Net grid power from import and export:
+
+  ```yaml
+  type: custom:apexcharts-card
+  header:
+    show: true
+    show_states: true
+  series:
+    - entity: sensor.grid_import_power
+      id: import
+      show:
+        in_chart: false
+        in_header: false
+    - entity: sensor.grid_export_power
+      id: export
+      show:
+        in_chart: false
+        in_header: false
+    - name: Net grid
+      unit: W
+      compute: return values.import - values.export;
+  ```
+
+* Total of three rooms, and each room's share of it:
+
+  ```yaml
+  type: custom:apexcharts-card
+  all_series_config:
+    yaxis_id: power
+    statistics:
+      type: mean
+      period: hour
+  series:
+    - entity: sensor.kitchen_power
+      id: kitchen
+    - entity: sensor.office_power
+      id: office
+    - entity: sensor.living_power
+      id: living
+    - name: Total
+      id: total
+      compute: return values.kitchen + values.office + values.living;
+    - name: Office share
+      unit: '%'
+      yaxis_id: percent
+      compute: return values.total ? (values.office / values.total) * 100 : null;
+  yaxis:
+    - id: power
+    - id: percent
+      opposite: true
+      min: 0
+      max: 100
+  ```
+
+  The rooms take hourly statistics from `all_series_config`; the computed series take only `yaxis_id` from it.
+
+* Difference between inside and outside temperature, as an hourly average:
+
+  ```yaml
+  type: custom:apexcharts-card
+  series:
+    - entity: sensor.living_room_temperature
+      id: inside
+      show:
+        in_chart: false
+    - entity: sensor.outdoor_temperature
+      id: outside
+      show:
+        in_chart: false
+    - name: Inside - outside
+      unit: °C
+      group_by:
+        func: avg
+        duration: 1h
+      compute: |
+        if (values.inside === null || values.outside === null) return null;
+        return values.inside - values.outside;
+  ```
 
 ### `yaxis` Options. Multi-Y axis
 

@@ -12,7 +12,16 @@ import {
 } from './const';
 import { ChartCardConfig } from './types';
 import type { CalendarPeriod } from './types-config';
-import { computeName, computeUom, getLang, is12Hour, mergeDeep, myFormatNumber, prettyPrintTime } from './utils';
+import {
+  computeName,
+  computeUom,
+  getLang,
+  is12Hour,
+  mergeDeep,
+  myFormatNumber,
+  prettyPrintTime,
+  seriesState,
+} from './utils';
 import { formatPeriod, nearestPeriodStart } from './calendar';
 import { layoutMinimal } from './layouts/minimal';
 import { getLocales, getDefaultLocale } from './locales';
@@ -106,7 +115,7 @@ export function getLayoutConfig(
 
   if (config.chart_type === 'rangeArea' || config.chart_type === 'heatmap') {
     const names = config.series_in_graph.map((serie, index) =>
-      computeName(hass, index, config.series_in_graph, undefined, hass?.states[serie.entity]),
+      computeName(hass, index, config.series_in_graph, undefined, seriesState(hass, serie)),
     );
     const visual: Record<string, unknown> = {
       series:
@@ -226,7 +235,7 @@ function getSeries(config: ChartCardConfig, hass: HomeAssistant | undefined, bru
   if (TIMESERIES_TYPES.includes(config.chart_type)) {
     return series.map((serie, index) => {
       return {
-        name: computeName(hass, index, series, undefined, hass?.states[serie.entity]),
+        name: computeName(hass, index, series, undefined, seriesState(hass, serie)),
         group: config.stacked && serie.type === 'column' ? serie.stack_group : undefined,
         type: serie.type,
         ...(!brush && config.experimental?.hidden_by_default && serie.show.hidden_by_default ? { hidden: true } : {}),
@@ -243,7 +252,7 @@ function getLabels(config: ChartCardConfig, hass: HomeAssistant | undefined) {
     return [];
   } else {
     return config.series_in_graph.map((serie, index) => {
-      return computeName(hass, index, config.series_in_graph, undefined, hass?.states[serie.entity]);
+      return computeName(hass, index, config.series_in_graph, undefined, seriesState(hass, serie));
     });
   }
 }
@@ -392,7 +401,7 @@ function getYTooltipFormatter(config: ChartCardConfig, hass: HomeAssistant | und
       opts.seriesIndex,
       conf.series_in_graph,
       undefined,
-      hass2?.states[conf.series_in_graph[opts.seriesIndex].entity],
+      seriesState(hass2, conf.series_in_graph[opts.seriesIndex]),
     );
     return conf.series_in_graph[opts.seriesIndex]?.show.as_duration
       ? [`<strong>${prettyPrintTime(lValue, conf.series_in_graph[opts.seriesIndex].show.as_duration!)}</strong>`]
@@ -486,7 +495,7 @@ function getLegendFormatter(config: ChartCardConfig, hass: HomeAssistant | undef
         opts.seriesIndex,
         conf.series_in_graph,
         undefined,
-        hass2?.states[conf.series_in_graph[opts.seriesIndex].entity],
+        seriesState(hass2, conf.series_in_graph[opts.seriesIndex]),
       );
     if (!conf.series_in_graph[opts.seriesIndex].show.in_legend) {
       return [];
@@ -510,7 +519,7 @@ function getLegendFormatter(config: ChartCardConfig, hass: HomeAssistant | undef
               opts.seriesIndex,
               conf.series_in_graph,
               undefined,
-              hass2?.states[conf.series_in_graph[opts.seriesIndex].entity],
+              seriesState(hass2, conf.series_in_graph[opts.seriesIndex]),
             );
       let valueString: string;
       if (value === undefined || value === null) {

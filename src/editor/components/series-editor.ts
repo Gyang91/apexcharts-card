@@ -6,7 +6,7 @@ import {
   ChartCardExternalConfig,
   ChartCardSeriesExternalConfig,
 } from '../../types-config';
-import { computeColor } from '../../utils';
+import { computeColor, isComputedSeries } from '../../utils';
 import { computeEntityName } from '../../entity-name';
 import { DEFAULT_COLORS } from '../../const';
 import { editorStyles } from '../styles';
@@ -67,6 +67,7 @@ export class ApexChartsCardSeriesEditor extends LitElement {
 
   private _displayName(s: ChartCardSeriesExternalConfig): string {
     if (typeof s.name === 'string' && s.name) return s.name;
+    if (isComputedSeries(s)) return s.id || t('series.source.compute');
     if (s.entity) return computeEntityName(this.hass, this.hass?.states[s.entity], s.name) || s.entity;
     return t('series.newSeries');
   }
@@ -128,9 +129,9 @@ export class ApexChartsCardSeriesEditor extends LitElement {
     ev.stopPropagation();
     if (!this.config) return;
     const updatedSeries = ev.detail.series as ChartCardSeriesExternalConfig;
-    // Draft case: only commit to config once the user actually picks an entity.
+    // Draft case: only commit to config once the user picks an entity or computes the series.
     if (this._draftIndex != null && index === this._draftIndex) {
-      if (!updatedSeries.entity) return;
+      if (!updatedSeries.entity && !isComputedSeries(updatedSeries)) return;
       const series = [...(this.config.series || []), updatedSeries];
       this._draftIndex = undefined;
       this._fire({ series });

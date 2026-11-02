@@ -220,3 +220,25 @@ test('@performance records generated-data render baseline without dropping sampl
     contentType: 'application/json',
   });
 });
+
+test('draws a series computed from another series, with its header value', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await mount(page, {
+    series: [
+      {
+        entity: 'sensor.temp',
+        id: 'temp',
+        show: { in_chart: false, in_header: false },
+        data_generator: `return Array.from({length: 50}, (_, i) =>
+          [start.getTime() + i * (end.getTime() - start.getTime()) / 49, i]);`,
+      },
+      { name: 'Doubled', unit: '°C', compute: 'return values.temp * 2;' },
+    ],
+  });
+  await expect(page.locator('apexcharts-card #graph .apexcharts-series')).toHaveCount(1);
+  await expect(page.locator('apexcharts-card #header__states')).toContainText('98');
+  await expect(page.locator('apexcharts-card #header__states')).toContainText('Doubled');
+  expect(await page.evaluate(() => window.card._graphs[1].history.at(-1)[1])).toBe(98);
+  expect(errors).toEqual([]);
+});

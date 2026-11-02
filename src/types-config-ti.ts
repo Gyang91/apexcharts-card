@@ -164,7 +164,9 @@ export const ChartCardSeriesShowConfigExt = t.iface([], {
 });
 
 export const ChartCardSeriesExternalConfig = t.iface(["ChartCardAllSeriesExternalConfig"], {
-  "entity": "string",
+  "entity": t.opt("string"),
+  "id": t.opt("string"),
+  "compute": t.opt("string"),
 });
 
 export const ChartCardPrettyTime = t.union(t.lit('millisecond'), t.lit('second'), t.lit('minute'), t.lit('hour'), t.lit('day'), t.lit('week'), t.lit('month'), t.lit('year'));

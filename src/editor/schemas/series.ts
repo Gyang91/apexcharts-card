@@ -11,6 +11,31 @@ export function getSeriesEntitySchema(statisticsMode: boolean): HaFormSchema[] {
   return [{ name: 'entity', selector: statisticsMode ? { statistic: {} } : { entity: {} } }];
 }
 
+export type SeriesSource = 'entity' | 'compute';
+
+// Where a series' data comes from: an entity, or a function of other series.
+// `id` names the series for computed ones.
+export function getSeriesSourceSchema(source: SeriesSource, statisticsMode: boolean): HaFormSchema[] {
+  return [
+    {
+      name: 'source',
+      selector: {
+        select: {
+          mode: 'dropdown',
+          options: [
+            { value: 'entity', label: t('series.source.entity') },
+            { value: 'compute', label: t('series.source.compute') },
+          ],
+        },
+      },
+    },
+    ...(source === 'compute'
+      ? [{ name: 'compute', selector: { text: { multiline: true } } }]
+      : getSeriesEntitySchema(statisticsMode)),
+    { name: 'id', label: t('field.series_id'), helper: t('helper.series_id'), selector: { text: {} } },
+  ];
+}
+
 // ── Core fields rendered above the expandables (entity is handled separately). ──
 export function getSeriesCoreSchema(): HaFormSchema[] {
   return [
