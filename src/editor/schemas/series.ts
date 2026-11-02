@@ -338,6 +338,7 @@ export function getSeriesAdvancedBaseSchema(): HaFormSchema[] {
           name: 'float_precision',
           selector: { number: { min: 0, max: 10, step: 1, mode: 'box' } },
         },
+        { name: 'fixed_decimals', selector: { boolean: {} } },
       ],
     },
     {

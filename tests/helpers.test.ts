@@ -425,13 +425,24 @@ describe('utils.ts', () => {
     it('formats a numeric value using the locale options', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const localeOptions = { language: 'en', number_format: 'comma_decimal' } as any;
-      expect(myFormatNumber(1234.5, localeOptions, 1)).toBe('1,234.5');
+      expect(myFormatNumber(1234.5, localeOptions, { float_precision: 1 })).toBe('1,234.5');
     });
 
     it('parses numeric strings before formatting', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const localeOptions = { language: 'en', number_format: 'comma_decimal' } as any;
-      expect(myFormatNumber('10', localeOptions, 0)).toBe('10');
+      expect(myFormatNumber('10', localeOptions, { float_precision: 0 })).toBe('10');
+    });
+
+    it('drops trailing zeros unless fixed_decimals is set (RomRider#1115)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const localeOptions = { language: 'en', number_format: 'comma_decimal' } as any;
+      expect(myFormatNumber(13, localeOptions, { float_precision: 1 })).toBe('13');
+      const fixed = { float_precision: 1, fixed_decimals: true };
+      expect(myFormatNumber(13, localeOptions, fixed)).toBe('13.0');
+      expect(myFormatNumber('1.25', localeOptions, { ...fixed, float_precision: 2 })).toBe('1.25');
+      expect(myFormatNumber(-0.04, localeOptions, fixed)).toBe('0.0');
+      expect(myFormatNumber(1234, { ...localeOptions, number_format: 'decimal_comma' }, fixed)).toBe('1.234,0');
     });
   });
 

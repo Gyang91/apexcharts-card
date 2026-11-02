@@ -366,7 +366,7 @@ function getYTooltipFormatter(config: ChartCardConfig, hass: HomeAssistant | und
       lValue = -lValue;
     }
     if (!conf.series_in_graph[opts.seriesIndex]?.show.as_duration) {
-      lValue = myFormatNumber(lValue, hass?.locale, conf.series_in_graph[opts.seriesIndex].float_precision);
+      lValue = myFormatNumber(lValue, hass?.locale, conf.series_in_graph[opts.seriesIndex]);
     }
     const uom = computeUom(
       opts.seriesIndex,
@@ -398,12 +398,12 @@ function getDataLabelsFormatter(
     return function (value: number, opts: ApexFormatterOpts, lgraphs = graphs, conf = config, lHass = hass) {
       if (conf.series_in_graph[opts.seriesIndex].show.datalabels !== false) {
         if (conf.series_in_graph[opts.seriesIndex].show.datalabels === 'percent') {
-          return myFormatNumber(value, lHass?.locale, conf.series_in_graph[opts.seriesIndex].float_precision);
+          return myFormatNumber(value, lHass?.locale, conf.series_in_graph[opts.seriesIndex]);
         }
         return myFormatNumber(
           lgraphs?.[conf.series_in_graph[opts.seriesIndex].index]?.lastState,
           lHass?.locale,
-          conf.series_in_graph[opts.seriesIndex].float_precision,
+          conf.series_in_graph[opts.seriesIndex],
         );
       }
       return '';
@@ -414,7 +414,7 @@ function getDataLabelsFormatter(
       return myFormatNumber(
         opts.w.globals.stackedSeriesTotals[opts.dataPointIndex],
         lHass?.locale,
-        conf.series_in_graph[opts.seriesIndex].float_precision,
+        conf.series_in_graph[opts.seriesIndex],
       );
     }
     if (value === null) return;
@@ -422,7 +422,7 @@ function getDataLabelsFormatter(
     if (conf.series_in_graph[opts.seriesIndex]?.invert && lValue) {
       lValue = -lValue;
     }
-    return myFormatNumber(lValue, lHass?.locale, conf.series_in_graph[opts.seriesIndex].float_precision);
+    return myFormatNumber(lValue, lHass?.locale, conf.series_in_graph[opts.seriesIndex]);
   };
 }
 
@@ -444,7 +444,7 @@ function getPlotOptions_radialBar(config: ChartCardConfig, hass: HomeAssistant |
               return parseFloat(String(value)) === x;
             });
             if (index !== undefined && index !== -1) {
-              return myFormatNumber(value, lHass?.locale, conf.series_in_graph[index].float_precision) + '%';
+              return myFormatNumber(value, lHass?.locale, conf.series_in_graph[index]) + '%';
             }
             return value;
           },
@@ -477,7 +477,7 @@ function getLegendFormatter(config: ChartCardConfig, hass: HomeAssistant | undef
         value = -value;
       }
       if (!conf.series_in_graph[opts.seriesIndex]?.show.as_duration) {
-        value = myFormatNumber(value, hass2?.locale, conf.series_in_graph[opts.seriesIndex].float_precision);
+        value = myFormatNumber(value, hass2?.locale, conf.series_in_graph[opts.seriesIndex]);
       }
       const uom =
         config.chart_type === 'radialBar'

@@ -104,6 +104,7 @@ export const ChartCardAllSeriesExternalConfig = t.iface([], {
     "align": t.opt(t.union(t.lit('start'), t.lit('end'), t.lit('middle'))),
   })),
   "float_precision": t.opt("number"),
+  "fixed_decimals": t.opt("boolean"),
   "min": t.opt("number"),
   "max": t.opt("number"),
   "offset": t.opt("string"),

@@ -108,6 +108,7 @@ export interface ChartCardAllSeriesExternalConfig {
     align?: 'start' | 'end' | 'middle';
   };
   float_precision?: number;
+  fixed_decimals?: boolean;
   min?: number;
   max?: number;
   offset?: string;

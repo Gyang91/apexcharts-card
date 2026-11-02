@@ -3,7 +3,12 @@ import { compress as lzStringCompress, decompress as lzStringDecompress } from '
 import { ChartCardConfig, EntityCachePoints } from './types';
 import { TinyColor } from '@ctrl/tinycolor';
 import parse from 'parse-duration';
-import { ChartCardExternalConfig, ChartCardPrettyTime, ChartCardSeriesExternalConfig } from './types-config';
+import {
+  ChartCardAllSeriesExternalConfig,
+  ChartCardExternalConfig,
+  ChartCardPrettyTime,
+  ChartCardSeriesExternalConfig,
+} from './types-config';
 import { DEFAULT_FLOAT_PRECISION, DEFAULT_MAX, DEFAULT_MIN, moment, NO_VALUE } from './const';
 import { formatNumber, FrontendLocaleData, HomeAssistant } from 'custom-card-helpers';
 import { OverrideFrontendLocaleData } from './types-ha';
@@ -347,7 +352,7 @@ export function truncateFloat(
 export function myFormatNumber(
   num: string | number | null | undefined,
   localeOptions?: FrontendLocaleData,
-  precision?: number | undefined,
+  format?: Pick<ChartCardAllSeriesExternalConfig, 'float_precision' | 'fixed_decimals'>,
 ): string | null {
   let lValue: string | number | null | undefined = num;
   if (lValue === undefined || lValue === null) return null;
@@ -357,9 +362,11 @@ export function myFormatNumber(
       return num as string;
     }
   }
-  return formatNumber(lValue, localeOptions, {
-    maximumFractionDigits: precision === undefined ? DEFAULT_FLOAT_PRECISION : precision,
-  });
+  const precision = format?.float_precision ?? DEFAULT_FLOAT_PRECISION;
+  if (!format?.fixed_decimals) return formatNumber(lValue, localeOptions, { maximumFractionDigits: precision });
+  // Always show `precision` decimals (13 -> 13.0) and never a negative zero (-0.04 -> 0.0)
+  const rounded = Number(lValue.toFixed(precision)) || 0;
+  return formatNumber(rounded, localeOptions, { minimumFractionDigits: precision, maximumFractionDigits: precision });
 }
 
 export function isUsingServerTimezone(/*config: ChartCardConfig, */ hass: HomeAssistant | undefined): boolean {

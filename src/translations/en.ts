@@ -126,6 +126,7 @@ export const en: Record<string, string> = {
   'field.transform': 'Transform',
   'field.data_generator': 'Data Generator',
   'field.float_precision': 'Float Precision',
+  'field.fixed_decimals': 'Fixed Decimals',
   'field.attribute': 'Attribute',
   'field.unit': 'Unit',
   'field.offset': 'Offset',
@@ -218,6 +219,7 @@ export const en: Record<string, string> = {
   'helper.attribute': 'Attribute name to use as value, if not the state',
   'helper.unit': 'Override unit of measurement',
   'helper.float_precision': 'Decimal places when displaying values',
+  'helper.fixed_decimals': 'Always show every decimal place, e.g. 13.0 instead of 13',
   'helper.section_mode':
     "Outside sections views, fill the parent's height. Sections views fill automatically when rows are pinned.",
   'helper.id': 'Identifier referenced by series to bind to this axis (e.g. "left", "kwh").',

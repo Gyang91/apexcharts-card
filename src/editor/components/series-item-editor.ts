@@ -307,6 +307,7 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
       attribute: s.attribute,
       unit: s.unit,
       float_precision: s.float_precision,
+      fixed_decimals: s.fixed_decimals,
       offset: s.offset,
       time_delta: s.time_delta,
       min: s.min,
@@ -381,6 +382,7 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
         (updates as Record<string, unknown>)[k as string] = v === undefined || v === '' ? undefined : Number(v);
       }
     }
+    if ('fixed_decimals' in data) updates.fixed_decimals = data.fixed_decimals ? true : undefined;
     this._fire(updates);
   };
 

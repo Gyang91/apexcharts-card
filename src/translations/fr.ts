@@ -126,6 +126,7 @@ export const fr: Record<string, string> = {
   'field.transform': 'Transformation',
   'field.data_generator': 'Générateur de données',
   'field.float_precision': 'Précision décimale',
+  'field.fixed_decimals': 'Décimales fixes',
   'field.attribute': 'Attribut',
   'field.unit': 'Unité',
   'field.offset': 'Décalage',
@@ -218,6 +219,7 @@ export const fr: Record<string, string> = {
   'helper.attribute': 'Nom de l’attribut à utiliser comme valeur, si ce n’est pas l’état.',
   'helper.unit': 'Remplace l’unité de mesure.',
   'helper.float_precision': 'Nombre de décimales affichées.',
+  'helper.fixed_decimals': 'Toujours afficher toutes les décimales, par ex. 13,0 au lieu de 13.',
   'helper.section_mode':
     'Hors des vues en sections, remplit la hauteur du parent. Les vues en sections le font automatiquement quand le nombre de lignes est fixé.',
   'helper.id': 'Identifiant utilisé par les séries pour se rattacher à cet axe (ex. : « left », « kwh »).',

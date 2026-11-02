@@ -1772,7 +1772,7 @@ export class ChartsCard extends LitElement {
         fillColor: 'var(--card-background-color)',
       },
       label: {
-        text: myFormatNumber(value[1], this._hass?.locale, serie.float_precision),
+        text: myFormatNumber(value[1], this._hass?.locale, serie),
         borderColor: 'var(--card-background-color)',
         offsetY: (value[1] ?? 0) < 0 ? 30 : 0,
         borderWidth: 2,
@@ -2161,7 +2161,7 @@ export class ChartsCard extends LitElement {
 
   private _computeLastState(value: number | null, index: number): string | number | null {
     if (value === null) return value;
-    return myFormatNumber(value, this._hass?.locale, this._config?.series[index].float_precision);
+    return myFormatNumber(value, this._hass?.locale, this._config?.series[index]);
   }
 
   /*
