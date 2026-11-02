@@ -342,6 +342,8 @@ This diagram shows how your data goes through all the steps allowed by this card
 
 ![data_processing_steps](docs/data_processing_chart.png)
 
+A [computed series](#compute-option) comes after these steps: it starts from the processed data of the series it reads, then goes through its own `group_by` and the display steps.
+
 ## Using the card
 
 ### Main Options
@@ -1255,6 +1257,8 @@ In the end, this would produce the same result but it's shorter and you can reus
 #### `all_series_config` options
 
 This will allow you to apply some settings to all the series avoiding repetition. It's just syntactic sugar and doesn't add more features.
+
+A [computed series](#compute-option) doesn't inherit `entity`, `attribute`, `statistics`, `data_generator`, `transform` or `offset` from it; it inherits everything else.
 
 Eg:
 ```yaml
