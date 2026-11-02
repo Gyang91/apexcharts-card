@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.14.1](https://github.com/Gyang91/apexcharts-card/compare/v2.14.0...v2.14.1) (2026-11-02)
+
+
+### Documentation
+
+* make the README current documentation ([712d14e](https://github.com/Gyang91/apexcharts-card/commit/712d14e860b3c110e1f2265c67c9539441f2c7c6))
+
 ## [2.14.0](https://github.com/Gyang91/apexcharts-card/compare/v2.13.2...v2.14.0) (2026-11-02)
 
 
