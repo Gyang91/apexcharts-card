@@ -74,17 +74,13 @@ import { DEFAULT_COLORS, DEFAULT_GRAPH_SPAN, HOUR_24 } from './const';
 import parse from 'parse-duration';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
-import { downsample, SamplingRange } from './downsample';
+import type { SamplingRange } from './downsample';
+import { hasSampling, sampleSeries, SamplingSeries } from './sampling';
 import { assertHeatmapBudget, heatmapData, rangeAreaData } from './visual-data';
 
 // Options passed to ApexCharts' updateOptions on each refresh
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ChartUpdate = any;
-
-interface SamplingSeries {
-  data: EntityCachePoints;
-  hidden?: boolean;
-}
 
 /* eslint no-console: 0 */
 console.info(
@@ -228,22 +224,32 @@ export class ChartsCard extends LitElement {
       window.requestAnimationFrame(() => {
         this._updateOnInterval();
       });
-      // Valid because setConfig has been done.
-
-      this._intervalTimeout = setInterval(() => this._updateOnInterval(), this._interval!);
     }
+    this._startIntervalTimer();
   }
 
   disconnectedCallback() {
-    if (this._intervalTimeout !== undefined) {
-      clearInterval(this._intervalTimeout);
-      this._intervalTimeout = undefined;
-    }
+    this._stopIntervalTimer();
     // ApexCharts adds a window resize listener that only destroy() removes, so a chart left
     // alive here keeps the whole card in memory after HA discards it (dashboard save or
     // navigation). connectedCallback rebuilds it, and the resize observer, via _initialLoad().
     this._destroyCharts();
     super.disconnectedCallback();
+  }
+
+  // `update_interval` refreshes; one timer at most, only while connected
+  private _startIntervalTimer(): void {
+    this._stopIntervalTimer();
+    if (this._config?.update_interval && this._interval) {
+      this._intervalTimeout = setInterval(() => this._updateOnInterval(), this._interval);
+    }
+  }
+
+  private _stopIntervalTimer(): void {
+    if (this._intervalTimeout !== undefined) {
+      clearInterval(this._intervalTimeout);
+      this._intervalTimeout = undefined;
+    }
   }
 
   private _updateOnInterval(): void {
@@ -498,6 +504,8 @@ export class ChartsCard extends LitElement {
       this._yAxisConfig = yAxisConfig;
       this._graphs = graphs;
       this._config = newConfig;
+      // A connected card keeps its timer from connectedCallback: follow the new interval
+      if (this.isConnected) this._startIntervalTimer();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       throw new Error(`/// apexcharts-card version ${pjson.version} /// ${e.message}`, { cause: e });
@@ -1016,34 +1024,13 @@ export class ChartsCard extends LitElement {
     });
   }
 
-  private _canSample(index: number, brush: boolean): boolean {
-    if (!this._config?.downsample || (this._config.chart_type && this._config.chart_type !== 'line')) return false;
-    const apex = brush ? this._config.brush?.apex_config : this._config.apex_config;
-    if (this._config.stacked || apex?.chart?.stacked) return false;
-    if (apex?.chart?.type && !['line', 'area'].includes(apex.chart.type)) return false;
-    const config = (brush ? this._config.series_in_brush : this._config.series_in_graph)[index];
-    if (!config || config.type === 'column') return false;
-    const curves = apex?.stroke?.curve;
-    const curve =
-      typeof curves === 'string' ? curves : (config.curve ?? (Array.isArray(curves) ? curves[index] : curves));
-    return curve !== 'stepline' && curve !== 'linestep';
-  }
-
   private _hasSampling(): boolean {
-    return (
-      !!this._config?.downsample &&
-      (this._config.series_in_graph.some((_, index) => this._canSample(index, false)) ||
-        this._config.series_in_brush.some((_, index) => this._canSample(index, true)))
-    );
+    return hasSampling(this._config);
   }
 
   private _sampleSeries(series: SamplingSeries[], brush: boolean, range?: SamplingRange): SamplingSeries[] {
     const width = this.shadowRoot?.querySelector<HTMLElement>(brush ? '#brush' : '#graph')?.clientWidth ?? 0;
-    return series.map((entry, index) => {
-      if (!this._canSample(index, brush)) return entry;
-      const data = downsample(entry.data, width, range);
-      return data === entry.data ? entry : { ...entry, data };
-    });
+    return sampleSeries(this._config, series, brush, width, range);
   }
 
   private _queueResample(): void {
