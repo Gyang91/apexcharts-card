@@ -60,6 +60,7 @@ export const en: Record<string, string> = {
   'error.interval.invalid': "'{prefix}: {interval}' is not a valid range of time",
   'error.offset.invalidSign': "'{prefix}: {interval}' should start with a '+' or a '-'",
   'error.template.missing': "apexcharts-card template '{template}' is missing from your config!",
+  'error.template.loop': 'apexcharts-card templates include each other in a loop: {templates}',
   'error.series.entityRequired': "series[{index}]: 'entity' is required, unless the series uses 'compute'.",
   'error.series.computeOptions': "series[{index}]: a computed series can't use '{option}'.",
   'error.series.duplicateId': 'Series IDs must be unique: {id}.',
