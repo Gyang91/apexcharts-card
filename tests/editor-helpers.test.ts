@@ -254,3 +254,39 @@ describe('apex-config-utils — EVAL formatter wrappers', () => {
     expect(unwrapEvalBody(wrapped)).toBe('return value;');
   });
 });
+
+// Pinned before setApexValue and setApexYaxisValue share their path setter
+describe('apex_config path setters', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cfg = (extra: any = {}): any => ({ type: 'custom:apexcharts-card', series: [], ...extra });
+
+  it('setApexYaxisValue sets, replaces non-objects on the way and prunes', () => {
+    const base = cfg({ yaxis: [{ id: 'a' }, { id: 'b', apex_config: { labels: 'x', tickAmount: 2 } }] });
+    const set = setApexYaxisValue(base, 1, 2, 'labels.style.color', 'red');
+    expect(set.yaxis).toEqual([
+      { id: 'a' },
+      { id: 'b', apex_config: { labels: { style: { color: 'red' } }, tickAmount: 2 } },
+    ]);
+    expect(base.yaxis[1].apex_config).toEqual({ labels: 'x', tickAmount: 2 });
+    const removed = setApexYaxisValue(set, 1, 2, 'labels.style.color', '');
+    expect(removed.yaxis[1]).toEqual({ id: 'b', apex_config: { tickAmount: 2 } });
+    const empty = setApexYaxisValue(removed, 1, 2, 'tickAmount', null);
+    expect(empty.yaxis[1]).toEqual({ id: 'b' });
+  });
+
+  it('setApexYaxisValue ignores missing axes and prototype-polluting paths', () => {
+    const base = cfg({ yaxis: [{ id: 'a' }] });
+    expect(setApexYaxisValue(base, 3, 1, 'min', 1)).toBe(base);
+    expect(setApexYaxisValue(cfg(), 0, 1, 'min', 1)).toEqual(cfg());
+    expect(setApexYaxisValue(base, 0, 1, 'labels.__proto__.polluted', true)).toBe(base);
+    expect(setApexYaxisValue(base, 0, 1, 'constructor', true)).toBe(base);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('setApexValue replaces arrays and nulls on the way, and drops an empty apex_config', () => {
+    const base = cfg({ apex_config: { chart: [1], legend: null } });
+    expect(setApexValue(base, 'chart.height', 100).apex_config).toEqual({ chart: { height: 100 }, legend: null });
+    expect(setApexValue(cfg({ apex_config: { a: 1 } }), 'a', undefined).apex_config).toBeUndefined();
+    expect(setApexValue(base, 'x.prototype.y', 1)).toBe(base);
+  });
+});
