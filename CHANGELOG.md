@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.16.3](https://github.com/Gyang91/apexcharts-card/compare/v2.16.2...v2.16.3) (2026-11-04)
+
+
+### Bug Fixes
+
+* **deps:** bump apexcharts to 8.7.0, tinycolor, moment-timezone, parse-duration ([#34](https://github.com/Gyang91/apexcharts-card/issues/34)) ([87229f3](https://github.com/Gyang91/apexcharts-card/commit/87229f3db31f841eb3afa426d555bd26b952ccd9))
+
 ## [2.16.2](https://github.com/Gyang91/apexcharts-card/compare/v2.16.1...v2.16.2) (2026-11-04)
 
 
