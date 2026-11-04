@@ -4,6 +4,19 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.16.6](https://github.com/Gyang91/apexcharts-card/compare/v2.16.5...v2.16.6) (2026-11-04)
+
+
+### Bug Fixes
+
+* update_interval follows a config change on a connected card ([79071e9](https://github.com/Gyang91/apexcharts-card/commit/79071e9c4633630b663560bb6b154e6640cc9635))
+* update_interval follows a config change; move sampling decisions out of the card ([3faae58](https://github.com/Gyang91/apexcharts-card/commit/3faae580f456870099d4712c98d434614fba0896))
+
+
+### Code Refactoring
+
+* move sampling decisions to sampling.ts ([63d0890](https://github.com/Gyang91/apexcharts-card/commit/63d0890a8d848e733eae41c085987f64c23a601c))
+
 ## [2.16.5](https://github.com/Gyang91/apexcharts-card/compare/v2.16.4...v2.16.5) (2026-11-04)
 
 
