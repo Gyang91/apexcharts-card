@@ -392,34 +392,28 @@ export class ChartsCard extends LitElement {
     }
   }
 
+  // All or nothing: a config that fails leaves the card as it was, and a
+  // valid one starts from the defaults, not from the previous config.
   public setConfig(config: ChartCardExternalConfig) {
     const configDup = prepareConfig(config, getLovelace);
     try {
       checkSchemaAndMergeAllSeries(configDup);
       checkVisualChart(configDup);
-      if (configDup.update_interval) {
-        this._interval = validateInterval(configDup.update_interval, 'update_interval');
-      }
-      if (configDup.graph_span) {
-        this._graphSpan = validateInterval(configDup.graph_span, 'graph_span');
-      }
-      if (configDup.span?.offset) {
-        this._offset = validateOffset(configDup.span.offset, 'span.offset');
-      }
+      const interval = configDup.update_interval
+        ? validateInterval(configDup.update_interval, 'update_interval')
+        : undefined;
+      const graphSpan = configDup.graph_span ? validateInterval(configDup.graph_span, 'graph_span') : HOUR_24;
+      const offset = configDup.span?.offset ? validateOffset(configDup.span.offset, 'span.offset') : 0;
       checkSpanAndNavigation(configDup);
-      this._navigationPeriod = configDup.navigation?.initial ?? 'day';
-      this._navigationAnchor = undefined;
-      if (configDup.brush?.selection_span) {
-        this._brushSelectionSpan = validateInterval(configDup.brush.selection_span, 'brush.selection_span');
-      }
-      const { offsets, timeDeltas } = checkSeries(configDup);
-      offsets.forEach((offset, index) => (this._seriesOffset[index] = offset));
-      timeDeltas.forEach((delta, index) => (this._seriesTimeDelta[index] = delta));
-      if (configDup.update_delay) {
-        this._updateDelay = validateInterval(configDup.update_delay, `update_delay`);
-      }
+      const brushSelectionSpan = configDup.brush?.selection_span
+        ? validateInterval(configDup.brush.selection_span, 'brush.selection_span')
+        : 0;
+      const { offsets: seriesOffset, timeDeltas: seriesTimeDelta } = checkSeries(configDup);
+      const updateDelay = configDup.update_delay
+        ? validateInterval(configDup.update_delay, `update_delay`)
+        : DEFAULT_UPDATE_DELAY;
 
-      this._config = mergeDeep(
+      const newConfig: ChartCardConfig = mergeDeep(
         {
           graph_span: DEFAULT_GRAPH_SPAN,
           cache: true,
@@ -429,78 +423,77 @@ export class ChartsCard extends LitElement {
         configDup,
       );
 
-      const defColors = this._config?.color_list || DEFAULT_COLORS;
-      if (this._config) {
-        this._graphs = this._config.series.map((serie, index) => {
-          serie.index = index;
-          serie.ignore_history = !!(
-            this._config?.chart_type &&
-            ['donut', 'pie', 'radialBar'].includes(this._config?.chart_type) &&
-            (!serie.group_by || serie.group_by?.func === 'raw') &&
-            !serie.data_generator &&
-            !isComputedSeries(serie) &&
-            !serie.statistics &&
-            !serie.offset
-          );
-          if (!this._headerColors[index]) {
-            this._headerColors[index] = defColors[index % defColors.length];
-          }
-          if (serie.color) {
-            this._headerColors[index] = serie.color;
-          }
-          applySeriesDefaults(serie, index, this._config?.chart_type);
-          if (serie.entity || isComputedSeries(serie)) {
-            const editMode = getLovelace()?.editMode;
-            // disable caching for editor
-
-            const caching = editMode === true ? false : this._config!.cache;
-            const graphEntry = new GraphEntry(
-              index,
-
-              this._graphSpan!,
-
-              caching,
-              serie,
-              this._config?.span,
-            );
-            if (this._hass) graphEntry.hass = this._hass;
-            return graphEntry;
-          }
-          return undefined;
-        });
-        this._config.series_in_graph = [];
-        this._config.series_in_brush = [];
-        this._config.series.forEach((serie, index) => {
-          if (serie.show.in_chart) {
-            this._colors.push(this._headerColors[index]);
-
-            this._config!.series_in_graph.push(serie);
-          }
-          if (this._config?.experimental?.brush && serie.show.in_brush) {
-            this._brushColors.push(this._headerColors[index]);
-
-            this._config!.series_in_brush.push(serie);
-          }
-        });
-        checkYAxes(this._config);
-        if (this._config.yaxis) {
-          const generated = generateYAxisConfig(this._config);
-          this._yAxisConfig = generated?.yAxes;
-          const yAxisConfig = generated?.apexYAxes;
-          if (this._config.apex_config) {
-            this._config.apex_config.yaxis = yAxisConfig;
-          } else {
-            this._config.apex_config = {
-              yaxis: yAxisConfig,
-            };
-          }
-          this._yAxisConfig?.forEach((yaxis) => {
-            [yaxis.min, yaxis.min_type] = getTypeOfMinMax(yaxis.min);
-            [yaxis.max, yaxis.max_type] = getTypeOfMinMax(yaxis.max);
-          });
+      const defColors = newConfig.color_list || DEFAULT_COLORS;
+      const headerColors: string[] = [];
+      const colors: string[] = [];
+      const brushColors: string[] = [];
+      let yAxisConfig: ChartCardYAxis[] | undefined;
+      const editMode = getLovelace()?.editMode;
+      const graphs = newConfig.series.map((serie, index) => {
+        serie.index = index;
+        serie.ignore_history = !!(
+          newConfig.chart_type &&
+          ['donut', 'pie', 'radialBar'].includes(newConfig.chart_type) &&
+          (!serie.group_by || serie.group_by?.func === 'raw') &&
+          !serie.data_generator &&
+          !isComputedSeries(serie) &&
+          !serie.statistics &&
+          !serie.offset
+        );
+        headerColors[index] = serie.color || defColors[index % defColors.length];
+        applySeriesDefaults(serie, index, newConfig.chart_type);
+        if (serie.entity || isComputedSeries(serie)) {
+          // disable caching for editor
+          const caching = editMode === true ? false : newConfig.cache;
+          const graphEntry = new GraphEntry(index, graphSpan, caching, serie, newConfig.span);
+          if (this._hass) graphEntry.hass = this._hass;
+          return graphEntry;
         }
-        this._headerColors = this._headerColors.slice(0, this._config?.series.length);
+        return undefined;
+      });
+      newConfig.series_in_graph = [];
+      newConfig.series_in_brush = [];
+      newConfig.series.forEach((serie, index) => {
+        if (serie.show.in_chart) {
+          colors.push(headerColors[index]);
+          newConfig.series_in_graph.push(serie);
+        }
+        if (newConfig.experimental?.brush && serie.show.in_brush) {
+          brushColors.push(headerColors[index]);
+          newConfig.series_in_brush.push(serie);
+        }
+      });
+      checkYAxes(newConfig);
+      if (newConfig.yaxis) {
+        const generated = generateYAxisConfig(newConfig);
+        yAxisConfig = generated?.yAxes;
+        if (newConfig.apex_config) {
+          newConfig.apex_config.yaxis = generated?.apexYAxes;
+        } else {
+          newConfig.apex_config = { yaxis: generated?.apexYAxes };
+        }
+        yAxisConfig?.forEach((yaxis) => {
+          [yaxis.min, yaxis.min_type] = getTypeOfMinMax(yaxis.min);
+          [yaxis.max, yaxis.max_type] = getTypeOfMinMax(yaxis.max);
+        });
       }
+
+      // Everything is valid: switch the card to the new config
+      this._interval = interval;
+      this._graphSpan = graphSpan;
+      this._offset = offset;
+      this._navigationPeriod = configDup.navigation?.initial ?? 'day';
+      this._navigationAnchor = undefined;
+      this._brushSelectionSpan = brushSelectionSpan;
+      this._seriesOffset = seriesOffset;
+      this._seriesTimeDelta = seriesTimeDelta;
+      this._updateDelay = updateDelay;
+      this._headerColors = headerColors;
+      this._colors = colors;
+      this._brushColors = brushColors;
+      this._yAxisConfig = yAxisConfig;
+      this._graphs = graphs;
+      this._config = newConfig;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       throw new Error(`/// apexcharts-card version ${pjson.version} /// ${e.message}`, { cause: e });
