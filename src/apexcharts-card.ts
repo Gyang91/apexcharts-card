@@ -49,12 +49,13 @@ import { getStatisticsMetadata } from './recorder';
 import { addPeriods, displayTimeZone, navigationRange } from './calendar';
 import { computeTimezoneDiffWithLocal, endOf, startOf } from './zone';
 import ApexCharts from 'apexcharts';
-import type { ApexOptions, ApexYAxis } from 'apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
 import { stylesApex } from './styles';
 import { getStubConfig, registerCustomCard } from './card-picker';
+import { computeYAxisAutoMinMax, generateYAxisConfig, getTypeOfMinMax, YAxisDataSource } from './yaxis';
 import { HassEntity } from 'home-assistant-js-websocket';
-import { getBrushLayoutConfig, getLayoutConfig, yAxisLabelFormatter } from './apex-layouts';
+import { getBrushLayoutConfig, getLayoutConfig } from './apex-layouts';
 import { entityNamesChanged } from './entity-name';
 import GraphEntry from './graphEntry';
 import { createCheckers } from 'ts-interface-checker';
@@ -70,7 +71,6 @@ import {
   COMPUTE_EXCLUDED_OPTIONS,
   DEFAULT_AREA_OPACITY,
   DEFAULT_FILL_RAW,
-  DEFAULT_FLOAT_PRECISION,
   DEFAULT_SHOW_IN_CHART,
   DEFAULT_SHOW_IN_HEADER,
   DEFAULT_SHOW_IN_LEGEND,
@@ -80,7 +80,6 @@ import {
   DEFAULT_SHOW_ZERO_IN_HEADER,
   DEFAULT_SHOW_OFFSET_IN_NAME,
   DEFAULT_UPDATE_DELAY,
-  MAX_TICK_STEPS,
   NO_VALUE,
   PLAIN_COLOR_TYPES,
   TIMESERIES_TYPES,
@@ -100,7 +99,6 @@ import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import { downsample, SamplingRange } from './downsample';
-import { alignSeries } from './align';
 import {
   DEFAULT_HEATMAP_CELLS,
   MAX_HEATMAP_CELLS,
@@ -710,7 +708,7 @@ export class ChartsCard extends LitElement {
             if (logarithmic) {
               for (const limit of [axis.min, axis.max]) {
                 if (limit === undefined || limit === 'auto') continue;
-                const [value, type] = this._getTypeOfMinMax(limit);
+                const [value, type] = getTypeOfMinMax(limit);
                 if (
                   type !== minmax_type.ABSOLUTE &&
                   (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
@@ -720,7 +718,9 @@ export class ChartsCard extends LitElement {
               }
             }
           });
-          const yAxisConfig = this._generateYAxisConfig(this._config);
+          const generated = generateYAxisConfig(this._config);
+          this._yAxisConfig = generated?.yAxes;
+          const yAxisConfig = generated?.apexYAxes;
           if (this._config.apex_config) {
             this._config.apex_config.yaxis = yAxisConfig;
           } else {
@@ -729,8 +729,8 @@ export class ChartsCard extends LitElement {
             };
           }
           this._yAxisConfig?.forEach((yaxis) => {
-            [yaxis.min, yaxis.min_type] = this._getTypeOfMinMax(yaxis.min);
-            [yaxis.max, yaxis.max_type] = this._getTypeOfMinMax(yaxis.max);
+            [yaxis.min, yaxis.min_type] = getTypeOfMinMax(yaxis.min);
+            [yaxis.max, yaxis.max_type] = getTypeOfMinMax(yaxis.max);
           });
         }
         this._headerColors = this._headerColors.slice(0, this._config?.series.length);
@@ -741,56 +741,6 @@ export class ChartsCard extends LitElement {
     }
     // Full reset only happens in editor mode
     // this._reset();
-  }
-
-  private _generateYAxisConfig(config: ChartCardConfig): ApexYAxis[] | undefined {
-    if (!config.yaxis) return undefined;
-    const burned: boolean[] = [];
-    this._yAxisConfig = JSON.parse(JSON.stringify(config.yaxis));
-    const yaxisConfig: ApexYAxis[] = config.series_in_graph.map((serie, serieIndex) => {
-      let idx: number;
-      if (config.yaxis?.length !== 1) {
-        idx = config.yaxis!.findIndex((yaxis) => {
-          return yaxis.id === serie.yaxis_id;
-        });
-      } else {
-        idx = 0;
-      }
-      if (idx < 0) {
-        throw new Error(t('error.yaxis.idNotFound', { id: String(serie.yaxis_id) }));
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let yAxisDup: any = JSON.parse(JSON.stringify(config.yaxis![idx]));
-      delete yAxisDup.apex_config;
-      delete yAxisDup.decimals;
-      delete yAxisDup.tick_step;
-      yAxisDup.decimalsInFloat =
-        config.yaxis![idx].decimals === undefined ? DEFAULT_FLOAT_PRECISION : config.yaxis![idx].decimals;
-      yAxisDup.labels = { formatter: yAxisLabelFormatter(yAxisDup.decimalsInFloat) };
-      if (this._yAxisConfig?.[idx].series_id) {
-        this._yAxisConfig?.[idx].series_id?.push(serieIndex);
-      } else {
-        this._yAxisConfig![idx].series_id! = [serieIndex];
-      }
-
-      if (config.yaxis![idx].apex_config) {
-        yAxisDup = mergeDeep(yAxisDup, config.yaxis![idx].apex_config);
-        delete yAxisDup.apex_config;
-      }
-      if (config.yaxis![idx].logarithmic !== undefined) yAxisDup.logarithmic = config.yaxis![idx].logarithmic;
-      if (config.yaxis![idx].log_base !== undefined) yAxisDup.logBase = config.yaxis![idx].log_base;
-      delete yAxisDup.log_base;
-      if (typeof yAxisDup.min !== 'number') delete yAxisDup.min;
-      if (typeof yAxisDup.max !== 'number') delete yAxisDup.max;
-      if (burned[idx]) {
-        yAxisDup.show = false;
-      } else {
-        yAxisDup.show = config.yaxis![idx].show === undefined ? true : config.yaxis![idx].show;
-        burned[idx] = true;
-      }
-      return yAxisDup;
-    });
-    return yaxisConfig;
   }
 
   static get styles(): CSSResultGroup {
@@ -2038,187 +1988,23 @@ export class ChartsCard extends LitElement {
 
   private _computeYAxisAutoMinMax(start: Date, end: Date) {
     if (!this._config) return;
-    this._yAxisConfig?.map((yaxis) => {
-      if (yaxis.min_type !== minmax_type.FIXED || yaxis.max_type !== minmax_type.FIXED) {
-        const minMax = yaxis.series_id?.map((id) => {
-          const serie = this._config!.series_in_graph[id];
-          if (this._isHiddenInChart(serie)) return undefined;
-          const graphIndex = serie.index;
-          const lMinMax = this._graphs![graphIndex]?.minMaxWithTimestampForYAxis(
-            start.getTime() + (this._seriesOffset[graphIndex] || 0),
-            end.getTime() + (this._seriesOffset[graphIndex] || 0),
-          );
-          if (!lMinMax) return undefined;
-          if (serie.invert) {
-            const cmin = lMinMax.min[1];
-            const cmax = lMinMax.max[1];
-            if (cmin !== null) {
-              lMinMax.max[1] = -cmin;
-            }
-            if (cmax !== null) {
-              lMinMax.min[1] = -cmax;
-            }
-          }
-          return lMinMax;
-        });
-        let min: number | null = null;
-        let max: number | null = null;
-        minMax?.forEach((elt) => {
-          if (!elt) return;
-          if (min === undefined || min === null) {
-            min = elt.min[1];
-          } else if (elt.min[1] !== null && min > elt.min[1]) {
-            min = elt.min[1];
-          }
-          if (max === undefined || max === null) {
-            max = elt.max[1];
-          } else if (elt.max[1] !== null && max < elt.max[1]) {
-            max = elt.max[1];
-          }
-        });
-        const stacked = this._stackTotals(yaxis.series_id, start, end);
-        if (stacked.max !== undefined && (max === null || stacked.max > max)) max = stacked.max;
-        if (stacked.min !== undefined && (min === null || stacked.min < min)) min = stacked.min;
-        const logarithmic = yaxis.logarithmic ?? yaxis.apex_config?.logarithmic ?? false;
-        if (yaxis.align_to !== undefined && !logarithmic) {
-          if (min !== null && yaxis.min_type !== minmax_type.FIXED) {
-            if (min % yaxis.align_to !== 0) {
-              min = min >= 0 ? min - (min % yaxis.align_to) : -(yaxis.align_to + (min % yaxis.align_to) - min);
-            }
-          }
-          if (max !== null && yaxis.max_type !== minmax_type.FIXED) {
-            if (max % yaxis.align_to !== 0) {
-              max = max >= 0 ? yaxis.align_to - (max % yaxis.align_to) + max : (max % yaxis.align_to) - max;
-            }
-          }
-        }
-        yaxis.series_id?.forEach((id) => {
-          const apexYAxis = (this._config!.apex_config!.yaxis as ApexYAxis[])[id];
-          if (yaxis.min_type !== minmax_type.FIXED) {
-            apexYAxis.min =
-              min === null
-                ? yaxis.min_type === minmax_type.SOFT
-                  ? yaxis.min
-                  : undefined
-                : this._getMinMaxBasedOnType(true, min, yaxis.min as number, yaxis.min_type!);
-          }
-          if (yaxis.max_type !== minmax_type.FIXED) {
-            apexYAxis.max =
-              max === null
-                ? yaxis.max_type === minmax_type.SOFT
-                  ? yaxis.max
-                  : undefined
-                : this._getMinMaxBasedOnType(false, max, yaxis.max as number, yaxis.max_type!);
-          }
-        });
-      }
-    });
-    this._yAxisConfig?.forEach((yaxis) => this._applyTickStep(yaxis));
-    return this._config?.apex_config?.yaxis;
+    return computeYAxisAutoMinMax(this._config, this._yAxisConfig, start, end, this._yAxisDataSource());
+  }
+
+  // The card's series data, as the y-axis extremas read it
+  private _yAxisDataSource(): YAxisDataSource {
+    return {
+      isHidden: (serie) => this._isHiddenInChart(serie),
+      minMax: (serie, start, end) => this._graphs![serie.index]?.minMaxWithTimestampForYAxis(start, end),
+      history: (serie) => this._graphs?.[serie.index]?.history ?? [],
+      offset: (serie) => this._seriesOffset[serie.index] || 0,
+    };
   }
 
   private _isHiddenInChart(serie: ChartCardSeriesConfig): boolean {
     return this._hiddenSeries
       ? this._hiddenSeries.has(serie.index)
       : !!(this._config?.experimental?.hidden_by_default && serie.show.hidden_by_default);
-  }
-
-  // Highest positive and lowest negative stack total of the visible range, as
-  // ApexCharts stacks them: per timestamp and stack group; when a chart mixes
-  // series types, only columns stack (`chart.stackOnlyBar`, on by default).
-  private _stackTotals(seriesIds: number[] | undefined, start: Date, end: Date): { min?: number; max?: number } {
-    const config = this._config!;
-    if (!seriesIds || !(config.stacked || config.apex_config?.chart?.stacked)) return {};
-    const onlyColumns =
-      new Set(config.series_in_graph.map((serie) => serie.type)).size > 1 &&
-      config.apex_config?.chart?.stackOnlyBar !== false;
-    // Visible points of each stacked series, on the chart's time axis, per stack group
-    const groups = new Map<string, EntityCachePoints[]>();
-    seriesIds.forEach((id) => {
-      const serie = config.series_in_graph[id];
-      if (this._isHiddenInChart(serie) || (onlyColumns && serie.type !== 'column')) return;
-      const offset = this._seriesOffset[serie.index] || 0;
-      const from = start.getTime() + offset;
-      const to = end.getTime() + offset;
-      const group = serie.type === 'column' ? (serie.stack_group ?? '') : '';
-      const points: EntityCachePoints = (this._graphs?.[serie.index]?.history ?? [])
-        .filter(([timestamp]) => timestamp >= from && timestamp <= to)
-        .map(([timestamp, value]) => [timestamp - offset, value !== null && serie.invert ? -value : value]);
-      groups.set(group, [...(groups.get(group) ?? []), points]);
-    });
-    const totals: [number, number][] = [];
-    groups.forEach((members) => {
-      alignSeries(members).forEach(([, values]) => {
-        const total: [number, number] = [0, 0];
-        values.forEach((value) => {
-          if (value !== null) total[value > 0 ? 0 : 1] += value;
-        });
-        totals.push(total);
-      });
-    });
-    const result: { min?: number; max?: number } = {};
-    totals.forEach(([positive, negative]) => {
-      if (positive > 0 && (result.max === undefined || positive > result.max)) result.max = positive;
-      if (negative < 0 && (result.min === undefined || negative < result.min)) result.min = negative;
-    });
-    return result;
-  }
-
-  // `tick_step`: a tick every N units. Moves the non-fixed extremas outwards to a
-  // multiple of N, then derives ApexCharts' tickAmount from the final range.
-  private _applyTickStep(yaxis: ChartCardYAxis): void {
-    const step = yaxis.tick_step;
-    if (!step || step <= 0 || (yaxis.logarithmic ?? yaxis.apex_config?.logarithmic)) return;
-    yaxis.series_id?.forEach((id) => {
-      const apexYAxis = (this._config!.apex_config!.yaxis as ApexYAxis[])[id];
-      if (typeof apexYAxis.min !== 'number' || typeof apexYAxis.max !== 'number') return;
-      // Rounding guards against floating-point noise (0.30000000000000004 / 0.1)
-      const steps = (value: number) => Math.round((value / step) * 1e9) / 1e9;
-      if (yaxis.min_type !== minmax_type.FIXED) apexYAxis.min = Math.floor(steps(apexYAxis.min)) * step;
-      if (yaxis.max_type !== minmax_type.FIXED) apexYAxis.max = Math.ceil(steps(apexYAxis.max)) * step;
-      const tickAmount = Math.round((apexYAxis.max - apexYAxis.min) / step);
-      // Past MAX_TICK_STEPS labels overlap: keep ApexCharts' own tick count
-      if (tickAmount >= 1 && tickAmount <= MAX_TICK_STEPS) apexYAxis.tickAmount = tickAmount;
-    });
-  }
-
-  private _getMinMaxBasedOnType(isMin: boolean, value: number, configMinMax: number, type: minmax_type): number {
-    switch (type) {
-      case minmax_type.AUTO:
-        return value;
-      case minmax_type.SOFT:
-        if ((isMin && value > configMinMax) || (!isMin && value < configMinMax)) {
-          return configMinMax;
-        } else {
-          return value;
-        }
-      case minmax_type.ABSOLUTE:
-        return value + configMinMax;
-      default:
-        return value;
-    }
-  }
-
-  private _getTypeOfMinMax(value?: 'auto' | number | string): [number | undefined, minmax_type] {
-    const regexFloat = /[+-]?\d+(\.\d+)?/g;
-    if (typeof value === 'number') {
-      return [value, minmax_type.FIXED];
-    } else if (value === undefined || value === 'auto') {
-      return [undefined, minmax_type.AUTO];
-    }
-    if (typeof value === 'string' && value !== 'auto') {
-      const matched = value.match(regexFloat);
-      if (!matched || matched.length !== 1) {
-        throw new Error(t('error.yaxis.badMinMaxFormat', { value }));
-      }
-      const floatValue = parseFloat(matched[0]);
-      if (value.startsWith('~')) {
-        return [floatValue, minmax_type.SOFT];
-      } else if (value.startsWith('|') && value.endsWith('|')) {
-        return [floatValue, minmax_type.ABSOLUTE];
-      }
-    }
-    throw new Error(t('error.yaxis.badMinMaxFormat', { value }));
   }
 
   private _computeChartColors(brush: boolean): (string | ThresholdColorFn)[] {
