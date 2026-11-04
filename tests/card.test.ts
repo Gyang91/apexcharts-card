@@ -3,6 +3,7 @@
 // and reads `window`/`document` -- all provided by the happy-dom environment.
 import '../src/apexcharts-card';
 import { mkHass, mkState } from './fixtures/hass';
+import { computeFillColorStops } from '../src/series-colors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyCard = any;
@@ -482,8 +483,7 @@ describe('apexcharts-card', () => {
 
   describe('threshold gradient stops', () => {
     const stops = (min: number, max: number, invert = false) => {
-      const card = new (customElements.get('apexcharts-card') as CustomElementConstructor)() as AnyCard;
-      return card._computeFillColorStops(
+      return computeFillColorStops(
         {
           type: 'area',
           color_threshold: [

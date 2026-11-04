@@ -2,6 +2,7 @@
 // header state color, pinned on the card's output
 import '../src/apexcharts-card';
 import { mkHass } from './fixtures/hass';
+import { computeFillColorStops } from '../src/series-colors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyCard = any;
@@ -88,15 +89,15 @@ describe('fill color stops', () => {
     });
     const serie = c._config.series[0];
     const stops = ranges.flatMap(([min, max]) => [
-      c._computeFillColorStops(serie, min, max, '#123456', false),
-      c._computeFillColorStops(serie, min, max, '#123456', true),
+      computeFillColorStops(serie, min, max, '#123456', false),
+      computeFillColorStops(serie, min, max, '#123456', true),
     ]);
     expect(stops).toMatchSnapshot();
   });
 
   it('has no stops without thresholds', async () => {
     const c = await card({ series: [{ entity: 'sensor.a' }] });
-    expect(c._computeFillColorStops(c._config.series[0], 0, 1, '#123456')).toBeUndefined();
+    expect(computeFillColorStops(c._config.series[0], 0, 1, '#123456')).toBeUndefined();
   });
 });
 

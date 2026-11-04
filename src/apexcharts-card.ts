@@ -25,7 +25,6 @@ import {
   formatApexDate,
   getLang,
   getPercentFromValue,
-  interpolateColor,
   isExternalStatisticId,
   log,
   mergeDeep,
@@ -48,6 +47,13 @@ import { Ripple } from '@material/mwc-ripple';
 import { stylesApex } from './styles';
 import { computeAnnotations } from './annotations';
 import {
+  computeChartColors,
+  computeHeaderStateColor,
+  computeThresholdFill,
+  thresholdGradientSeries,
+  ThresholdColorFn,
+} from './series-colors';
+import {
   applySeriesDefaults,
   checkSchemaAndMergeAllSeries,
   checkSeries,
@@ -63,10 +69,9 @@ import { getBrushLayoutConfig, getLayoutConfig } from './apex-layouts';
 import { entityNamesChanged } from './entity-name';
 import GraphEntry from './graphEntry';
 import { ActionsConfig, ChartCardExternalConfig, NavigationPeriod } from './types-config';
-import { DEFAULT_AREA_OPACITY, DEFAULT_UPDATE_DELAY, NO_VALUE, PLAIN_COLOR_TYPES, TIMESERIES_TYPES } from './const';
+import { DEFAULT_UPDATE_DELAY, NO_VALUE, TIMESERIES_TYPES } from './const';
 import { DEFAULT_COLORS, DEFAULT_GRAPH_SPAN, HOUR_24 } from './const';
 import parse from 'parse-duration';
-import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import { downsample, SamplingRange } from './downsample';
@@ -86,8 +91,6 @@ console.info(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).ApexCharts = ApexCharts;
-
-type ThresholdColorFn = (opts: { value: number }) => string;
 
 // Optional `entity` of a tap/hold/double_tap action (ActionConfig does not declare it)
 const actionEntity = (config: ActionsConfig, action: ActionHandlerDetail['action']): string | undefined =>
@@ -977,11 +980,7 @@ export class ChartsCard extends LitElement {
   }
 
   private _thresholdGradientSeries(brush: boolean): { serie: ChartCardSeriesConfig; index: number }[] {
-    if (!this._config?.experimental?.color_threshold) return [];
-    if ((brush ? this._config.brush?.apex_config : this._config.apex_config)?.fill !== undefined) return [];
-    return (brush ? this._config.series_in_brush : this._config.series_in_graph)
-      .map((serie, index) => ({ serie, index }))
-      .filter(({ serie }) => serie.color_threshold?.length && [undefined, 'area', 'line'].includes(serie.type));
+    return thresholdGradientSeries(this._config, brush);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1620,160 +1619,24 @@ export class ChartsCard extends LitElement {
   }
 
   private _computeChartColors(brush: boolean): (string | ThresholdColorFn)[] {
-    const colors = brush ? this._brushColors : this._colors;
-    const defaultColors: (string | ThresholdColorFn)[] = computeColors(colors);
-    const series = brush ? this._config?.series_in_brush : this._config?.series_in_graph;
-    series?.forEach((serie, index) => {
-      if (
-        this._config?.experimental?.color_threshold &&
-        (PLAIN_COLOR_TYPES.includes(this._config!.chart_type!) || serie.type === 'column') &&
-        serie.color_threshold &&
-        serie.color_threshold.length > 0
-      ) {
-        defaultColors[index] = function (
-          { value }: { value: number },
-          sortedL = serie.color_threshold!,
-          defColor = colors[index],
-        ) {
-          let returnValue = sortedL[0].color || defColor;
-          sortedL.forEach((color) => {
-            if (value > color.value) returnValue = color.color || defColor;
-          });
-          return computeColor(returnValue);
-        };
-      }
-    });
-    return defaultColors.slice(0, series?.length);
+    return computeChartColors(
+      this._config,
+      brush ? this._config?.series_in_brush : this._config?.series_in_graph,
+      brush ? this._brushColors : this._colors,
+    );
   }
 
   private _computeThresholdFill(brush: boolean): ApexOptions['fill'] {
-    if (!this._config) return undefined;
-    const customFill = brush ? this._config.brush?.apex_config?.fill : this._config.apex_config?.fill;
-    if (customFill !== undefined) return undefined;
-    const series = brush ? this._config.series_in_brush : this._config.series_in_graph;
-    const colors = brush ? this._brushColors : this._colors;
-    return {
-      gradient: {
-        type: 'vertical',
-        colorStops: series.map((serie, index) => {
-          if (!serie.color_threshold || ![undefined, 'area', 'line'].includes(serie.type)) return [];
-          const min = this._graphs?.[serie.index]?.min;
-          const max = this._graphs?.[serie.index]?.max;
-          if (min === undefined || max === undefined) return [];
-          return this._computeFillColorStops(serie, min, max, computeColor(colors[index]), serie.invert) || [];
-        }),
-      },
-    };
-  }
-
-  private _computeFillColorStops(
-    serie: ChartCardSeriesConfig,
-    min: number,
-    max: number,
-    defColor: string,
-    invert = false,
-  ): { offset: number; color: string; opacity: number }[] | undefined {
-    if (!serie.color_threshold) return undefined;
-    const scale = max - min;
-
-    const result = serie.color_threshold.flatMap((thres, index, arr) => {
-      if (
-        (thres.value > max && arr[index - 1] && arr[index - 1].value > max) ||
-        (thres.value < min && arr[index + 1] && arr[index + 1].value < min)
-      ) {
-        return [];
-      }
-      let color: string | undefined = undefined;
-      const defaultOp = serie.opacity !== undefined ? serie.opacity : serie.type === 'area' ? DEFAULT_AREA_OPACITY : 1;
-      let opacity = thres.opacity === undefined ? defaultOp : thres.opacity;
-      if (thres.value > max && arr[index - 1]) {
-        const factor = (max - arr[index - 1].value) / (thres.value - arr[index - 1].value);
-        color = interpolateColor(
-          new TinyColor(arr[index - 1].color || defColor).toHexString(),
-          new TinyColor(thres.color || defColor).toHexString(),
-          factor,
-        );
-
-        const prevOp = arr[index - 1].opacity === undefined ? defaultOp : arr[index - 1].opacity!;
-
-        const curOp = thres.opacity === undefined ? defaultOp : thres.opacity!;
-
-        if (prevOp > curOp) {
-          opacity = (prevOp - curOp) * (1 - factor) + curOp;
-        } else {
-          opacity = (curOp - prevOp) * factor + prevOp;
-        }
-        opacity = opacity < 0 ? -opacity : opacity;
-      } else if (thres.value < min && arr[index + 1]) {
-        const factor = (arr[index + 1].value - min) / (arr[index + 1].value - thres.value);
-        color = interpolateColor(
-          new TinyColor(arr[index + 1].color || defColor).toHexString(),
-          new TinyColor(thres.color || defColor).toHexString(),
-          factor,
-        );
-
-        const nextOp = arr[index + 1].opacity === undefined ? defaultOp : arr[index + 1].opacity!;
-
-        const curOp = thres.opacity === undefined ? defaultOp : thres.opacity!;
-        if (nextOp > curOp) {
-          opacity = (nextOp - curOp) * (1 - factor) + curOp;
-        } else {
-          opacity = (curOp - nextOp) * factor + nextOp;
-        }
-        opacity = opacity < 0 ? -opacity : opacity;
-      }
-      color = color || new TinyColor(thres.color || defColor).toHexString();
-      if ([undefined, 'line'].includes(serie.type)) color = new TinyColor(color).setAlpha(opacity).toHex8String();
-      const position = Math.max(0, Math.min(100, (max - thres.value) * (100 / scale)));
-      return [
-        {
-          color: color || new TinyColor(thres.color || defColor).toHexString(),
-          offset: scale <= 0 ? 0 : invert ? 100 - position : position,
-          opacity,
-        },
-      ];
-    });
-    return invert ? result : result.reverse();
+    return computeThresholdFill(
+      this._config,
+      brush,
+      brush ? this._brushColors : this._colors,
+      (serie) => this._graphs?.[serie.index],
+    );
   }
 
   private _computeHeaderStateColor(serie: ChartCardSeriesConfig, value: number | null): string {
-    let color = '';
-    if (this._config?.header?.colorize_states) {
-      if (
-        this._config.experimental?.color_threshold &&
-        serie.show.header_color_threshold &&
-        serie.color_threshold &&
-        serie.color_threshold.length > 0 &&
-        value !== null
-      ) {
-        const index = serie.color_threshold.findIndex((thres) => {
-          return thres.value > value;
-        });
-        if (index < 0) {
-          color = computeColor(
-            serie.color_threshold[serie.color_threshold.length - 1].color || this._headerColors[serie.index],
-          );
-        } else if (index === 0) {
-          color = computeColor(serie.color_threshold[0].color || this._headerColors[serie.index]);
-        } else {
-          const prev = serie.color_threshold[index - 1];
-          const next = serie.color_threshold[index];
-          if (serie.type === 'column') {
-            color = computeColor(prev.color || this._headerColors[serie.index]);
-          } else {
-            const factor = (value - prev.value) / (next.value - prev.value);
-            color = interpolateColor(
-              computeColor(prev.color || this._headerColors[serie.index]),
-              computeColor(next.color || this._headerColors[serie.index]),
-              factor,
-            );
-          }
-        }
-      } else {
-        return this._headerColors && this._headerColors.length > 0 ? `color: ${this._headerColors[serie.index]};` : '';
-      }
-    }
-    return color ? `color: ${color};` : '';
+    return computeHeaderStateColor(this._config, serie, value, this._headerColors);
   }
 
   private _computeLastState(value: number | null, index: number): string | number | null {
