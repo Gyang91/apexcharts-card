@@ -182,7 +182,7 @@ export function registerCustomCard(): void {
     name: 'ApexCharts Card',
     preview: true,
     description: 'A graph card based on ApexCharts',
-    documentationURL: 'https://github.com/foXaCe/apexcharts-card',
+    documentationURL: 'https://github.com/Gyang91/apexcharts-card',
     getEntitySuggestion,
   });
 }
