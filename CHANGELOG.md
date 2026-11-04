@@ -4,6 +4,27 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.16.5](https://github.com/Gyang91/apexcharts-card/compare/v2.16.4...v2.16.5) (2026-11-04)
+
+
+### Bug Fixes
+
+* a new config on an existing card no longer inherits the old one ([eb44587](https://github.com/Gyang91/apexcharts-card/commit/eb44587088efdc8688396bf4e9e906e956ec8f4d))
+* card picker links to this fork's documentation ([c6ac73f](https://github.com/Gyang91/apexcharts-card/commit/c6ac73f8bc8d7d16af761ed12ea2bc840672dca1))
+
+
+### Code Refactoring
+
+* move annotations to annotations.ts ([9ac177f](https://github.com/Gyang91/apexcharts-card/commit/9ac177f0297b849133c7283f097147b7401d47ec))
+* move card picker support to card-picker.ts ([2b75f5a](https://github.com/Gyang91/apexcharts-card/commit/2b75f5ae5a292be8b6fd14497d1845608200bb46))
+* move config checks and series defaults to config.ts ([b82a438](https://github.com/Gyang91/apexcharts-card/commit/b82a438cb02d7fa41b055fe9f0751a1defd94673))
+* move series colors to series-colors.ts ([638d65e](https://github.com/Gyang91/apexcharts-card/commit/638d65e841785fc35363c2853ddcf8c51f04c724))
+* move y-axis logic to yaxis.ts ([3dc2157](https://github.com/Gyang91/apexcharts-card/commit/3dc215722840e065481523c05a0d5ff0028b09a5))
+* one path getter and setter for the editor's apex_config ([4b603dc](https://github.com/Gyang91/apexcharts-card/commit/4b603dc9539c8f556c89ed2ca071b0ef4cd39597))
+* share the chart locale of the main chart and the brush ([d089aaa](https://github.com/Gyang91/apexcharts-card/commit/d089aaa5a7978a6bbc249e44ba0ea00f18bbb8ab))
+* split _updateData into named steps ([c0075ec](https://github.com/Gyang91/apexcharts-card/commit/c0075ec704c4dd4076c45bd5eb2eac84776dc56e))
+* split the card into modules, and fix config reuse on an existing card ([c2aa264](https://github.com/Gyang91/apexcharts-card/commit/c2aa26468c8d1969619a7039aeab30a83ec1e830))
+
 ## [2.16.4](https://github.com/Gyang91/apexcharts-card/compare/v2.16.3...v2.16.4) (2026-11-04)
 
 
