@@ -77,6 +77,10 @@ import { setLocale, t } from './localize';
 import { downsample, SamplingRange } from './downsample';
 import { assertHeatmapBudget, heatmapData, rangeAreaData } from './visual-data';
 
+// Options passed to ApexCharts' updateOptions on each refresh
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartUpdate = any;
+
 interface SamplingSeries {
   data: EntityCachePoints;
   hidden?: boolean;
@@ -1211,117 +1215,13 @@ export class ChartsCard extends LitElement {
         const failure = results[failedIndex];
         if (failure.status === 'rejected') throw failure.reason;
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let graphData: any = { series: [] };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const brushData: any = { series: [] };
+      let graphData: ChartUpdate;
+      let brushData: ChartUpdate = { series: [] };
       let visualEmpty: boolean | undefined;
       if (TIMESERIES_TYPES.includes(this._config.chart_type)) {
-        this._graphs.forEach((graph, index) => {
-          if (!graph) return [];
-          const inHeader = this._config?.series[index].show.in_header;
-          if (inHeader && inHeader !== 'raw') {
-            if (inHeader === 'after_now' || inHeader === 'before_now') {
-              // before_now / after_now
-              this._headerState[index] = graph.nowValue(
-                now.getTime() + (this._seriesOffset[index] ? this._seriesOffset[index] : 0),
-                inHeader === 'before_now',
-              );
-            } else {
-              // not raw
-              this._headerState[index] = graph.lastState;
-            }
-          } else if (inHeader === 'raw' && this._hasNoEntityState(index)) {
-            // Without an entity state, `raw` shows the latest value instead.
-            this._headerState[index] = graph.lastState;
-          }
-          if (!this._config?.series[index].show.in_chart && !this._config?.series[index].show.in_brush) {
-            return;
-          }
-          // Names go with every refresh so a renamed entity, device or area shows up
-          const name = computeName(this._hass, index, this._config?.series, this._entities);
-          if (graph.history.length === 0) {
-            if (this._config?.series[index].show.in_chart) graphData.series.push({ name, data: [] });
-            if (this._config?.series[index].show.in_brush) brushData.series.push({ name, data: [] });
-            return;
-          }
-          let data: EntityCachePoints;
-          const offset =
-            this._serverTimeOffset + (this._seriesOffset[index] || 0) - (this._seriesTimeDelta[index] || 0);
-          if (offset) {
-            data = offsetData(graph.history, offset);
-          } else {
-            data = [...graph.history];
-          }
-          if (this._config?.series[index].type !== 'column' && this._config?.series[index].extend_to) {
-            const lastPoint = data.slice(-1)[0]!;
-            if (
-              this._config?.series[index].extend_to === 'end' &&
-              lastPoint[0] < end.getTime() - this._serverTimeOffset
-            ) {
-              data.push([end.getTime() - this._serverTimeOffset, lastPoint[1]]);
-            } else if (
-              this._config?.series[index].extend_to === 'now' &&
-              lastPoint[0] < now.getTime() - this._serverTimeOffset
-            ) {
-              data.push([now.getTime() - this._serverTimeOffset, lastPoint[1]]);
-            }
-          }
-          const result = { name, data: this._config?.series[index].invert ? this._invertData(data) : data };
-          if (this._config?.series[index].show.in_chart) graphData.series.push(result);
-          if (this._config?.series[index].show.in_brush) brushData.series.push(result);
-          return;
-        });
-        graphData.annotations = this._computeAnnotations(start, end, new Date(now.getTime() - this._serverTimeOffset));
-        if (this._yAxisConfig) {
-          graphData.yaxis = this._computeYAxisAutoMinMax(start, end);
-        }
-        if (!this._apexBrush) {
-          const newMinMax = this._findStartAndEndOfChart(
-            new Date(start.getTime() - this._serverTimeOffset),
-            new Date(end.getTime() - this._serverTimeOffset),
-            false,
-          );
-          graphData.xaxis = {
-            min: newMinMax.start,
-            max: newMinMax.end,
-          };
-        }
+        ({ graphData, brushData } = this._timelineData(start, end, now));
       } else {
-        // No timeline charts
-        graphData = {
-          series: this._graphs.flatMap((graph, index) => {
-            if (!graph) return [];
-            let data: number;
-            // Without an entity state, `raw` also resolves to the latest value.
-            const computedHeader =
-              this._config?.series[index].show.in_header !== 'raw' || this._hasNoEntityState(index);
-            if (graph.history.length === 0) {
-              if (computedHeader) {
-                this._headerState[index] = null;
-              }
-              data = 0;
-            } else {
-              const lastState = graph.lastState;
-              data = lastState || 0;
-              if (computedHeader) {
-                this._headerState[index] = lastState;
-              }
-            }
-            if (!this._config?.series[index].show.in_chart) {
-              return [];
-            }
-            if (this._config?.chart_type === 'radialBar') {
-              return [getPercentFromValue(data, this._config.series[index].min, this._config.series[index].max)];
-            } else {
-              return [data];
-            }
-          }),
-          // Names go with every refresh so a renamed entity, device or area shows up
-          labels: this._config.series_in_graph.map((serie, index) =>
-            computeName(this._hass, index, this._config!.series_in_graph, undefined, seriesState(this._hass, serie)),
-          ),
-        };
+        graphData = this._valueData();
       }
       if (TIMESERIES_TYPES.includes(this._config.chart_type) && this._config.experimental?.hidden_by_default) {
         // Partial series updates otherwise inherit the original hidden flag in ApexCharts.
@@ -1333,23 +1233,8 @@ export class ChartsCard extends LitElement {
           };
         });
       }
-      if (this._config.chart_type === 'rangeArea') {
-        const [lower, upper] = graphData.series as { name: string; data: EntityCachePoints }[];
-        const data = rangeAreaData(lower.data, upper.data);
-        visualEmpty = data.every((point) => point.y[0] === null);
-        graphData.series = [{ name: `${lower.name} - ${upper.name}`, data }];
-      } else if (this._config.chart_type === 'heatmap') {
-        const series = graphData.series as { name: string; data: EntityCachePoints }[];
-        const rows = heatmapData(
-          series.map((serie) => serie.data),
-          this._config.heatmap?.max_cells,
-        );
-        // Native datetime heatmaps position sparse cells by timestamp. Omit
-        // missing cells: native heatmap shading otherwise treats null as zero.
-        graphData.series = rows.map((data, row) => ({
-          name: series[row].name,
-          data: data.filter((point) => point.y !== null),
-        }));
+      if (this._config.chart_type === 'rangeArea' || this._config.chart_type === 'heatmap') {
+        visualEmpty = this._reshapeVisualSeries(graphData);
       }
       if (this._hasSampling()) {
         this._samplingSeries = { main: graphData.series, brush: brushData.series };
@@ -1357,74 +1242,9 @@ export class ChartsCard extends LitElement {
         graphData.series = this._sampleSeries(graphData.series, false, this._readChartRange(chart));
         brushData.series = this._sampleSeries(brushData.series, true);
       }
-      graphData.colors = this._computeChartColors(false);
-      if (
-        this._config.chart_type === 'heatmap' &&
-        !this._config.color_list &&
-        !this._config.series.some((serie) => serie.color)
-      ) {
-        graphData.colors = this._config.series.map(() => graphData.colors[0]);
-      }
-      if (this._apexBrush) {
-        brushData.colors = this._computeChartColors(true);
-      }
-      if (this._config.experimental?.color_threshold && this._config.series.some((serie) => serie.color_threshold)) {
-        graphData.markers = {
-          colors: computeColors(
-            this._config.series_in_graph.flatMap((serie, index) => {
-              if (serie.type === 'column') return [];
-              return [this._colors[index]];
-            }),
-          ),
-        };
-        graphData.legend = { markers: { fillColors: computeColors(this._colors) } };
-        graphData.tooltip = { marker: { fillColors: graphData.legend.markers.fillColors } };
-        const mainFill = this._computeThresholdFill(false);
-        if (mainFill) graphData.fill = mainFill;
-        if (this._apexBrush) {
-          const brushFill = this._computeThresholdFill(true);
-          if (brushFill) brushData.fill = brushFill;
-        }
-      }
-      // graphData.tooltip = { marker: { fillColors: ['#ff0000', '#00ff00'] } };
-      const currentRange = this._apexBrush ? this._readChartRange(this._apexChart) : undefined;
-      const brushRange = this._apexBrush ? this._readChartRange(this._apexBrush) : undefined;
-      const brushIsAtEnd = currentRange && brushRange && currentRange.max === brushRange.max;
+      this._applySeriesColors(graphData, brushData);
       this._headerState = [...this._headerState];
-      // With a brush, the main chart shows the brush selection. Work it out
-      // before updating either chart: without an x range of its own, a data
-      // update would reset the main chart to the full graph span.
-      let brushSelection: { min: number; max: number } | undefined;
-      if (this._apexBrush) {
-        const newMinMax = this._findStartAndEndOfChart(
-          new Date(start.getTime() - this._serverTimeOffset),
-          new Date(end.getTime() - this._serverTimeOffset),
-          true,
-        );
-        brushData.xaxis = {
-          min: newMinMax.start,
-          max: newMinMax.end,
-        };
-        if (this._brushInit && !currentRange) {
-          log('Brush selection bounds are unavailable or invalid; resetting to the latest range.');
-        }
-        if (brushIsAtEnd || !this._brushInit || !currentRange) {
-          brushSelection = {
-            min: Math.max(
-              newMinMax.start,
-              newMinMax.end - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
-            ),
-            max: newMinMax.end,
-          };
-        } else {
-          const selectionWidth = Math.min(currentRange.max - currentRange.min, newMinMax.end - newMinMax.start);
-          const selectionStart = Math.max(newMinMax.start, Math.min(currentRange.min, newMinMax.end - selectionWidth));
-          brushSelection = { min: selectionStart, max: selectionStart + selectionWidth };
-        }
-        if (TIMESERIES_TYPES.includes(this._config.chart_type)) {
-          graphData.xaxis = { ...graphData.xaxis, min: brushSelection.min, max: brushSelection.max };
-        }
-      }
+      const brushSelection = this._brushSelection(start, end, graphData, brushData);
       const chartUpdates: Promise<unknown>[] = [];
       chartUpdates.push(
         this._apexChart?.updateOptions(
@@ -1472,6 +1292,218 @@ export class ChartsCard extends LitElement {
         this._queueResample();
       }
     }
+  }
+
+  // Timeline charts: header states, and the series of the main chart and brush
+  // with their offsets, extend_to and invert applied
+  private _timelineData(start: Date, end: Date, now: Date): { graphData: ChartUpdate; brushData: ChartUpdate } {
+    const graphData: ChartUpdate = { series: [] };
+    const brushData: ChartUpdate = { series: [] };
+    this._graphs!.forEach((graph, index) => {
+      if (!graph) return [];
+      const inHeader = this._config?.series[index].show.in_header;
+      if (inHeader && inHeader !== 'raw') {
+        if (inHeader === 'after_now' || inHeader === 'before_now') {
+          // before_now / after_now
+          this._headerState[index] = graph.nowValue(
+            now.getTime() + (this._seriesOffset[index] ? this._seriesOffset[index] : 0),
+            inHeader === 'before_now',
+          );
+        } else {
+          // not raw
+          this._headerState[index] = graph.lastState;
+        }
+      } else if (inHeader === 'raw' && this._hasNoEntityState(index)) {
+        // Without an entity state, `raw` shows the latest value instead.
+        this._headerState[index] = graph.lastState;
+      }
+      if (!this._config?.series[index].show.in_chart && !this._config?.series[index].show.in_brush) {
+        return;
+      }
+      // Names go with every refresh so a renamed entity, device or area shows up
+      const name = computeName(this._hass, index, this._config?.series, this._entities);
+      if (graph.history.length === 0) {
+        if (this._config?.series[index].show.in_chart) graphData.series.push({ name, data: [] });
+        if (this._config?.series[index].show.in_brush) brushData.series.push({ name, data: [] });
+        return;
+      }
+      let data: EntityCachePoints;
+      const offset = this._serverTimeOffset + (this._seriesOffset[index] || 0) - (this._seriesTimeDelta[index] || 0);
+      if (offset) {
+        data = offsetData(graph.history, offset);
+      } else {
+        data = [...graph.history];
+      }
+      if (this._config?.series[index].type !== 'column' && this._config?.series[index].extend_to) {
+        const lastPoint = data.slice(-1)[0]!;
+        if (this._config?.series[index].extend_to === 'end' && lastPoint[0] < end.getTime() - this._serverTimeOffset) {
+          data.push([end.getTime() - this._serverTimeOffset, lastPoint[1]]);
+        } else if (
+          this._config?.series[index].extend_to === 'now' &&
+          lastPoint[0] < now.getTime() - this._serverTimeOffset
+        ) {
+          data.push([now.getTime() - this._serverTimeOffset, lastPoint[1]]);
+        }
+      }
+      const result = { name, data: this._config?.series[index].invert ? this._invertData(data) : data };
+      if (this._config?.series[index].show.in_chart) graphData.series.push(result);
+      if (this._config?.series[index].show.in_brush) brushData.series.push(result);
+      return;
+    });
+    graphData.annotations = this._computeAnnotations(start, end, new Date(now.getTime() - this._serverTimeOffset));
+    if (this._yAxisConfig) {
+      graphData.yaxis = this._computeYAxisAutoMinMax(start, end);
+    }
+    if (!this._apexBrush) {
+      const newMinMax = this._findStartAndEndOfChart(
+        new Date(start.getTime() - this._serverTimeOffset),
+        new Date(end.getTime() - this._serverTimeOffset),
+        false,
+      );
+      graphData.xaxis = {
+        min: newMinMax.start,
+        max: newMinMax.end,
+      };
+    }
+    return { graphData, brushData };
+  }
+
+  // Pie, donut and radialBar: the latest value of each series, and the header states
+  private _valueData(): ChartUpdate {
+    return {
+      series: this._graphs!.flatMap((graph, index) => {
+        if (!graph) return [];
+        let data: number;
+        // Without an entity state, `raw` also resolves to the latest value.
+        const computedHeader = this._config?.series[index].show.in_header !== 'raw' || this._hasNoEntityState(index);
+        if (graph.history.length === 0) {
+          if (computedHeader) {
+            this._headerState[index] = null;
+          }
+          data = 0;
+        } else {
+          const lastState = graph.lastState;
+          data = lastState || 0;
+          if (computedHeader) {
+            this._headerState[index] = lastState;
+          }
+        }
+        if (!this._config?.series[index].show.in_chart) {
+          return [];
+        }
+        if (this._config?.chart_type === 'radialBar') {
+          return [getPercentFromValue(data, this._config.series[index].min, this._config.series[index].max)];
+        } else {
+          return [data];
+        }
+      }),
+      // Names go with every refresh so a renamed entity, device or area shows up
+      labels: this._config!.series_in_graph.map((serie, index) =>
+        computeName(this._hass, index, this._config!.series_in_graph, undefined, seriesState(this._hass, serie)),
+      ),
+    };
+  }
+
+  // rangeArea and heatmap: turn the series into the chart's own shape. Returns
+  // whether a rangeArea has no data at all.
+  private _reshapeVisualSeries(graphData: ChartUpdate): boolean | undefined {
+    let visualEmpty: boolean | undefined;
+    if (this._config!.chart_type === 'rangeArea') {
+      const [lower, upper] = graphData.series as { name: string; data: EntityCachePoints }[];
+      const data = rangeAreaData(lower.data, upper.data);
+      visualEmpty = data.every((point) => point.y[0] === null);
+      graphData.series = [{ name: `${lower.name} - ${upper.name}`, data }];
+    } else if (this._config!.chart_type === 'heatmap') {
+      const series = graphData.series as { name: string; data: EntityCachePoints }[];
+      const rows = heatmapData(
+        series.map((serie) => serie.data),
+        this._config!.heatmap?.max_cells,
+      );
+      // Native datetime heatmaps position sparse cells by timestamp. Omit
+      // missing cells: native heatmap shading otherwise treats null as zero.
+      graphData.series = rows.map((data, row) => ({
+        name: series[row].name,
+        data: data.filter((point) => point.y !== null),
+      }));
+    }
+    return visualEmpty;
+  }
+
+  // Series colors, and the markers, legend, tooltip and gradient fill of threshold colors
+  private _applySeriesColors(graphData: ChartUpdate, brushData: ChartUpdate): void {
+    const config = this._config!;
+    graphData.colors = this._computeChartColors(false);
+    if (config.chart_type === 'heatmap' && !config.color_list && !config.series.some((serie) => serie.color)) {
+      graphData.colors = config.series.map(() => graphData.colors[0]);
+    }
+    if (this._apexBrush) {
+      brushData.colors = this._computeChartColors(true);
+    }
+    if (config.experimental?.color_threshold && config.series.some((serie) => serie.color_threshold)) {
+      graphData.markers = {
+        colors: computeColors(
+          config.series_in_graph.flatMap((serie, index) => {
+            if (serie.type === 'column') return [];
+            return [this._colors[index]];
+          }),
+        ),
+      };
+      graphData.legend = { markers: { fillColors: computeColors(this._colors) } };
+      graphData.tooltip = { marker: { fillColors: graphData.legend.markers.fillColors } };
+      const mainFill = this._computeThresholdFill(false);
+      if (mainFill) graphData.fill = mainFill;
+      if (this._apexBrush) {
+        const brushFill = this._computeThresholdFill(true);
+        if (brushFill) brushData.fill = brushFill;
+      }
+    }
+  }
+
+  // With a brush: the brush's x range, and the selection the main chart shows
+  private _brushSelection(
+    start: Date,
+    end: Date,
+    graphData: ChartUpdate,
+    brushData: ChartUpdate,
+  ): { min: number; max: number } | undefined {
+    const currentRange = this._apexBrush ? this._readChartRange(this._apexChart!) : undefined;
+    const brushRange = this._apexBrush ? this._readChartRange(this._apexBrush) : undefined;
+    const brushIsAtEnd = currentRange && brushRange && currentRange.max === brushRange.max;
+    // With a brush, the main chart shows the brush selection. Work it out
+    // before updating either chart: without an x range of its own, a data
+    // update would reset the main chart to the full graph span.
+    let brushSelection: { min: number; max: number } | undefined;
+    if (this._apexBrush) {
+      const newMinMax = this._findStartAndEndOfChart(
+        new Date(start.getTime() - this._serverTimeOffset),
+        new Date(end.getTime() - this._serverTimeOffset),
+        true,
+      );
+      brushData.xaxis = {
+        min: newMinMax.start,
+        max: newMinMax.end,
+      };
+      if (this._brushInit && !currentRange) {
+        log('Brush selection bounds are unavailable or invalid; resetting to the latest range.');
+      }
+      if (brushIsAtEnd || !this._brushInit || !currentRange) {
+        brushSelection = {
+          min: Math.max(
+            newMinMax.start,
+            newMinMax.end - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
+          ),
+          max: newMinMax.end,
+        };
+      } else {
+        const selectionWidth = Math.min(currentRange.max - currentRange.min, newMinMax.end - newMinMax.start);
+        const selectionStart = Math.max(newMinMax.start, Math.min(currentRange.min, newMinMax.end - selectionWidth));
+        brushSelection = { min: selectionStart, max: selectionStart + selectionWidth };
+      }
+      if (TIMESERIES_TYPES.includes(this._config!.chart_type)) {
+        graphData.xaxis = { ...graphData.xaxis, min: brushSelection.min, max: brushSelection.max };
+      }
+    }
+    return brushSelection;
   }
 
   // Loads every series. Computed series come last, in config order: each one
