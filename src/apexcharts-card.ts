@@ -228,22 +228,32 @@ export class ChartsCard extends LitElement {
       window.requestAnimationFrame(() => {
         this._updateOnInterval();
       });
-      // Valid because setConfig has been done.
-
-      this._intervalTimeout = setInterval(() => this._updateOnInterval(), this._interval!);
     }
+    this._startIntervalTimer();
   }
 
   disconnectedCallback() {
-    if (this._intervalTimeout !== undefined) {
-      clearInterval(this._intervalTimeout);
-      this._intervalTimeout = undefined;
-    }
+    this._stopIntervalTimer();
     // ApexCharts adds a window resize listener that only destroy() removes, so a chart left
     // alive here keeps the whole card in memory after HA discards it (dashboard save or
     // navigation). connectedCallback rebuilds it, and the resize observer, via _initialLoad().
     this._destroyCharts();
     super.disconnectedCallback();
+  }
+
+  // `update_interval` refreshes; one timer at most, only while connected
+  private _startIntervalTimer(): void {
+    this._stopIntervalTimer();
+    if (this._config?.update_interval && this._interval) {
+      this._intervalTimeout = setInterval(() => this._updateOnInterval(), this._interval);
+    }
+  }
+
+  private _stopIntervalTimer(): void {
+    if (this._intervalTimeout !== undefined) {
+      clearInterval(this._intervalTimeout);
+      this._intervalTimeout = undefined;
+    }
   }
 
   private _updateOnInterval(): void {
@@ -498,6 +508,8 @@ export class ChartsCard extends LitElement {
       this._yAxisConfig = yAxisConfig;
       this._graphs = graphs;
       this._config = newConfig;
+      // A connected card keeps its timer from connectedCallback: follow the new interval
+      if (this.isConnected) this._startIntervalTimer();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       throw new Error(`/// apexcharts-card version ${pjson.version} /// ${e.message}`, { cause: e });

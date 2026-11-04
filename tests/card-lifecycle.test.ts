@@ -259,3 +259,68 @@ describe('card lifecycle and diagnostics', () => {
     expect(card._apexBrush.updateOptions.mock.calls[1][0].series[0]).not.toHaveProperty('hidden');
   });
 });
+
+describe('update_interval timer', () => {
+  const T = 'custom:apexcharts-card';
+  const connected = async (update_interval?: string): Promise<AnyCard> => {
+    const card = new (customElements.get('apexcharts-card') as CustomElementConstructor)() as AnyCard;
+    card.setConfig({ type: T, update_interval, series: [{ entity: 'sensor.temp' }] });
+    card._hass = mkHass({ 'sensor.temp': mkState('sensor.temp', '12') });
+    vi.spyOn(card, '_initialLoad').mockResolvedValue(undefined);
+    document.body.appendChild(card);
+    await card.updateComplete;
+    // let the refresh connectedCallback schedules for the next frame run
+    if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50);
+    return card;
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    document.body.replaceChildren();
+  });
+
+  it('follows a changed interval on a connected card', async () => {
+    vi.useFakeTimers();
+    const card = await connected('1min');
+    const refresh = vi.spyOn(card, '_updateOnInterval').mockImplementation(() => undefined);
+    card.setConfig({ type: T, update_interval: '5min', series: [{ entity: 'sensor.temp' }] });
+    await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+    expect(refresh).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60 * 1000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops when update_interval is removed, and starts when it is added', async () => {
+    vi.useFakeTimers();
+    const card = await connected('1min');
+    const refresh = vi.spyOn(card, '_updateOnInterval').mockImplementation(() => undefined);
+    card.setConfig({ type: T, series: [{ entity: 'sensor.temp' }] });
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(card._intervalTimeout).toBeUndefined();
+    card.setConfig({ type: T, update_interval: '1min', series: [{ entity: 'sensor.temp' }] });
+    await vi.advanceTimersByTimeAsync(60 * 1000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps one timer across reconnects and none while detached', async () => {
+    vi.useFakeTimers();
+    const card = await connected('1min');
+    const refresh = vi.spyOn(card, '_updateOnInterval').mockImplementation(() => undefined);
+    card.remove();
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    expect(refresh).not.toHaveBeenCalled();
+    document.body.appendChild(card);
+    await vi.advanceTimersByTimeAsync(50);
+    refresh.mockClear();
+    await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+    expect(refresh).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not start a timer for a card that is not connected', async () => {
+    const card = new (customElements.get('apexcharts-card') as CustomElementConstructor)() as AnyCard;
+    card.setConfig({ type: T, update_interval: '1min', series: [{ entity: 'sensor.temp' }] });
+    expect(card._intervalTimeout).toBeUndefined();
+  });
+});
