@@ -24,6 +24,17 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
 
 ## Table of Content <!-- omit in toc -->
 
+- [Quick start](#quick-start)
+- [How-to guides](#how-to-guides)
+  - [Show a sensor over the last 24 hours](#show-a-sensor-over-the-last-24-hours)
+  - [Show energy used per day](#show-energy-used-per-day)
+  - [Compare today with yesterday](#compare-today-with-yesterday)
+  - [Put two units on one chart](#put-two-units-on-one-chart)
+  - [Calculate a value from other sensors](#calculate-a-value-from-other-sensors)
+  - [Keep names short on Home Assistant 2026.11](#keep-names-short-on-home-assistant-202611)
+  - [Refresh on a fixed schedule](#refresh-on-a-fixed-schedule)
+  - [Browse earlier days and weeks](#browse-earlier-days-and-weeks)
+  - [Reuse the same settings on many cards](#reuse-the-same-settings-on-many-cards)
 - [What's different in this fork](#whats-different-in-this-fork)
 - [Feature guide](#feature-guide)
 - [Calendar navigation](#calendar-navigation)
@@ -71,6 +82,7 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
   - [`color_threshold` experimental feature](#color_threshold-experimental-feature)
   - [`hidden_by_default` experimental feature](#hidden_by_default-experimental-feature)
   - [`brush` experimental feature](#brush-experimental-feature)
+- [Troubleshooting](#troubleshooting)
 - [Known issues](#known-issues)
 - [License](#license)
 - [Examples](#examples-1)
@@ -81,6 +93,202 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
   - [Change the line thickness](#change-the-line-thickness)
   - [Use apexcharts-card with auto-entities](#use-apexcharts-card-with-auto-entities)
   - [Change the height of the graph](#change-the-height-of-the-graph)
+
+## Quick start
+
+1. **Install the card**, see [Installation](#installation). On Home Assistant 2026.11 and later, use **Settings** > **Marketplace** > **Add from link** with `Gyang91/apexcharts-card`.
+2. **Reload your browser** after installing or updating, so it loads the new file.
+3. **Add the card**: edit a dashboard, select **Add card**, search for **ApexCharts Card**, and pick a sensor. The visual editor covers most options; the [presets](#visual-editor-starter-presets) in its **General** tab set up a temperature, power or consumption chart for you.
+4. **Or paste YAML**: select **Show code editor** in the card editor and start from this:
+
+   ```yaml
+   type: custom:apexcharts-card
+   graph_span: 24h
+   header:
+     show: true
+     title: Living room
+     show_states: true
+   series:
+     - entity: sensor.living_room_temperature
+   ```
+
+   Replace `sensor.living_room_temperature` with one of your sensors (**Settings** > **Devices & services** > **Entities** lists their IDs).
+
+Then pick a task in the [How-to guides](#how-to-guides), or look up an option under [Using the card](#using-the-card). If the card shows an error or no data, see [Troubleshooting](#troubleshooting).
+
+## How-to guides
+
+Short recipes for common charts. Each one is a complete card: paste it, then replace the entity IDs with yours.
+
+### Show a sensor over the last 24 hours
+
+A line of the last 24 hours, averaged per 15 minutes so it stays smooth, with the lowest and highest value marked:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 24h
+header:
+  show: true
+  title: Living room
+  show_states: true
+  colorize_states: true
+series:
+  - entity: sensor.living_room_temperature
+    name: Temperature
+    group_by:
+      func: avg
+      duration: 15min
+    show:
+      extremas: true
+```
+
+For a sensor that only changes now and then, like a thermostat setpoint, use `func: last` instead of `avg`. For a precise average of a slow sensor, use `func: time_avg`, which weighs each value by how long it was held. See [`func`](#func-options).
+
+### Show energy used per day
+
+Columns of the energy used on each of the last 7 days, read from Home Assistant's long-term statistics:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 7d
+span:
+  end: day
+header:
+  show: true
+  title: Energy per day
+series:
+  - entity: sensor.house_energy
+    name: Energy
+    type: column
+    statistics:
+      type: change
+      period: day
+```
+
+- `sensor.house_energy` must be an **energy counter** that only goes up (unit kWh or Wh, state class `total` or `total_increasing`), like the sensors you add to the Energy dashboard. A **power** sensor (W) does not work here: it has no daily total.
+- `statistics` reads Home Assistant's hourly long-term statistics, which are kept for years, instead of the recent history, which the recorder keeps for 10 days by default.
+- For weeks, months or years, change `graph_span`, `span.end` and `statistics.period` together, for example `12month`, `month` and `month`.
+
+### Compare today with yesterday
+
+The same sensor twice, the second one moved forward by a day, so today and yesterday share the time axis:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 24h
+span:
+  start: day
+series:
+  - entity: sensor.outdoor_temperature
+    name: Today
+  - entity: sensor.outdoor_temperature
+    name: Yesterday
+    offset: -1d
+    stroke_width: 1
+```
+
+Give each series its own `name`: both come from the same entity, so their default names would be the same.
+
+### Put two units on one chart
+
+Temperature on the left axis and humidity on the right, each with its own scale:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 24h
+yaxis:
+  - id: temperature
+    decimals: 1
+  - id: humidity
+    opposite: true
+    min: 0
+    max: 100
+    decimals: 0
+series:
+  - entity: sensor.bedroom_temperature
+    yaxis_id: temperature
+  - entity: sensor.bedroom_humidity
+    yaxis_id: humidity
+```
+
+With more than one y axis, every axis needs an `id` and every series a `yaxis_id`. `min: ~0` instead of `min: 0` lets the axis go lower when the data does; see [Min/Max Format](#minmax-format).
+
+### Calculate a value from other sensors
+
+Grid power from what the house uses and what the solar panels make, without a template sensor:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 24h
+series:
+  - entity: sensor.house_power
+    id: house
+  - entity: sensor.solar_power
+    id: solar
+  - name: Grid
+    unit: W
+    compute: return values.house - values.solar;
+```
+
+Each source series gets an `id`; `values.<id>` is its value at each point in time. See [`compute`](#compute-option) for totals, ratios and how missing values are handled.
+
+### Keep names short on Home Assistant 2026.11
+
+From Home Assistant 2026.11, a series without `name` shows the device name followed by the entity name, like the built-in cards: "Thermostat Temperature" instead of "Temperature". To keep a name short, either:
+
+- set a fixed `name` on the series, or
+- build the name from parts that follow renames, see [Structured names](#structured-names):
+
+  ```yaml
+  type: custom:apexcharts-card
+  series:
+    - entity: sensor.bedroom_thermostat_temperature
+      name: # shows "Bedroom Temperature"
+        - type: area
+        - type: entity
+  ```
+
+- or rename the device in Home Assistant, or turn on **Main entity of the device** for the entity, which then goes by the device's name.
+
+### Refresh on a fixed schedule
+
+The card redraws when a series' entity changes. To redraw on a timer instead, for example for [external statistics](#external-statistics) or a [`data_generator`](#data_generator-option) that has no entity changes, set `update_interval`:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 30d
+update_interval: 15min
+series:
+  - entity: sensor.water_meter
+    type: column
+    statistics:
+      type: change
+      period: day
+```
+
+From version 2.16.6, a changed or removed `update_interval` takes effect as soon as you save the card.
+
+### Browse earlier days and weeks
+
+Previous and next buttons and a day, week or month choice above the chart:
+
+```yaml
+type: custom:apexcharts-card
+navigation:
+  show: true
+  initial: week
+series:
+  - entity: sensor.living_room_temperature
+    group_by:
+      func: avg
+      duration: 1h
+```
+
+See [Calendar navigation](#calendar-navigation). It cannot be combined with `span`.
+
+### Reuse the same settings on many cards
+
+Define the shared settings once as a template in your dashboard's raw configuration, then use it on each card with `config_templates`. See [Configuration Templates](#configuration-templates). To share settings between the series of one card, use [`all_series_config`](#all_series_config-options).
 
 ## What's different in this fork
 
@@ -130,7 +338,7 @@ series:
     group_by:
       func: avg
       duration: 1h
-      fill: null
+      fill: 'null'
 ```
 
 - `navigation.show` defaults to `false`; `navigation.initial` defaults to `day` and accepts `day`, `week`, `month`.
@@ -213,13 +421,13 @@ series:
     group_by:
       func: avg
       duration: 1h
-      fill: null
+      fill: 'null'
   - entity: sensor.bedroom_temperature
     name: Bedroom
     group_by:
       func: avg
       duration: 1h
-      fill: null
+      fill: 'null'
 ```
 
 For energy patterns, use energy counters with `statistics: {type: change, period: hour, align: start}`. For occupancy, transform the source state into numeric 0/1 and use an appropriate aggregate; `avg` of event samples is not a time-occupancy percentage—use `time_avg` when you need time weighting.
@@ -335,20 +543,31 @@ $ wget https://github.com/Gyang91/apexcharts-card/releases/latest/download/apexc
 
 ### Add resource reference
 
-If you configure Lovelace via YAML, add a reference to `apexcharts-card.js` inside your `configuration.yaml`:
+HACS and the Marketplace add the resource for you. Only add it yourself after a manual or CLI install, or if you manage dashboard resources in YAML.
+
+The URL depends on where the file is:
+
+| Installed with | Resource URL |
+| --- | --- |
+| Marketplace (2026.11 and later) | `/local/community/apexcharts-card/apexcharts-card.js` |
+| HACS (2026.10 and earlier) | `/hacsfiles/apexcharts-card/apexcharts-card.js` (still works after the move to the Marketplace) |
+| Manual or CLI install into `config/www` | `/local/apexcharts-card.js` |
+
+In YAML (`configuration.yaml`, for dashboards in YAML mode):
 
 ```yaml
-resources:
-  - url: /local/apexcharts-card.js?v=2.8.6 # change the version after each update
-    type: module
+lovelace:
+  resources:
+    - url: /local/apexcharts-card.js?v=1 # raise the number after each update, so browsers load the new file
+      type: module
 ```
 
-Else, if you prefer the graphical editor, use the menu to add the resource:
+In the UI:
 
-1. Make sure, advanced mode is enabled in your user profile (click on your user name to get there)
-2. Navigate to Dashboard --> Edit Dashboard --> Manage resources. Click the '+ Add Resource' icon in bottom-right.
-3. Enter URL `/local/apexcharts-card.js` and select type "JavaScript Module".
-4. Restart Home Assistant.
+1. Make sure advanced mode is enabled in your user profile.
+2. Go to **Settings** > **Dashboards**, open the three dots menu, then **Resources**, and select **Add resource**.
+3. Enter the URL from the table above and select **JavaScript module**.
+4. Reload your browser. Home Assistant does not need a restart.
 
 ## Data processing steps
 
@@ -734,6 +953,8 @@ Eg:
   graph_span: 24h
   span:
     start: day
+  series:
+    - entity: sensor.temperature
   ```
 * Display 24 hours from the start of the previous day (00:00 -> 23:59, -1 day)
   ```yaml
@@ -742,6 +963,8 @@ Eg:
   span:
     start: day
     offset: -1d
+  series:
+    - entity: sensor.temperature
   ```
 * Display 12h between 06:00 and 18:00 of the current day
   ```yaml
@@ -750,6 +973,8 @@ Eg:
   span:
     start: day
     offset: +6h
+  series:
+    - entity: sensor.temperature
   ```
 * Display the last 7 days, the end of the graph is the end of the current day
   ```yaml
@@ -757,6 +982,8 @@ Eg:
   graph_span: 7d
   span:
     end: day
+  series:
+    - entity: sensor.temperature
   ```
 
 ### Binary sensors
@@ -951,7 +1178,7 @@ In the visual editor, choose **Computed from other series** as the series' sourc
     - name: Office share
       unit: '%'
       yaxis_id: percent
-      compute: return values.total ? (values.office / values.total) * 100 : null;
+      compute: 'return values.total ? (values.office / values.total) * 100 : null;'
   yaxis:
     - id: power
     - id: percent
@@ -1129,7 +1356,7 @@ Hundreds of options are available and it is not possible to describe them all he
 ```yaml
 type: custom:apexcharts-card
 series:
-  - ...
+  - entity: sensor.temperature
 apex_config:
   dataLabels:
     enabled: true
@@ -1162,6 +1389,8 @@ type: custom:apexcharts-card
 grid_options:
   rows: 4 # default is auto
   columns: 6 # default is 12
+series:
+  - entity: sensor.temperature
 ```
 
 Outside sections views, `section_mode: true` fills the parent's height instead, which needs a parent with a fixed height. Inside sections it's no longer needed and is ignored. A `chart.height` set in `apex_config` takes precedence over both.
@@ -1194,7 +1423,11 @@ For code junkies, you'll find the default options I use in [`src/apex-layouts.ts
   config_templates:
     - template1
     - template2
-  # or
+  ```
+
+  or, with a single template:
+
+  ```yaml
   type: custom:apexcharts-card
   config_templates: template1
   ```
@@ -1443,6 +1676,31 @@ series:
       in_chart: false
 ```
 
+## Troubleshooting
+
+**"Custom element doesn't exist: apexcharts-card"**
+The browser did not load the card. Check that it is installed and that the [resource](#add-resource-reference) is listed under **Settings** > **Dashboards** > three dots menu > **Resources**, then reload the browser. In the companion app, use **Settings** > **Companion app** > **Debugging** > **Reset frontend cache**.
+
+**Which version is running?**
+Open the browser's developer console (F12): the card logs `APEXCHARTS-CARD vX.Y.Z` when it loads. If it still shows the old version after an update, reload the page while bypassing the cache (Ctrl+Shift+R, or Cmd+Shift+R on a Mac).
+
+**The card shows `/// apexcharts-card version ... ///` and a message**
+The configuration has an error, and the message names the option, for example `value.series[0].group_by.fill is none of "null", "last", "zero"`. Values in quotes must be written as shown: `fill: 'null'` with quotes, because `fill: null` without them means "no value" in YAML.
+
+**The chart is empty**
+- Check that the entity records history: entities excluded from the [recorder](https://www.home-assistant.io/integrations/recorder/) have none.
+- Recent history only goes back as far as the recorder keeps it (10 days by default). For longer spans, use [`statistics`](#statistics-options).
+- An [external statistic](#external-statistics) ID (with a `:`) needs the `statistics` option.
+
+**Names changed after updating Home Assistant**
+From 2026.11, series without `name` show the device name and the entity name. See [Keep names short on Home Assistant 2026.11](#keep-names-short-on-home-assistant-202611).
+
+**Deleted readings still show**
+Statistics are kept in the browser for up to 10 minutes, so a time range you deleted under **Tools** > **Statistics** can stay on the chart until then. Reloading the page clears it.
+
+**A long history is slow**
+Group the data before it is drawn: use [`statistics`](#statistics-options) for spans of more than a few days, [`group_by`](#group_by-options) for raw history, or [`downsample`](#large-history-performance) for dense line and area charts.
+
 ## Known issues
 
 * **Grouped columns:** columns sit in the middle of their bucket; use `group_by.align: start` to put them at the start. Raw columns center on their sample timestamps, as expected by ApexCharts ([apexcharts/apexcharts.js#1688](https://github.com/apexcharts/apexcharts.js/issues/1688)). All bars have the same width, even when calendar buckets differ in length (for example months).
@@ -1596,7 +1854,7 @@ card:
 This is described in the ApexCharts.js documentation [here](https://apexcharts.com/docs/options/chart/height/) where you can find way more options.
 
 ```yaml
-type: custom:apexchart-card
+type: custom:apexcharts-card
 apex_config:
   chart:
     height: 250px

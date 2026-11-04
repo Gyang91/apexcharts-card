@@ -60,6 +60,7 @@ export const fr: Record<string, string> = {
   'error.interval.invalid': "'{prefix} : {interval}' n'est pas un intervalle de temps valide",
   'error.offset.invalidSign': "'{prefix} : {interval}' doit commencer par '+' ou '-'",
   'error.template.missing': "Le modèle apexcharts-card '{template}' est absent de votre configuration !",
+  'error.template.loop': 'Les modèles apexcharts-card s’incluent mutuellement en boucle : {templates}',
   'error.series.entityRequired': "series[{index}] : 'entity' est obligatoire, sauf si la série utilise 'compute'.",
   'error.series.computeOptions': "series[{index}] : une série calculée ne peut pas utiliser '{option}'.",
   'error.series.duplicateId': 'Les identifiants des séries doivent être uniques : {id}.',

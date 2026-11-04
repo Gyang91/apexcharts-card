@@ -258,16 +258,26 @@ export function interpolateColor(a: string, b: string, factor: number): string {
   return `#${(((1 << 24) + (rr << 16) + (rg << 8) + rb) | 0).toString(16).slice(1)}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mergeConfigTemplates(ll: any, config: ChartCardExternalConfig): ChartCardExternalConfig {
+export function mergeConfigTemplates(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ll: any,
+  config: ChartCardExternalConfig,
+  // Templates being merged above this one, to stop a template that includes itself
+  chain: string[] = [],
+): ChartCardExternalConfig {
   const tpl = config.config_templates;
   if (!tpl) return config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let result: any = {};
   const tpls = tpl && Array.isArray(tpl) ? tpl : [tpl];
   tpls?.forEach((template) => {
-    if (!ll.config.apexcharts_card_templates?.[template]) throw new Error(t('error.template.missing', { template }));
-    const res = mergeConfigTemplates(ll, JSON.parse(JSON.stringify(ll.config.apexcharts_card_templates[template])));
+    // No dashboard config (card shown outside a dashboard) reads as a missing template
+    const templates = ll?.config?.apexcharts_card_templates;
+    if (!templates?.[template]) throw new Error(t('error.template.missing', { template }));
+    if (chain.includes(template)) {
+      throw new Error(t('error.template.loop', { templates: [...chain, template].join(' > ') }));
+    }
+    const res = mergeConfigTemplates(ll, JSON.parse(JSON.stringify(templates[template])), [...chain, template]);
     result = mergeDeepConfig(result, res);
   });
   result = mergeDeepConfig(result, config);

@@ -351,6 +351,48 @@ describe('utils.ts', () => {
         mergeConfigTemplates(ll, { config_templates: ['missing'], series: [] } as any),
       ).toThrow(/is missing from your config/);
     });
+
+    it('says the template is missing when there is no dashboard config', () => {
+      for (const ll of [null, undefined, {}]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect(() => mergeConfigTemplates(ll, { config_templates: 'tpl', series: [] } as any)).toThrow(
+          /'tpl' is missing from your config/,
+        );
+      }
+    });
+
+    it('names a loop of templates instead of overflowing the stack', () => {
+      const ll = {
+        config: {
+          apexcharts_card_templates: {
+            a: { config_templates: 'b', graph_span: '1h' },
+            b: { config_templates: ['a'] },
+            self: { config_templates: 'self' },
+          },
+        },
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => mergeConfigTemplates(ll, { config_templates: 'a', series: [] } as any)).toThrow(
+        /in a loop: a > b > a/,
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => mergeConfigTemplates(ll, { config_templates: 'self', series: [] } as any)).toThrow(/self > self/);
+    });
+
+    it('still allows the same template twice side by side and in separate branches', () => {
+      const ll = {
+        config: {
+          apexcharts_card_templates: {
+            base: { graph_span: '1h' },
+            x: { config_templates: 'base', header: { show: true } },
+            y: { config_templates: 'base', update_interval: '1min' },
+          },
+        },
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: any = mergeConfigTemplates(ll, { config_templates: ['x', 'y', 'base'], series: [] } as any);
+      expect(result).toMatchObject({ graph_span: '1h', header: { show: true }, update_interval: '1min' });
+    });
   });
 
   describe('is12HourFromLocale', () => {
