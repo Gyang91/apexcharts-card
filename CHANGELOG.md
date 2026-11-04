@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.16.4](https://github.com/Gyang91/apexcharts-card/compare/v2.16.3...v2.16.4) (2026-11-04)
+
+
+### Code Refactoring
+
+* share one deep merge between mergeDeep and mergeDeepConfig ([#36](https://github.com/Gyang91/apexcharts-card/issues/36)) ([b25436d](https://github.com/Gyang91/apexcharts-card/commit/b25436d1402ef554b613e2be66fd3cf18207361b))
+
 ## [2.16.3](https://github.com/Gyang91/apexcharts-card/compare/v2.16.2...v2.16.3) (2026-11-04)
 
 
