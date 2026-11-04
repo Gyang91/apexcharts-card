@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.16.2](https://github.com/Gyang91/apexcharts-card/compare/v2.16.1...v2.16.2) (2026-11-04)
+
+
+### Bug Fixes
+
+* harden entity names and document Marketplace for Home Assistant 2026.11 ([#32](https://github.com/Gyang91/apexcharts-card/issues/32)) ([657d061](https://github.com/Gyang91/apexcharts-card/commit/657d0613f9c34882ad8ae2aeabb9a4db4fd865a1))
+
 ## [2.16.1](https://github.com/Gyang91/apexcharts-card/compare/v2.16.0...v2.16.1) (2026-11-02)
 
 
