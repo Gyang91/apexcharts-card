@@ -827,3 +827,22 @@ describe('apexcharts-card', () => {
     });
   });
 });
+
+describe('setConfig after a failed config', () => {
+  it('does not keep the offsets of a config that failed validation', async () => {
+    await customElements.whenDefined('apexcharts-card');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const card: any = document.createElement('apexcharts-card');
+    expect(() =>
+      card.setConfig({
+        type: 'custom:apexcharts-card',
+        series: [
+          { entity: 'sensor.a', offset: '-1d' },
+          { compute: 'return 1', id: 'b', offset: '+1h' },
+        ],
+      }),
+    ).toThrow(/offset/);
+    card.setConfig({ type: 'custom:apexcharts-card', series: [{ entity: 'sensor.a' }] });
+    expect(card._seriesOffset[0]).toBeUndefined();
+  });
+});

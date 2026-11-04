@@ -8,7 +8,6 @@ import {
   ChartCardYAxis,
   EntityCachePoints,
   EntityEntryCache,
-  minmax_type,
   StatisticsMetadata,
   ActionHandlerDetail,
 } from './types';
@@ -29,9 +28,7 @@ import {
   interpolateColor,
   isExternalStatisticId,
   log,
-  mergeConfigTemplates,
   mergeDeep,
-  mergeDeepConfig,
   myFormatNumber,
   offsetData,
   prettyPrintTime,
@@ -50,60 +47,30 @@ import type { ApexOptions } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
 import { stylesApex } from './styles';
 import { computeAnnotations } from './annotations';
+import {
+  applySeriesDefaults,
+  checkSchemaAndMergeAllSeries,
+  checkSeries,
+  checkSpanAndNavigation,
+  checkVisualChart,
+  checkYAxes,
+  prepareConfig,
+} from './config';
 import { getStubConfig, registerCustomCard } from './card-picker';
 import { computeYAxisAutoMinMax, generateYAxisConfig, getTypeOfMinMax, YAxisDataSource } from './yaxis';
 import { HassEntity } from 'home-assistant-js-websocket';
 import { getBrushLayoutConfig, getLayoutConfig } from './apex-layouts';
 import { entityNamesChanged } from './entity-name';
 import GraphEntry from './graphEntry';
-import { createCheckers } from 'ts-interface-checker';
-import {
-  ActionsConfig,
-  ChartCardColorThreshold,
-  ChartCardExternalConfig,
-  ChartCardAllSeriesExternalConfig,
-  NavigationPeriod,
-} from './types-config';
-import exportedTypeSuite from './types-config-ti';
-import {
-  COMPUTE_EXCLUDED_OPTIONS,
-  DEFAULT_AREA_OPACITY,
-  DEFAULT_FILL_RAW,
-  DEFAULT_SHOW_IN_CHART,
-  DEFAULT_SHOW_IN_HEADER,
-  DEFAULT_SHOW_IN_LEGEND,
-  DEFAULT_SHOW_LEGEND_VALUE,
-  DEFAULT_SHOW_NAME_IN_HEADER,
-  DEFAULT_SHOW_NULL_IN_HEADER,
-  DEFAULT_SHOW_ZERO_IN_HEADER,
-  DEFAULT_SHOW_OFFSET_IN_NAME,
-  DEFAULT_UPDATE_DELAY,
-  NO_VALUE,
-  PLAIN_COLOR_TYPES,
-  TIMESERIES_TYPES,
-} from './const';
-import {
-  DEFAULT_COLORS,
-  DEFAULT_DURATION,
-  DEFAULT_OFFSET,
-  DEFAULT_FUNC,
-  DEFAULT_GROUP_BY_FILL,
-  DEFAULT_GRAPH_SPAN,
-  DEFAULT_SERIE_TYPE,
-  HOUR_24,
-} from './const';
+import { ActionsConfig, ChartCardExternalConfig, NavigationPeriod } from './types-config';
+import { DEFAULT_AREA_OPACITY, DEFAULT_UPDATE_DELAY, NO_VALUE, PLAIN_COLOR_TYPES, TIMESERIES_TYPES } from './const';
+import { DEFAULT_COLORS, DEFAULT_GRAPH_SPAN, HOUR_24 } from './const';
 import parse from 'parse-duration';
 import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import { downsample, SamplingRange } from './downsample';
-import {
-  DEFAULT_HEATMAP_CELLS,
-  MAX_HEATMAP_CELLS,
-  assertHeatmapBudget,
-  heatmapData,
-  rangeAreaData,
-} from './visual-data';
+import { assertHeatmapBudget, heatmapData, rangeAreaData } from './visual-data';
 
 interface SamplingSeries {
   data: EntityCachePoints;
@@ -423,82 +390,10 @@ export class ChartsCard extends LitElement {
   }
 
   public setConfig(config: ChartCardExternalConfig) {
-    let configDup: ChartCardExternalConfig = JSON.parse(JSON.stringify(config));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((configDup as any).entities) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      configDup.series = (configDup as any).entities;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (configDup as any).entities;
-    }
-    configDup = configDup as ChartCardExternalConfig;
-    if (configDup.config_templates) {
-      configDup.config_templates =
-        configDup.config_templates && Array.isArray(configDup.config_templates)
-          ? configDup.config_templates
-          : [configDup.config_templates];
-      configDup = mergeConfigTemplates(getLovelace(), configDup);
-    }
+    const configDup = prepareConfig(config, getLovelace);
     try {
-      const { ChartCardExternalConfig } = createCheckers(exportedTypeSuite);
-      if (!configDup.experimental?.disable_config_validation) {
-        ChartCardExternalConfig.strictCheck(configDup);
-      }
-      if (configDup.all_series_config) {
-        configDup.series.forEach((serie, index) => {
-          const allDup: ChartCardAllSeriesExternalConfig = JSON.parse(JSON.stringify(configDup.all_series_config));
-          if (isComputedSeries(serie)) COMPUTE_EXCLUDED_OPTIONS.forEach((key) => delete allDup[key]);
-          configDup.series[index] = mergeDeepConfig(allDup, serie);
-        });
-      }
-      const visual = configDup.chart_type === 'rangeArea' || configDup.chart_type === 'heatmap';
-      if (visual) {
-        if (
-          configDup.stacked ||
-          configDup.experimental?.brush ||
-          configDup.experimental?.hidden_by_default ||
-          configDup.experimental?.color_threshold ||
-          configDup.yaxis ||
-          configDup.apex_config?.chart?.stacked
-        ) {
-          throw new Error(t('error.visual.options'));
-        }
-        if (
-          configDup.series.some(
-            (serie) =>
-              serie.show?.in_chart === false ||
-              serie.invert ||
-              serie.show?.extremas ||
-              serie.show?.datalabels ||
-              serie.color_threshold ||
-              serie.yaxis_id,
-          )
-        ) {
-          throw new Error(t('error.visual.series'));
-        }
-        if (configDup.chart_type === 'rangeArea' && configDup.series.length !== 2) {
-          throw new Error(t('error.visual.pair'));
-        }
-        if (configDup.chart_type === 'heatmap') {
-          const limit = configDup.heatmap?.max_cells ?? DEFAULT_HEATMAP_CELLS;
-          if (!Number.isInteger(limit) || limit < 1 || limit > MAX_HEATMAP_CELLS) {
-            throw new Error(t('error.heatmap.limit'));
-          }
-          if (
-            !configDup.series.length ||
-            configDup.series.some(
-              (serie) => !serie.statistics && (!serie.group_by?.func || serie.group_by.func === 'raw'),
-            )
-          ) {
-            throw new Error(t('error.heatmap.aggregation'));
-          }
-        }
-        configDup.series.forEach((serie) => {
-          serie.extend_to = false;
-        });
-      } else if (configDup.heatmap) {
-        throw new Error(t('error.heatmap.type'));
-      }
+      checkSchemaAndMergeAllSeries(configDup);
+      checkVisualChart(configDup);
       if (configDup.update_interval) {
         this._interval = validateInterval(configDup.update_interval, 'update_interval');
       }
@@ -508,44 +403,15 @@ export class ChartsCard extends LitElement {
       if (configDup.span?.offset) {
         this._offset = validateOffset(configDup.span.offset, 'span.offset');
       }
-      if (configDup.span?.end && configDup.span?.start) {
-        throw new Error(t('error.span.startEnd'));
-      }
-      if (configDup.navigation?.show) {
-        if (configDup.span) throw new Error(t('error.navigation.span'));
-        if (configDup.chart_type && !['line', 'scatter', 'rangeArea', 'heatmap'].includes(configDup.chart_type)) {
-          throw new Error(t('error.navigation.timeline'));
-        }
-      }
+      checkSpanAndNavigation(configDup);
       this._navigationPeriod = configDup.navigation?.initial ?? 'day';
       this._navigationAnchor = undefined;
       if (configDup.brush?.selection_span) {
         this._brushSelectionSpan = validateInterval(configDup.brush.selection_span, 'brush.selection_span');
       }
-      const seriesIds = new Set<string>();
-      configDup.series.forEach((serie, index) => {
-        if (isComputedSeries(serie)) {
-          const option = COMPUTE_EXCLUDED_OPTIONS.find((key) => serie[key] !== undefined);
-          if (option) throw new Error(t('error.series.computeOptions', { index, option }));
-        } else if (!serie.entity) {
-          throw new Error(t('error.series.entityRequired', { index }));
-        }
-        if (serie.id !== undefined) {
-          if (seriesIds.has(serie.id)) throw new Error(t('error.series.duplicateId', { id: serie.id }));
-          seriesIds.add(serie.id);
-        }
-        if (isExternalStatisticId(serie.entity) && !serie.statistics) {
-          // External statistic IDs have no recorder history: without the
-          // statistics option there is nothing to plot.
-          throw new Error(t('error.statistics.externalRequired', { entity: serie.entity }));
-        }
-        if (serie.offset) {
-          this._seriesOffset[index] = validateOffset(serie.offset, `series[${index}].offset`);
-        }
-        if (serie.time_delta) {
-          this._seriesTimeDelta[index] = validateOffset(serie.time_delta, `series[${index}].time_delta`);
-        }
-      });
+      const { offsets, timeDeltas } = checkSeries(configDup);
+      offsets.forEach((offset, index) => (this._seriesOffset[index] = offset));
+      timeDeltas.forEach((delta, index) => (this._seriesTimeDelta[index] = delta));
       if (configDup.update_delay) {
         this._updateDelay = validateInterval(configDup.update_delay, `update_delay`);
       }
@@ -579,69 +445,7 @@ export class ChartsCard extends LitElement {
           if (serie.color) {
             this._headerColors[index] = serie.color;
           }
-          serie.fill_raw = serie.fill_raw || DEFAULT_FILL_RAW;
-          // External statistics have no live state to extend to
-          serie.extend_to = isExternalStatisticId(serie.entity)
-            ? false
-            : serie.extend_to !== undefined
-              ? serie.extend_to
-              : 'end';
-          serie.type =
-            !this._config?.chart_type || this._config.chart_type === 'line'
-              ? serie.type || DEFAULT_SERIE_TYPE
-              : undefined;
-          if (!serie.group_by) {
-            serie.group_by = {
-              duration: DEFAULT_DURATION,
-              offset: DEFAULT_OFFSET,
-              func: DEFAULT_FUNC,
-              fill: DEFAULT_GROUP_BY_FILL,
-            };
-          } else {
-            serie.group_by.duration = serie.group_by.duration || DEFAULT_DURATION;
-            serie.group_by.offset = serie.group_by.offset || DEFAULT_OFFSET;
-            serie.group_by.func = serie.group_by.func || DEFAULT_FUNC;
-            serie.group_by.fill = serie.group_by.fill || DEFAULT_GROUP_BY_FILL;
-          }
-          if (!serie.show) {
-            serie.show = {
-              in_legend: DEFAULT_SHOW_IN_LEGEND,
-              legend_value: DEFAULT_SHOW_LEGEND_VALUE,
-              in_header: DEFAULT_SHOW_IN_HEADER,
-              in_chart: DEFAULT_SHOW_IN_CHART,
-              name_in_header: DEFAULT_SHOW_NAME_IN_HEADER,
-              null_in_header: DEFAULT_SHOW_NULL_IN_HEADER,
-              zero_in_header: DEFAULT_SHOW_ZERO_IN_HEADER,
-              offset_in_name: DEFAULT_SHOW_OFFSET_IN_NAME,
-            };
-          } else {
-            serie.show.in_legend = serie.show.in_legend === undefined ? DEFAULT_SHOW_IN_LEGEND : serie.show.in_legend;
-            serie.show.legend_value =
-              serie.show.legend_value === undefined ? DEFAULT_SHOW_LEGEND_VALUE : serie.show.legend_value;
-            serie.show.in_chart = serie.show.in_chart === undefined ? DEFAULT_SHOW_IN_CHART : serie.show.in_chart;
-            serie.show.in_header =
-              serie.show.in_header === undefined
-                ? !serie.show.in_chart && serie.show.in_brush
-                  ? false
-                  : DEFAULT_SHOW_IN_HEADER
-                : serie.show.in_header;
-            serie.show.name_in_header =
-              serie.show.name_in_header === undefined ? DEFAULT_SHOW_NAME_IN_HEADER : serie.show.name_in_header;
-            serie.show.null_in_header =
-              serie.show.null_in_header === undefined ? DEFAULT_SHOW_NULL_IN_HEADER : serie.show.null_in_header;
-            serie.show.zero_in_header =
-              serie.show.zero_in_header === undefined ? DEFAULT_SHOW_ZERO_IN_HEADER : serie.show.zero_in_header;
-            serie.show.offset_in_name =
-              serie.show.offset_in_name === undefined ? DEFAULT_SHOW_OFFSET_IN_NAME : serie.show.offset_in_name;
-          }
-          validateInterval(serie.group_by.duration, `series[${index}].group_by.duration`);
-          validateOffset(serie.group_by.offset, `series[${index}].group_by.offset`);
-          if (serie.color_threshold && serie.color_threshold.length > 0) {
-            const sorted: ChartCardColorThreshold[] = JSON.parse(JSON.stringify(serie.color_threshold));
-            sorted.sort((a, b) => (a.value < b.value ? -1 : 1));
-            serie.color_threshold = sorted;
-          }
-
+          applySeriesDefaults(serie, index, this._config?.chart_type);
           if (serie.entity || isComputedSeries(serie)) {
             const editMode = getLovelace()?.editMode;
             // disable caching for editor
@@ -675,47 +479,8 @@ export class ChartsCard extends LitElement {
             this._config!.series_in_brush.push(serie);
           }
         });
-        if (this._config.yaxis && this._config.yaxis.length > 1) {
-          if (
-            this._config.series_in_graph.some((serie) => {
-              return !serie.yaxis_id;
-            })
-          ) {
-            throw new Error(t('error.yaxis.missingYaxisId'));
-          }
-          if (
-            this._config.yaxis.some((yaxis) => {
-              return !yaxis.id;
-            })
-          ) {
-            throw new Error(t('error.yaxis.missingId'));
-          }
-        }
+        checkYAxes(this._config);
         if (this._config.yaxis) {
-          const ids = new Set<string>();
-          this._config.yaxis.forEach((axis) => {
-            if (axis.id) {
-              if (ids.has(axis.id)) throw new Error(t('error.yaxis.duplicateId', { id: axis.id }));
-              ids.add(axis.id);
-            }
-            const logarithmic = axis.logarithmic ?? axis.apex_config?.logarithmic ?? false;
-            const base = axis.log_base ?? axis.apex_config?.logBase ?? 10;
-            if (typeof base !== 'number' || !Number.isFinite(base) || base <= 1) {
-              throw new Error(t('error.yaxis.logBase'));
-            }
-            if (logarithmic) {
-              for (const limit of [axis.min, axis.max]) {
-                if (limit === undefined || limit === 'auto') continue;
-                const [value, type] = getTypeOfMinMax(limit);
-                if (
-                  type !== minmax_type.ABSOLUTE &&
-                  (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
-                ) {
-                  throw new Error(t('error.yaxis.logLimit'));
-                }
-              }
-            }
-          });
           const generated = generateYAxisConfig(this._config);
           this._yAxisConfig = generated?.yAxes;
           const yAxisConfig = generated?.apexYAxes;
