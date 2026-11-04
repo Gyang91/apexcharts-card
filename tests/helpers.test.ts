@@ -94,6 +94,48 @@ describe('utils.ts', () => {
       expect(mergeDeepConfig(null, { a: 1 })).toEqual({ a: 1 });
       expect(mergeDeepConfig({ a: 1 }, null)).toBeNull();
     });
+
+    it('keeps extra items of either array and lets the source replace primitives', () => {
+      expect(mergeDeepConfig({ list: [1, { a: 1 }, 3] }, { list: [9, { b: 2 }] }).list).toEqual([9, { a: 1, b: 2 }, 3]);
+      expect(mergeDeepConfig({ list: [1] }, { list: [1, 2, 3] }).list).toEqual([1, 2, 3]);
+    });
+  });
+
+  // Both merges copy nested objects instead of writing into the target's
+  // objects; config templates and all_series_config rely on that.
+  describe.each([
+    ['mergeDeep', mergeDeep],
+    ['mergeDeepConfig', mergeDeepConfig],
+  ])('%s shared behaviour', (_name, merge) => {
+    it('does not modify nested objects of the target or the source', () => {
+      const nested = { x: 1 };
+      const target = { nested };
+      const source = { nested: { y: 2 }, added: { z: 3 } };
+      const result = merge(target, source);
+      expect(nested).toEqual({ x: 1 });
+      expect(result.nested).not.toBe(nested);
+      expect(source).toEqual({ nested: { y: 2 }, added: { z: 3 } });
+      expect(result).toBe(target);
+    });
+
+    it('ignores prototype-polluting keys from user YAML/JSON', () => {
+      const source = JSON.parse(
+        '{"__proto__": {"polluted": true}, "constructor": {"prototype": {"polluted": true}}, "nested": {"__proto__": {"polluted": true}}, "ok": 1}',
+      );
+      const result = merge({ nested: {} }, source);
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      expect(Object.prototype.hasOwnProperty.call(result, 'constructor')).toBe(false);
+      expect(result.nested.polluted).toBeUndefined();
+      expect(result.ok).toBe(1);
+    });
+
+    // Current behaviour, pinned so a refactor cannot change it silently: an
+    // array and an object are merged key by key into a plain object.
+    it('merges an array and an object key by key', () => {
+      expect(merge({ a: [1] }, { a: { b: 1 } })).toEqual({ a: { 0: 1, b: 1 } });
+      expect(merge({ a: { b: 1 } }, { a: [1] })).toEqual({ a: { 0: 1, b: 1 } });
+      expect(merge({ a: { b: 1 } }, { a: null })).toEqual({ a: null });
+    });
   });
 
   describe('computeName', () => {

@@ -38,36 +38,51 @@ export function log(message: unknown): void {
 
 const isObject = (obj: unknown): boolean => !!obj && typeof obj === 'object';
 
+// Keys that would reach Object.prototype through user-supplied YAML/JSON
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+// How two arrays under the same key are combined:
+// 'concat' appends the source items, 'byIndex' merges item by item in place.
+type ArrayMerge = 'concat' | 'byIndex';
+
 /**
- * Performs a deep merge of `source` into `target`.
- * Mutates `target` only but not its objects and arrays.
+ * Deep merge of `source` into `target`, shared by mergeDeep and
+ * mergeDeepConfig. Mutates `target`; nested objects are copied before being
+ * merged into.
  *
  * @author inspired by [jhildenbiddle](https://stackoverflow.com/a/48218209).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mergeDeep(target: any, source: any): any {
+function mergeDeepWith(target: any, source: any, arrays: ArrayMerge): any {
   if (!isObject(target) || !isObject(source)) {
     return source;
   }
 
   Object.keys(source).forEach((key) => {
-    // Guard against prototype pollution through user-supplied YAML/JSON
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-      return;
-    }
+    if (UNSAFE_KEYS.has(key)) return;
     const targetValue = target[key];
     const sourceValue = source[key];
 
     if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
-      target[key] = targetValue.concat(sourceValue);
+      target[key] =
+        arrays === 'concat' ? targetValue.concat(sourceValue) : mergeDeepWith(targetValue, sourceValue, arrays);
     } else if (isObject(targetValue) && isObject(sourceValue)) {
-      target[key] = mergeDeep(Object.assign({}, targetValue), sourceValue);
+      target[key] = mergeDeepWith(Object.assign({}, targetValue), sourceValue, arrays);
     } else {
       target[key] = sourceValue;
     }
   });
 
   return target;
+}
+
+/**
+ * Deep merge for ApexCharts options: arrays are concatenated.
+ * Mutates `target` only but not its objects and arrays.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mergeDeep(target: any, source: any): any {
+  return mergeDeepWith(target, source, 'concat');
 }
 
 // External long-term statistics use a `source:object_id` ID (e.g.
@@ -259,30 +274,14 @@ export function mergeConfigTemplates(ll: any, config: ChartCardExternalConfig): 
   return result as ChartCardExternalConfig;
 }
 
+/**
+ * Deep merge for card configs (templates, all_series_config): arrays such as
+ * `series` are merged item by item, so a template's series is extended, not
+ * duplicated. Mutates `target`, including its arrays.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mergeDeepConfig(target: any, source: any): any {
-  if (!isObject(target) || !isObject(source)) {
-    return source;
-  }
-
-  Object.keys(source).forEach((key) => {
-    // Guard against prototype pollution through user-supplied YAML/JSON
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-      return;
-    }
-    const targetValue = target[key];
-    const sourceValue = source[key];
-
-    if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
-      target[key] = mergeDeepConfig(targetValue, sourceValue);
-    } else if (isObject(targetValue) && isObject(sourceValue)) {
-      target[key] = mergeDeepConfig(Object.assign({}, targetValue), sourceValue);
-    } else {
-      target[key] = sourceValue;
-    }
-  });
-
-  return target;
+  return mergeDeepWith(target, source, 'byIndex');
 }
 
 export function is12HourFromLocale(locale: string): boolean {
