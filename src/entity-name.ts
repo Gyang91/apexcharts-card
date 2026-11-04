@@ -37,8 +37,31 @@ export function computeEntityName(
   // An empty name has always meant "use Home Assistant's name"
   if (typeof name === 'string' && name !== '') return name;
   if (!stateObj) return '';
-  if (supportsEntityNames(hass)) return hass.formatEntityName(stateObj, name || undefined);
+  if (supportsEntityNames(hass)) {
+    // The formatter is a moving frontend API: a throw would blank the whole
+    // card and an empty result would leave the series unnamed, so fall back.
+    try {
+      const formatted = hass.formatEntityName(stateObj, name || undefined);
+      if (formatted) return formatted;
+    } catch {
+      // fall through to the friendly name
+    }
+  }
+  return friendlyName(stateObj);
+}
+
+function friendlyName(stateObj: HassEntity): string {
   return stateObj.attributes?.friendly_name || stateObj.entity_id || '';
+}
+
+/**
+ * Name of an external statistic. It is not a Home Assistant entity (no
+ * registry entry, device or area), so Home Assistant's formatter is not asked:
+ * the card's own state object carries the recorder metadata name.
+ */
+export function computeStatisticName(stateObj: HassEntity | undefined, name: EntityName | undefined): string {
+  if (typeof name === 'string' && name !== '') return name;
+  return stateObj ? friendlyName(stateObj) : '';
 }
 
 // Inputs of formatEntityName that change without an entity state change: a

@@ -35,6 +35,32 @@ describe('computeEntityName', () => {
   });
 });
 
+describe('formatter fallbacks', () => {
+  it('falls back to friendly_name when the formatter throws or returns nothing', () => {
+    const throwing = {
+      ...withFormatter('2026.11.0'),
+      formatEntityName: vi.fn(() => {
+        throw new Error('changed API');
+      }),
+    };
+    expect(computeEntityName(throwing, state, undefined)).toBe('Living room Temp');
+    const empty = { ...withFormatter('2026.11.0'), formatEntityName: vi.fn(() => '') };
+    expect(computeEntityName(empty, state, undefined)).toBe('Living room Temp');
+    const bare = { ...mkState('sensor.no_name', '1'), attributes: {} };
+    expect(computeEntityName(empty, bare, undefined)).toBe('sensor.no_name');
+  });
+
+  it('does not ask the formatter to name external statistics', () => {
+    const hass = withFormatter('2026.11.0');
+    const ext = { ...mkState('veolia:daily', 'unknown'), attributes: { friendly_name: 'Water' } };
+    const series = [{ entity: 'veolia:daily' }];
+    expect(computeName(hass, 0, series as AnyHass, undefined, ext)).toBe('Water');
+    expect(computeName(hass, 0, series as AnyHass)).toBe('veolia:daily');
+    expect(computeName(hass, 0, [{ entity: 'veolia:daily', name: 'Mine' }] as AnyHass, undefined, ext)).toBe('Mine');
+    expect(hass.formatEntityName).not.toHaveBeenCalled();
+  });
+});
+
 describe('entityNamesChanged', () => {
   it('detects registry and formatter changes, not state changes', () => {
     const hass = withFormatter('2026.4.0');

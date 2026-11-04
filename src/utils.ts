@@ -13,7 +13,7 @@ import { DEFAULT_FLOAT_PRECISION, DEFAULT_MAX, DEFAULT_MIN, moment, NO_VALUE } f
 import { formatNumber, FrontendLocaleData, HomeAssistant } from 'custom-card-helpers';
 import { OverrideFrontendLocaleData } from './types-ha';
 import { t } from './localize';
-import { computeEntityName } from './entity-name';
+import { computeEntityName, computeStatisticName } from './entity-name';
 
 export function compress(data: unknown): string {
   return lzStringCompress(JSON.stringify(data));
@@ -120,10 +120,11 @@ export function computeName(
 ): string {
   if (!series || !series[index]) return '';
   const stateObj = entity ?? (entities as Record<number, HassEntity | undefined> | undefined)?.[index];
-  let name = computeEntityName(hass, stateObj, series[index].name);
-  if (!name && isExternalStatisticId(series[index].entity)) {
-    name = series[index].entity;
-  }
+  const external = isExternalStatisticId(series[index].entity);
+  let name = external
+    ? computeStatisticName(stateObj, series[index].name)
+    : computeEntityName(hass, stateObj, series[index].name);
+  if (!name && external) name = series[index].entity!;
   if (!name && isComputedSeries(series[index])) name = series[index].id ?? '';
   return name + (series[index].show?.offset_in_name && series[index].offset ? ` (${series[index].offset})` : '');
 }

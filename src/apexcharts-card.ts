@@ -319,7 +319,7 @@ export class ChartsCard extends LitElement {
     // header now, the chart takes the new names on its next refresh
     if (entityNamesChanged(oldHass, hass)) this.requestUpdate();
 
-    this._graphs.map((graph) => {
+    this._graphs.forEach((graph) => {
       if (graph) graph.hass = hass;
     });
 
@@ -343,9 +343,6 @@ export class ChartsCard extends LitElement {
       } else if (entityState && this._entities[index] !== entityState) {
         this._entities[index] = entityState;
         updated = true;
-        if (this._graphs && this._graphs[index]) {
-          this._graphs[index]!.hass = this._hass!;
-        }
         if (serie.show.in_header === 'raw') {
           this._headerState[index] = truncateFloat(
             serie.attribute
