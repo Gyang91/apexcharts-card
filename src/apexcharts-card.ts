@@ -8,7 +8,6 @@ import {
   ChartCardYAxis,
   EntityCachePoints,
   EntityEntryCache,
-  HistoryPoint,
   minmax_type,
   StatisticsMetadata,
   ActionHandlerDetail,
@@ -22,14 +21,12 @@ import {
   computeName,
   isComputedSeries,
   seriesState,
-  computeTextColor,
   computeUom,
   decompress,
   formatApexDate,
   getLang,
   getPercentFromValue,
   interpolateColor,
-  is12Hour,
   isExternalStatisticId,
   log,
   mergeConfigTemplates,
@@ -52,6 +49,7 @@ import ApexCharts from 'apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
 import { stylesApex } from './styles';
+import { computeAnnotations } from './annotations';
 import { getStubConfig, registerCustomCard } from './card-picker';
 import { computeYAxisAutoMinMax, generateYAxisConfig, getTypeOfMinMax, YAxisDataSource } from './yaxis';
 import { HassEntity } from 'home-assistant-js-websocket';
@@ -1779,173 +1777,22 @@ export class ChartsCard extends LitElement {
   }
 
   private _computeAnnotations(start: Date, end: Date, now: Date) {
-    return {
-      ...this._computeMinMaxPointsAnnotations(start, end),
-      ...this._computeNowAnnotation(now),
-    };
-  }
-
-  private _computeMinMaxPointsAnnotations(start: Date, end: Date) {
-    const sameDay =
-      start.getFullYear() === end.getFullYear() &&
-      start.getMonth() === end.getMonth() &&
-      start.getDate() === end.getDate();
-    const minMaxPoints = this._config?.series_in_graph.flatMap((serie, index) => {
-      if (serie.show.extremas) {
-        const { min, max } = this._graphs?.[serie.index]?.minMaxWithTimestamp(
-          this._seriesOffset[serie.index]
-            ? new Date(start.getTime() + this._seriesOffset[serie.index]).getTime()
-            : start.getTime(),
-          this._seriesOffset[serie.index]
-            ? new Date(end.getTime() + this._seriesOffset[serie.index]).getTime()
-            : end.getTime(),
-          this._serverTimeOffset - (this._seriesTimeDelta[serie.index] || 0),
-        ) || {
-          min: [0, null],
-          max: [0, null],
-        };
-        const bgColor = computeColor(this._colors[index]);
-        const txtColor = computeTextColor(bgColor);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const extremas: any = [];
-        if (min[0] && ['min', 'min+time', true, 'time'].includes(serie.show.extremas)) {
-          const withTime = serie.show.extremas === 'time' || serie.show.extremas === 'min+time';
-          extremas.push(
-            ...this._getPointAnnotationStyle(
-              min,
-              this._seriesOffset[serie.index],
-              bgColor,
-              txtColor,
-              serie,
-              index,
-              serie.invert,
-              sameDay,
-              withTime,
-            ),
-          );
-        }
-        if (max[0] && ['max', 'max+time', true, 'time'].includes(serie.show.extremas)) {
-          const withTime = serie.show.extremas === 'time' || serie.show.extremas === 'max+time';
-          extremas.push(
-            ...this._getPointAnnotationStyle(
-              max,
-              this._seriesOffset[serie.index],
-              bgColor,
-              txtColor,
-              serie,
-              index,
-              serie.invert,
-              sameDay,
-              withTime,
-            ),
-          );
-        }
-        return extremas;
-      } else {
-        return [];
-      }
-    });
-    return { points: [...(minMaxPoints || []), ...(this._config?.apex_config?.annotations?.points || [])] };
-  }
-
-  private _getPointAnnotationStyle(
-    value: HistoryPoint,
-    offset: number,
-    bgColor: string,
-    txtColor: string,
-    serie: ChartCardSeriesConfig,
-    index: number,
-    invert = false,
-    sameDay: boolean,
-    withTime: boolean,
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const points: any = [];
-    const multiYAxis =
-      this._config?.apex_config?.yaxis &&
-      Array.isArray(this._config.apex_config.yaxis) &&
-      this._config.apex_config.yaxis.length > 1;
-    points.push({
-      x: offset ? value[0] - offset : value[0],
-      y: invert && value[1] ? -value[1] : value[1],
-      seriesIndex: index,
-      yAxisIndex: multiYAxis ? index : 0,
-      marker: {
-        strokeColor: bgColor,
-        fillColor: 'var(--card-background-color)',
-      },
-      label: {
-        text: myFormatNumber(value[1], this._hass?.locale, serie),
-        borderColor: 'var(--card-background-color)',
-        offsetY: (value[1] ?? 0) < 0 ? 30 : 0,
-        borderWidth: 2,
-        style: {
-          background: bgColor,
-          color: txtColor,
+    return computeAnnotations(
+      {
+        config: this._config,
+        hass: this._hass,
+        colors: this._colors,
+        source: {
+          minMax: (serie, from, to, timeOffset) =>
+            this._graphs?.[serie.index]?.minMaxWithTimestamp(from, to, timeOffset),
+          offset: (serie) => this._seriesOffset[serie.index],
+          timeOffset: (serie) => this._serverTimeOffset - (this._seriesTimeDelta[serie.index] || 0),
         },
       },
-    });
-    if (withTime) {
-      let bgColorTime = new TinyColor(computeColor('var(--card-background-color)'));
-      bgColorTime =
-        bgColorTime.isValid && bgColorTime.getLuminance() > 0.5 ? bgColorTime.darken(20) : bgColorTime.lighten(20);
-      const txtColorTime = computeTextColor(bgColorTime.toHexString());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let options: any = { timeStyle: 'medium' };
-      if (!sameDay) {
-        options.dateStyle = 'medium';
-      }
-      options = { ...options, ...(is12Hour(this._config, this._hass) ? { hour12: true } : { hourCycle: 'h23' }) };
-      const lang = getLang(this._config, this._hass);
-      points.push({
-        x: offset ? value[0] - offset : value[0],
-        y: invert && value[1] ? -value[1] : value[1],
-        seriesIndex: index,
-        yAxisIndex: multiYAxis ? index : 0,
-        marker: {
-          size: 0,
-        },
-        label: {
-          text: `${Intl.DateTimeFormat(lang, options).format(value[0])}`,
-          borderColor: 'var(--card-background-color)',
-          offsetY: (value[1] ?? 0) < 0 ? 38 : -22,
-          borderWidth: 0,
-          style: {
-            background: bgColorTime.toHexString(),
-            color: txtColorTime,
-            fontSize: '8px',
-            fontWeight: 200,
-          },
-        },
-      });
-    }
-    return points;
-  }
-
-  private _computeNowAnnotation(now: Date) {
-    if (this._config?.now?.show) {
-      const color = computeColor(this._config.now.color || 'var(--primary-color)');
-      const textColor = computeTextColor(color);
-      return {
-        xaxis: [
-          {
-            x: now.getTime(),
-            strokeDashArray: 3,
-            label: {
-              text: this._config.now.label,
-              borderColor: color,
-              style: {
-                color: textColor,
-                background: color,
-              },
-            },
-            borderColor: color,
-          },
-          ...(this._config?.apex_config?.annotations?.xaxis || []),
-        ],
-      };
-    }
-    return {};
+      start,
+      end,
+      now,
+    );
   }
 
   private _configureSeriesVisibility(layout: ApexOptions): void {
