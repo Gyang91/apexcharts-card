@@ -33,7 +33,8 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
 - [Reliability and data status](#reliability-and-data-status)
 - [Large-history performance](#large-history-performance)
 - [Installation](#installation)
-  - [HACS (recommended)](#hacs-recommended)
+  - [Marketplace (Home Assistant 2026.11 and later)](#marketplace-home-assistant-202611-and-later)
+  - [HACS (Home Assistant 2026.10 and earlier)](#hacs-home-assistant-202610-and-earlier)
   - [Manual install](#manual-install)
   - [CLI install](#cli-install)
   - [Add resource reference](#add-resource-reference)
@@ -289,7 +290,20 @@ Recorder requests with identical entity, range and wire options are shared **onl
 
 ## Installation
 
-### HACS (recommended)
+### Marketplace (Home Assistant 2026.11 and later)
+
+From Home Assistant 2026.11, the built-in [Marketplace](https://www.home-assistant.io/integrations/marketplace/) replaces HACS. This fork is not in the catalog, so add it as a custom repository:
+
+1. Go to **Settings** > **Marketplace** and accept the community content notice.
+2. Select **Add from link** and enter `Gyang91/apexcharts-card`. Pick the type **Dashboard** if asked. The Marketplace asks you to connect GitHub first.
+3. Open **apexcharts-card** and select **Install**, then reload your browser. The Marketplace adds the dashboard resource for you.
+
+Coming from HACS? The Marketplace migrates this repository on the first start after the update: nothing to reinstall. Two things to check:
+
+- **Connect GitHub** (**Settings** > **Devices & services** > **Marketplace** > ⋮ > **Reconfigure**). Custom repositories only get updates with a GitHub connection, checked about every 48 hours.
+- **YAML-managed resources** move from `/hacsfiles/apexcharts-card/apexcharts-card.js` to `/local/community/apexcharts-card/apexcharts-card.js`. The old path keeps working, and a repair reminds you to change it. Resources managed in the UI are handled for you.
+
+### HACS (Home Assistant 2026.10 and earlier)
 
 [HACS](https://hacs.xyz/) (Home Assistant Community Store) installs this fork as a custom repository:
 
