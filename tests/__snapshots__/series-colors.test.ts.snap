@@ -1,0 +1,513 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`chart colors > gives column series with thresholds a function of the value; line series keep a color 1`] = `
+[
+  "#0000ff",
+  "#0000ff",
+  "#0000ff",
+  "#0000ff",
+  "#00ff00",
+  "#ff0000",
+]
+`;
+
+exports[`chart colors > gives column series with thresholds a function of the value; line series keep a color 2`] = `
+[
+  "#abcdef",
+  "#abcdef",
+]
+`;
+
+exports[`chart colors > threshold fill: one entry per series, none with a custom apex fill 1`] = `
+{
+  "gradient": {
+    "colorStops": [
+      [
+        {
+          "color": "#ff0000ff",
+          "offset": 0,
+          "opacity": 1,
+        },
+        {
+          "color": "#00ff0080",
+          "offset": 50,
+          "opacity": 0.5,
+        },
+        {
+          "color": "#0000ffff",
+          "offset": 100,
+          "opacity": 1,
+        },
+      ],
+      [],
+      [],
+    ],
+    "type": "vertical",
+  },
+}
+`;
+
+exports[`fill color stops > area series 1`] = `
+[
+  [
+    {
+      "color": "#ff0000",
+      "offset": 0,
+      "opacity": 0.7,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#0000ff",
+      "offset": 100,
+      "opacity": 0.7,
+    },
+  ],
+  [
+    {
+      "color": "#0000ff",
+      "offset": 0,
+      "opacity": 0.7,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#ff0000",
+      "offset": 100,
+      "opacity": 0.7,
+    },
+  ],
+  [
+    {
+      "color": "#7f7f00",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#007f7f",
+      "offset": 100,
+      "opacity": 0.6,
+    },
+  ],
+  [
+    {
+      "color": "#007f7f",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#7f7f00",
+      "offset": 100,
+      "opacity": 0.6,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000",
+      "offset": 25,
+      "opacity": 0.7,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#0000ff",
+      "offset": 75,
+      "opacity": 0.7,
+    },
+  ],
+  [
+    {
+      "color": "#0000ff",
+      "offset": 25,
+      "opacity": 0.7,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#ff0000",
+      "offset": 75,
+      "opacity": 0.7,
+    },
+  ],
+  [
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.54,
+    },
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.54,
+    },
+  ],
+  [
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.54,
+    },
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.54,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000",
+      "offset": 100,
+      "opacity": 0.7,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000",
+      "offset": 0,
+      "opacity": 0.7,
+    },
+  ],
+]
+`;
+
+exports[`fill color stops > column series 1`] = `
+[
+  [
+    {
+      "color": "#ff0000",
+      "offset": 0,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#0000ff",
+      "offset": 100,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#0000ff",
+      "offset": 0,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#ff0000",
+      "offset": 100,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#7f7f00",
+      "offset": 0,
+      "opacity": 0.75,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#007f7f",
+      "offset": 100,
+      "opacity": 0.75,
+    },
+  ],
+  [
+    {
+      "color": "#007f7f",
+      "offset": 0,
+      "opacity": 0.75,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#7f7f00",
+      "offset": 100,
+      "opacity": 0.75,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000",
+      "offset": 25,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#0000ff",
+      "offset": 75,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#0000ff",
+      "offset": 25,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff00",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#ff0000",
+      "offset": 75,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+  ],
+  [
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+    {
+      "color": "#33cc00",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000",
+      "offset": 100,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000",
+      "offset": 0,
+      "opacity": 1,
+    },
+  ],
+]
+`;
+
+exports[`fill color stops > line series 1`] = `
+[
+  [
+    {
+      "color": "#ff0000ff",
+      "offset": 0,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff0080",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#0000ffff",
+      "offset": 100,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#0000ffff",
+      "offset": 0,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff0080",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#ff0000ff",
+      "offset": 100,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#7f7f00bf",
+      "offset": 0,
+      "opacity": 0.75,
+    },
+    {
+      "color": "#00ff0080",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#007f7fbf",
+      "offset": 100,
+      "opacity": 0.75,
+    },
+  ],
+  [
+    {
+      "color": "#007f7fbf",
+      "offset": 0,
+      "opacity": 0.75,
+    },
+    {
+      "color": "#00ff0080",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#7f7f00bf",
+      "offset": 100,
+      "opacity": 0.75,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000ff",
+      "offset": 25,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff0080",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#0000ffff",
+      "offset": 75,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#0000ffff",
+      "offset": 25,
+      "opacity": 1,
+    },
+    {
+      "color": "#00ff0080",
+      "offset": 50,
+      "opacity": 0.5,
+    },
+    {
+      "color": "#ff0000ff",
+      "offset": 75,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#33cc0099",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+    {
+      "color": "#33cc0099",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+  ],
+  [
+    {
+      "color": "#33cc0099",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+    {
+      "color": "#33cc0099",
+      "offset": 0,
+      "opacity": 0.6,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000ff",
+      "offset": 100,
+      "opacity": 1,
+    },
+  ],
+  [
+    {
+      "color": "#ff0000ff",
+      "offset": 0,
+      "opacity": 1,
+    },
+  ],
+]
+`;
+
+exports[`header state color > column, value -5 1`] = `"color: #0000ff;"`;
+
+exports[`header state color > column, value 5 1`] = `"color: #0000ff;"`;
+
+exports[`header state color > column, value 15 1`] = `"color: #00ff00;"`;
+
+exports[`header state color > column, value 25 1`] = `"color: #ff0000;"`;
+
+exports[`header state color > line, value -5 1`] = `"color: #0000ff;"`;
+
+exports[`header state color > line, value 0 1`] = `"color: #0000ff;"`;
+
+exports[`header state color > line, value 5 1`] = `"color: #007f7f;"`;
+
+exports[`header state color > line, value 10 1`] = `"color: #00ff00;"`;
+
+exports[`header state color > line, value 15 1`] = `"color: #7f7f00;"`;
+
+exports[`header state color > line, value 20 1`] = `"color: #ff0000;"`;
+
+exports[`header state color > line, value 25 1`] = `"color: #ff0000;"`;
+
+exports[`header state color > uses the series color for thresholds without a color 1`] = `
+[
+  "color: #123456;",
+  "color: #123456;",
+  "color: #123456;",
+]
+`;

@@ -1,0 +1,404 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`annotations > extremas across days add the date, honour offset and invert, and keep apex_config points 1`] = `
+{
+  "points": [
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 30,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "-2.5",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 2.5,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 0,
+        "offsetY": 38,
+        "style": {
+          "background": "#333333",
+          "color": "#fff",
+          "fontSize": "8px",
+          "fontWeight": 200,
+        },
+        "text": "10 janv. 2026, 09:00:00",
+      },
+      "marker": {
+        "size": 0,
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 2.5,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 0,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "7.3",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768042800000,
+      "y": -7.25,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 0,
+        "offsetY": -22,
+        "style": {
+          "background": "#333333",
+          "color": "#fff",
+          "fontSize": "8px",
+          "fontWeight": 200,
+        },
+        "text": "10 janv. 2026, 10:00:00",
+      },
+      "marker": {
+        "size": 0,
+      },
+      "seriesIndex": 0,
+      "x": 1768042800000,
+      "y": -7.25,
+      "yAxisIndex": 0,
+    },
+    {
+      "x": 1,
+      "y": 1,
+    },
+  ],
+}
+`;
+
+exports[`annotations > extremas: max 1`] = `
+{
+  "points": [
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 0,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "7.3",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 7.25,
+      "yAxisIndex": 0,
+    },
+  ],
+}
+`;
+
+exports[`annotations > extremas: max+time 1`] = `
+{
+  "points": [
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 0,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "7.3",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 7.25,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 0,
+        "offsetY": -22,
+        "style": {
+          "background": "#333333",
+          "color": "#fff",
+          "fontSize": "8px",
+          "fontWeight": 200,
+        },
+        "text": "10:00:00",
+      },
+      "marker": {
+        "size": 0,
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 7.25,
+      "yAxisIndex": 0,
+    },
+  ],
+}
+`;
+
+exports[`annotations > extremas: min 1`] = `
+{
+  "points": [
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 30,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "-2.5",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768035600000,
+      "y": -2.5,
+      "yAxisIndex": 0,
+    },
+  ],
+}
+`;
+
+exports[`annotations > extremas: min+time 1`] = `
+{
+  "points": [
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 30,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "-2.5",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768035600000,
+      "y": -2.5,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 0,
+        "offsetY": 38,
+        "style": {
+          "background": "#333333",
+          "color": "#fff",
+          "fontSize": "8px",
+          "fontWeight": 200,
+        },
+        "text": "09:00:00",
+      },
+      "marker": {
+        "size": 0,
+      },
+      "seriesIndex": 0,
+      "x": 1768035600000,
+      "y": -2.5,
+      "yAxisIndex": 0,
+    },
+  ],
+}
+`;
+
+exports[`annotations > extremas: time 1`] = `
+{
+  "points": [
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 30,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "-2.5",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768035600000,
+      "y": -2.5,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 0,
+        "offsetY": 38,
+        "style": {
+          "background": "#333333",
+          "color": "#fff",
+          "fontSize": "8px",
+          "fontWeight": 200,
+        },
+        "text": "09:00:00",
+      },
+      "marker": {
+        "size": 0,
+      },
+      "seriesIndex": 0,
+      "x": 1768035600000,
+      "y": -2.5,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 0,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "7.3",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 7.25,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 0,
+        "offsetY": -22,
+        "style": {
+          "background": "#333333",
+          "color": "#fff",
+          "fontSize": "8px",
+          "fontWeight": 200,
+        },
+        "text": "10:00:00",
+      },
+      "marker": {
+        "size": 0,
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 7.25,
+      "yAxisIndex": 0,
+    },
+  ],
+}
+`;
+
+exports[`annotations > extremas: true 1`] = `
+{
+  "points": [
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 30,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "-2.5",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768035600000,
+      "y": -2.5,
+      "yAxisIndex": 0,
+    },
+    {
+      "label": {
+        "borderColor": "var(--card-background-color)",
+        "borderWidth": 2,
+        "offsetY": 0,
+        "style": {
+          "background": "#000000",
+          "color": "#fff",
+        },
+        "text": "7.3",
+      },
+      "marker": {
+        "fillColor": "var(--card-background-color)",
+        "strokeColor": "#000000",
+      },
+      "seriesIndex": 0,
+      "x": 1768039200000,
+      "y": 7.25,
+      "yAxisIndex": 0,
+    },
+  ],
+}
+`;
+
+exports[`annotations > now marker, with apex_config x-axis annotations after it 1`] = `
+{
+  "points": [],
+  "xaxis": [
+    {
+      "borderColor": "#ff0000",
+      "label": {
+        "borderColor": "#ff0000",
+        "style": {
+          "background": "#ff0000",
+          "color": "#fff",
+        },
+        "text": "Now",
+      },
+      "strokeDashArray": 3,
+      "x": 1768033800000,
+    },
+    {
+      "x": 5,
+    },
+  ],
+}
+`;

@@ -6,31 +6,30 @@ function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v));
 }
 
-export function getApexValue(config: ChartCardExternalConfig | undefined, path: string): unknown {
-  if (!config?.apex_config) return undefined;
-  const segs = path.split('.');
-  let cur: unknown = config.apex_config;
-  for (const s of segs) {
+// Value at a dotted path of `root`, undefined when a step is missing
+function getPath(root: unknown, path: string): unknown {
+  let cur: unknown = root;
+  for (const s of path.split('.')) {
     if (cur === undefined || cur === null) return undefined;
     cur = (cur as AnyRec)[s];
   }
   return cur;
 }
 
-// Set apex_config.<path> = value. When value is `undefined` (or '' for strings),
-// remove the leaf and prune any empty objects up the chain so the YAML stays tidy.
-export function setApexValue(config: ChartCardExternalConfig, path: string, value: unknown): ChartCardExternalConfig {
-  const apex: AnyRec = config.apex_config ? clone(config.apex_config as AnyRec) : {};
+// Sets root.<path> = value. When value is `undefined`, '' or null, removes the
+// leaf and prunes any empty objects up the chain so the YAML stays tidy.
+// Returns false, for the caller to drop `root`, on a prototype-polluting path.
+function setPath(root: AnyRec, path: string, value: unknown): boolean {
   const segs = path.split('.');
   const leaf = segs[segs.length - 1];
-  if (segs.some((s) => s === '__proto__' || s === 'constructor' || s === 'prototype')) return config;
+  if (segs.some((s) => s === '__proto__' || s === 'constructor' || s === 'prototype')) return false;
 
-  const parents: AnyRec[] = [apex];
-  let cur: AnyRec = apex;
+  const parents: AnyRec[] = [root];
+  let cur: AnyRec = root;
   for (let i = 0; i < segs.length - 1; i++) {
     const k = segs[i];
     // Defense in depth on top of the upfront segs check (recognized by CodeQL)
-    if (k === '__proto__' || k === 'constructor' || k === 'prototype') return config;
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') return false;
     if (typeof cur[k] !== 'object' || cur[k] === null || Array.isArray(cur[k])) {
       cur[k] = {};
     }
@@ -56,14 +55,24 @@ export function setApexValue(config: ChartCardExternalConfig, path: string, valu
       break;
     }
   }
+  return true;
+}
 
+export function getApexValue(config: ChartCardExternalConfig | undefined, path: string): unknown {
+  if (!config?.apex_config) return undefined;
+  return getPath(config.apex_config, path);
+}
+
+// Set apex_config.<path> = value; see setPath for removal.
+export function setApexValue(config: ChartCardExternalConfig, path: string, value: unknown): ChartCardExternalConfig {
+  const apex: AnyRec = config.apex_config ? clone(config.apex_config as AnyRec) : {};
+  if (!setPath(apex, path, value)) return config;
   return {
     ...config,
     apex_config: Object.keys(apex).length > 0 ? apex : undefined,
   };
 }
 
-// Update multiple paths in one shot — same semantics as setApexValue per entry.
 export function setApexValues(
   config: ChartCardExternalConfig,
   patches: Record<string, unknown>,
@@ -83,13 +92,7 @@ export function getApexYaxisValue(config: ChartCardExternalConfig | undefined, i
   if (!yaxis) return undefined;
   const apex = (yaxis as unknown as { apex_config?: AnyRec }).apex_config;
   if (!apex) return undefined;
-  const segs = path.split('.');
-  let cur: unknown = apex;
-  for (const s of segs) {
-    if (cur === undefined || cur === null) return undefined;
-    cur = (cur as AnyRec)[s];
-  }
-  return cur;
+  return getPath(apex, path);
 }
 
 export function setApexYaxisValue(
@@ -105,38 +108,7 @@ export function setApexYaxisValue(
   const yaxisList = config.yaxis.map((y) => ({ ...y }));
   const target = yaxisList[index] as unknown as { apex_config?: AnyRec };
   const apex: AnyRec = target.apex_config ? clone(target.apex_config) : {};
-
-  const segs = path.split('.');
-  const leaf = segs[segs.length - 1];
-  if (segs.some((s) => s === '__proto__' || s === 'constructor' || s === 'prototype')) return config;
-  const parents: AnyRec[] = [apex];
-  let cur: AnyRec = apex;
-  for (let i = 0; i < segs.length - 1; i++) {
-    const k = segs[i];
-    // Defense in depth on top of the upfront segs check (recognized by CodeQL)
-    if (k === '__proto__' || k === 'constructor' || k === 'prototype') return config;
-    if (typeof cur[k] !== 'object' || cur[k] === null || Array.isArray(cur[k])) {
-      cur[k] = {};
-    }
-    cur = cur[k] as AnyRec;
-    parents.push(cur);
-  }
-
-  const shouldRemove = value === undefined || value === '' || value === null;
-  if (shouldRemove) delete cur[leaf];
-  else cur[leaf] = value;
-
-  // Prune empty parent objects
-  for (let i = parents.length - 1; i > 0; i--) {
-    const node = parents[i];
-    if (Object.keys(node).length === 0) {
-      const parent = parents[i - 1];
-      const parentKey = segs[i - 1];
-      delete parent[parentKey];
-    } else {
-      break;
-    }
-  }
+  if (!setPath(apex, path, value)) return config;
 
   if (Object.keys(apex).length > 0) {
     target.apex_config = apex;

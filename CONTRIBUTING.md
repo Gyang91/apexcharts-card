@@ -88,5 +88,7 @@ pull request publishes the release (tag + `apexcharts-card.js` asset).
 
 ## Dependency management
 
-This repo uses **Renovate** (not Dependabot). Dependency update pull requests are opened
-by `@renovate[bot]` — see the Dependency Dashboard issue for the full queue.
+This repo uses **Dependabot** (`.github/dependabot.yml`). It opens dependency update
+pull requests every Monday. Updates of libraries shipped in the card are titled
+`fix(deps): ...`, so merging one publishes a release; build tool and workflow updates
+(`chore(deps)`, `ci(deps)`) do not.

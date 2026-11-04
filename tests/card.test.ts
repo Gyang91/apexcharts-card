@@ -3,6 +3,7 @@
 // and reads `window`/`document` -- all provided by the happy-dom environment.
 import '../src/apexcharts-card';
 import { mkHass, mkState } from './fixtures/hass';
+import { computeFillColorStops } from '../src/series-colors';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyCard = any;
@@ -482,8 +483,7 @@ describe('apexcharts-card', () => {
 
   describe('threshold gradient stops', () => {
     const stops = (min: number, max: number, invert = false) => {
-      const card = new (customElements.get('apexcharts-card') as CustomElementConstructor)() as AnyCard;
-      return card._computeFillColorStops(
+      return computeFillColorStops(
         {
           type: 'area',
           color_threshold: [
@@ -825,5 +825,92 @@ describe('apexcharts-card', () => {
         expect(suggestion.config).toBeDefined();
       });
     });
+  });
+});
+
+describe('setConfig after a failed config', () => {
+  it('does not keep the offsets of a config that failed validation', async () => {
+    await customElements.whenDefined('apexcharts-card');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const card: any = document.createElement('apexcharts-card');
+    expect(() =>
+      card.setConfig({
+        type: 'custom:apexcharts-card',
+        series: [
+          { entity: 'sensor.a', offset: '-1d' },
+          { compute: 'return 1', id: 'b', offset: '+1h' },
+        ],
+      }),
+    ).toThrow(/offset/);
+    card.setConfig({ type: 'custom:apexcharts-card', series: [{ entity: 'sensor.a' }] });
+    expect(card._seriesOffset[0]).toBeUndefined();
+  });
+});
+
+// HA can call setConfig again on the same card (editor preview, saving an
+// edit): the new config must behave like it does on a fresh card.
+describe('setConfig on a card that already has a config', () => {
+  const T = 'custom:apexcharts-card';
+  const mk = async () => {
+    await customElements.whenDefined('apexcharts-card');
+    const card: AnyCard = document.createElement('apexcharts-card');
+    card._hass = mkHass();
+    return card;
+  };
+
+  it('uses the new series color in the chart and the header', async () => {
+    const card = await mk();
+    card.setConfig({ type: T, series: [{ entity: 'sensor.a', color: '#111111' }] });
+    card.setConfig({ type: T, series: [{ entity: 'sensor.a', color: '#222222' }] });
+    expect(card._computeChartColors(false)).toEqual(['#222222']);
+    expect(card._headerColors).toEqual(['#222222']);
+    card.setConfig({ type: T, series: [{ entity: 'sensor.a' }] });
+    expect(card._headerColors).not.toEqual(['#222222']);
+  });
+
+  it('drops a removed offset, graph_span, span offset, brush selection and update delay', async () => {
+    const card = await mk();
+    card.setConfig({
+      type: T,
+      graph_span: '7d',
+      span: { offset: '-1d' },
+      update_delay: '5s',
+      experimental: { brush: true },
+      brush: { selection_span: '1h' },
+      series: [{ entity: 'sensor.a', offset: '-1d', time_delta: '+1h', show: { in_brush: true } }],
+    });
+    card.setConfig({ type: T, series: [{ entity: 'sensor.a' }] });
+    const fresh = await mk();
+    fresh.setConfig({ type: T, series: [{ entity: 'sensor.a' }] });
+    for (const key of [
+      '_seriesOffset',
+      '_seriesTimeDelta',
+      '_graphSpan',
+      '_offset',
+      '_brushSelectionSpan',
+      '_updateDelay',
+      '_brushColors',
+    ]) {
+      expect(card[key]).toEqual(fresh[key]);
+    }
+  });
+
+  it('does not keep the y axes of a config without yaxis', async () => {
+    const card = await mk();
+    card.setConfig({ type: T, yaxis: [{ min: 'auto' }], series: [{ entity: 'sensor.a' }] });
+    card.setConfig({ type: T, series: [{ entity: 'sensor.a' }] });
+    card._graphs = [{ minMaxWithTimestampForYAxis: () => ({ min: [0, 1], max: [0, 2] }), history: [] }];
+    expect(card._yAxisConfig).toBeUndefined();
+    expect(() => card._computeYAxisAutoMinMax(new Date(0), new Date(1))).not.toThrow();
+  });
+
+  it('leaves the card as it was when the new config is invalid', async () => {
+    const card = await mk();
+    card.setConfig({ type: T, graph_span: '7d', series: [{ entity: 'sensor.a', color: '#111111' }] });
+    const before = { config: card._config, graphs: card._graphs, span: card._graphSpan, colors: card._colors };
+    expect(() =>
+      card.setConfig({ type: T, graph_span: '2d', series: [{ entity: 'sensor.a', offset: 'bad' }] }),
+    ).toThrow();
+    expect({ config: card._config, graphs: card._graphs, span: card._graphSpan, colors: card._colors }).toEqual(before);
   });
 });

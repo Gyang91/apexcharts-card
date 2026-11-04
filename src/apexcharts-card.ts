@@ -8,8 +8,6 @@ import {
   ChartCardYAxis,
   EntityCachePoints,
   EntityEntryCache,
-  HistoryPoint,
-  minmax_type,
   StatisticsMetadata,
   ActionHandlerDetail,
 } from './types';
@@ -22,19 +20,14 @@ import {
   computeName,
   isComputedSeries,
   seriesState,
-  computeTextColor,
   computeUom,
   decompress,
   formatApexDate,
   getLang,
   getPercentFromValue,
-  interpolateColor,
-  is12Hour,
   isExternalStatisticId,
   log,
-  mergeConfigTemplates,
   mergeDeep,
-  mergeDeepConfig,
   myFormatNumber,
   offsetData,
   prettyPrintTime,
@@ -49,65 +42,44 @@ import { getStatisticsMetadata } from './recorder';
 import { addPeriods, displayTimeZone, navigationRange } from './calendar';
 import { computeTimezoneDiffWithLocal, endOf, startOf } from './zone';
 import ApexCharts from 'apexcharts';
-import type { ApexOptions, ApexYAxis } from 'apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import { Ripple } from '@material/mwc-ripple';
 import { stylesApex } from './styles';
+import { computeAnnotations } from './annotations';
+import {
+  computeChartColors,
+  computeHeaderStateColor,
+  computeThresholdFill,
+  thresholdGradientSeries,
+  ThresholdColorFn,
+} from './series-colors';
+import {
+  applySeriesDefaults,
+  checkSchemaAndMergeAllSeries,
+  checkSeries,
+  checkSpanAndNavigation,
+  checkVisualChart,
+  checkYAxes,
+  prepareConfig,
+} from './config';
+import { getStubConfig, registerCustomCard } from './card-picker';
+import { computeYAxisAutoMinMax, generateYAxisConfig, getTypeOfMinMax, YAxisDataSource } from './yaxis';
 import { HassEntity } from 'home-assistant-js-websocket';
-import { getBrushLayoutConfig, getLayoutConfig, yAxisLabelFormatter } from './apex-layouts';
+import { getBrushLayoutConfig, getLayoutConfig } from './apex-layouts';
 import { entityNamesChanged } from './entity-name';
 import GraphEntry from './graphEntry';
-import { createCheckers } from 'ts-interface-checker';
-import {
-  ActionsConfig,
-  ChartCardColorThreshold,
-  ChartCardExternalConfig,
-  ChartCardAllSeriesExternalConfig,
-  ChartCardSeriesExternalConfig,
-  NavigationPeriod,
-} from './types-config';
-import exportedTypeSuite from './types-config-ti';
-import {
-  COMPUTE_EXCLUDED_OPTIONS,
-  DEFAULT_AREA_OPACITY,
-  DEFAULT_FILL_RAW,
-  DEFAULT_FLOAT_PRECISION,
-  DEFAULT_SHOW_IN_CHART,
-  DEFAULT_SHOW_IN_HEADER,
-  DEFAULT_SHOW_IN_LEGEND,
-  DEFAULT_SHOW_LEGEND_VALUE,
-  DEFAULT_SHOW_NAME_IN_HEADER,
-  DEFAULT_SHOW_NULL_IN_HEADER,
-  DEFAULT_SHOW_ZERO_IN_HEADER,
-  DEFAULT_SHOW_OFFSET_IN_NAME,
-  DEFAULT_UPDATE_DELAY,
-  MAX_TICK_STEPS,
-  NO_VALUE,
-  PLAIN_COLOR_TYPES,
-  TIMESERIES_TYPES,
-} from './const';
-import {
-  DEFAULT_COLORS,
-  DEFAULT_DURATION,
-  DEFAULT_OFFSET,
-  DEFAULT_FUNC,
-  DEFAULT_GROUP_BY_FILL,
-  DEFAULT_GRAPH_SPAN,
-  DEFAULT_SERIE_TYPE,
-  HOUR_24,
-} from './const';
+import { ActionsConfig, ChartCardExternalConfig, NavigationPeriod } from './types-config';
+import { DEFAULT_UPDATE_DELAY, NO_VALUE, TIMESERIES_TYPES } from './const';
+import { DEFAULT_COLORS, DEFAULT_GRAPH_SPAN, HOUR_24 } from './const';
 import parse from 'parse-duration';
-import { TinyColor } from '@ctrl/tinycolor';
 import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import { downsample, SamplingRange } from './downsample';
-import { alignSeries } from './align';
-import {
-  DEFAULT_HEATMAP_CELLS,
-  MAX_HEATMAP_CELLS,
-  assertHeatmapBudget,
-  heatmapData,
-  rangeAreaData,
-} from './visual-data';
+import { assertHeatmapBudget, heatmapData, rangeAreaData } from './visual-data';
+
+// Options passed to ApexCharts' updateOptions on each refresh
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartUpdate = any;
 
 interface SamplingSeries {
   data: EntityCachePoints;
@@ -123,8 +95,6 @@ console.info(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).ApexCharts = ApexCharts;
-
-type ThresholdColorFn = (opts: { value: number }) => string;
 
 // Optional `entity` of a tap/hold/double_tap action (ActionConfig does not declare it)
 const actionEntity = (config: ActionsConfig, action: ActionHandlerDetail['action']): string | undefined =>
@@ -426,135 +396,28 @@ export class ChartsCard extends LitElement {
     }
   }
 
+  // All or nothing: a config that fails leaves the card as it was, and a
+  // valid one starts from the defaults, not from the previous config.
   public setConfig(config: ChartCardExternalConfig) {
-    let configDup: ChartCardExternalConfig = JSON.parse(JSON.stringify(config));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((configDup as any).entities) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      configDup.series = (configDup as any).entities;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (configDup as any).entities;
-    }
-    configDup = configDup as ChartCardExternalConfig;
-    if (configDup.config_templates) {
-      configDup.config_templates =
-        configDup.config_templates && Array.isArray(configDup.config_templates)
-          ? configDup.config_templates
-          : [configDup.config_templates];
-      configDup = mergeConfigTemplates(getLovelace(), configDup);
-    }
+    const configDup = prepareConfig(config, getLovelace);
     try {
-      const { ChartCardExternalConfig } = createCheckers(exportedTypeSuite);
-      if (!configDup.experimental?.disable_config_validation) {
-        ChartCardExternalConfig.strictCheck(configDup);
-      }
-      if (configDup.all_series_config) {
-        configDup.series.forEach((serie, index) => {
-          const allDup: ChartCardAllSeriesExternalConfig = JSON.parse(JSON.stringify(configDup.all_series_config));
-          if (isComputedSeries(serie)) COMPUTE_EXCLUDED_OPTIONS.forEach((key) => delete allDup[key]);
-          configDup.series[index] = mergeDeepConfig(allDup, serie);
-        });
-      }
-      const visual = configDup.chart_type === 'rangeArea' || configDup.chart_type === 'heatmap';
-      if (visual) {
-        if (
-          configDup.stacked ||
-          configDup.experimental?.brush ||
-          configDup.experimental?.hidden_by_default ||
-          configDup.experimental?.color_threshold ||
-          configDup.yaxis ||
-          configDup.apex_config?.chart?.stacked
-        ) {
-          throw new Error(t('error.visual.options'));
-        }
-        if (
-          configDup.series.some(
-            (serie) =>
-              serie.show?.in_chart === false ||
-              serie.invert ||
-              serie.show?.extremas ||
-              serie.show?.datalabels ||
-              serie.color_threshold ||
-              serie.yaxis_id,
-          )
-        ) {
-          throw new Error(t('error.visual.series'));
-        }
-        if (configDup.chart_type === 'rangeArea' && configDup.series.length !== 2) {
-          throw new Error(t('error.visual.pair'));
-        }
-        if (configDup.chart_type === 'heatmap') {
-          const limit = configDup.heatmap?.max_cells ?? DEFAULT_HEATMAP_CELLS;
-          if (!Number.isInteger(limit) || limit < 1 || limit > MAX_HEATMAP_CELLS) {
-            throw new Error(t('error.heatmap.limit'));
-          }
-          if (
-            !configDup.series.length ||
-            configDup.series.some(
-              (serie) => !serie.statistics && (!serie.group_by?.func || serie.group_by.func === 'raw'),
-            )
-          ) {
-            throw new Error(t('error.heatmap.aggregation'));
-          }
-        }
-        configDup.series.forEach((serie) => {
-          serie.extend_to = false;
-        });
-      } else if (configDup.heatmap) {
-        throw new Error(t('error.heatmap.type'));
-      }
-      if (configDup.update_interval) {
-        this._interval = validateInterval(configDup.update_interval, 'update_interval');
-      }
-      if (configDup.graph_span) {
-        this._graphSpan = validateInterval(configDup.graph_span, 'graph_span');
-      }
-      if (configDup.span?.offset) {
-        this._offset = validateOffset(configDup.span.offset, 'span.offset');
-      }
-      if (configDup.span?.end && configDup.span?.start) {
-        throw new Error(t('error.span.startEnd'));
-      }
-      if (configDup.navigation?.show) {
-        if (configDup.span) throw new Error(t('error.navigation.span'));
-        if (configDup.chart_type && !['line', 'scatter', 'rangeArea', 'heatmap'].includes(configDup.chart_type)) {
-          throw new Error(t('error.navigation.timeline'));
-        }
-      }
-      this._navigationPeriod = configDup.navigation?.initial ?? 'day';
-      this._navigationAnchor = undefined;
-      if (configDup.brush?.selection_span) {
-        this._brushSelectionSpan = validateInterval(configDup.brush.selection_span, 'brush.selection_span');
-      }
-      const seriesIds = new Set<string>();
-      configDup.series.forEach((serie, index) => {
-        if (isComputedSeries(serie)) {
-          const option = COMPUTE_EXCLUDED_OPTIONS.find((key) => serie[key] !== undefined);
-          if (option) throw new Error(t('error.series.computeOptions', { index, option }));
-        } else if (!serie.entity) {
-          throw new Error(t('error.series.entityRequired', { index }));
-        }
-        if (serie.id !== undefined) {
-          if (seriesIds.has(serie.id)) throw new Error(t('error.series.duplicateId', { id: serie.id }));
-          seriesIds.add(serie.id);
-        }
-        if (isExternalStatisticId(serie.entity) && !serie.statistics) {
-          // External statistic IDs have no recorder history: without the
-          // statistics option there is nothing to plot.
-          throw new Error(t('error.statistics.externalRequired', { entity: serie.entity }));
-        }
-        if (serie.offset) {
-          this._seriesOffset[index] = validateOffset(serie.offset, `series[${index}].offset`);
-        }
-        if (serie.time_delta) {
-          this._seriesTimeDelta[index] = validateOffset(serie.time_delta, `series[${index}].time_delta`);
-        }
-      });
-      if (configDup.update_delay) {
-        this._updateDelay = validateInterval(configDup.update_delay, `update_delay`);
-      }
+      checkSchemaAndMergeAllSeries(configDup);
+      checkVisualChart(configDup);
+      const interval = configDup.update_interval
+        ? validateInterval(configDup.update_interval, 'update_interval')
+        : undefined;
+      const graphSpan = configDup.graph_span ? validateInterval(configDup.graph_span, 'graph_span') : HOUR_24;
+      const offset = configDup.span?.offset ? validateOffset(configDup.span.offset, 'span.offset') : 0;
+      checkSpanAndNavigation(configDup);
+      const brushSelectionSpan = configDup.brush?.selection_span
+        ? validateInterval(configDup.brush.selection_span, 'brush.selection_span')
+        : 0;
+      const { offsets: seriesOffset, timeDeltas: seriesTimeDelta } = checkSeries(configDup);
+      const updateDelay = configDup.update_delay
+        ? validateInterval(configDup.update_delay, `update_delay`)
+        : DEFAULT_UPDATE_DELAY;
 
-      this._config = mergeDeep(
+      const newConfig: ChartCardConfig = mergeDeep(
         {
           graph_span: DEFAULT_GRAPH_SPAN,
           cache: true,
@@ -564,233 +427,83 @@ export class ChartsCard extends LitElement {
         configDup,
       );
 
-      const defColors = this._config?.color_list || DEFAULT_COLORS;
-      if (this._config) {
-        this._graphs = this._config.series.map((serie, index) => {
-          serie.index = index;
-          serie.ignore_history = !!(
-            this._config?.chart_type &&
-            ['donut', 'pie', 'radialBar'].includes(this._config?.chart_type) &&
-            (!serie.group_by || serie.group_by?.func === 'raw') &&
-            !serie.data_generator &&
-            !isComputedSeries(serie) &&
-            !serie.statistics &&
-            !serie.offset
-          );
-          if (!this._headerColors[index]) {
-            this._headerColors[index] = defColors[index % defColors.length];
-          }
-          if (serie.color) {
-            this._headerColors[index] = serie.color;
-          }
-          serie.fill_raw = serie.fill_raw || DEFAULT_FILL_RAW;
-          // External statistics have no live state to extend to
-          serie.extend_to = isExternalStatisticId(serie.entity)
-            ? false
-            : serie.extend_to !== undefined
-              ? serie.extend_to
-              : 'end';
-          serie.type =
-            !this._config?.chart_type || this._config.chart_type === 'line'
-              ? serie.type || DEFAULT_SERIE_TYPE
-              : undefined;
-          if (!serie.group_by) {
-            serie.group_by = {
-              duration: DEFAULT_DURATION,
-              offset: DEFAULT_OFFSET,
-              func: DEFAULT_FUNC,
-              fill: DEFAULT_GROUP_BY_FILL,
-            };
-          } else {
-            serie.group_by.duration = serie.group_by.duration || DEFAULT_DURATION;
-            serie.group_by.offset = serie.group_by.offset || DEFAULT_OFFSET;
-            serie.group_by.func = serie.group_by.func || DEFAULT_FUNC;
-            serie.group_by.fill = serie.group_by.fill || DEFAULT_GROUP_BY_FILL;
-          }
-          if (!serie.show) {
-            serie.show = {
-              in_legend: DEFAULT_SHOW_IN_LEGEND,
-              legend_value: DEFAULT_SHOW_LEGEND_VALUE,
-              in_header: DEFAULT_SHOW_IN_HEADER,
-              in_chart: DEFAULT_SHOW_IN_CHART,
-              name_in_header: DEFAULT_SHOW_NAME_IN_HEADER,
-              null_in_header: DEFAULT_SHOW_NULL_IN_HEADER,
-              zero_in_header: DEFAULT_SHOW_ZERO_IN_HEADER,
-              offset_in_name: DEFAULT_SHOW_OFFSET_IN_NAME,
-            };
-          } else {
-            serie.show.in_legend = serie.show.in_legend === undefined ? DEFAULT_SHOW_IN_LEGEND : serie.show.in_legend;
-            serie.show.legend_value =
-              serie.show.legend_value === undefined ? DEFAULT_SHOW_LEGEND_VALUE : serie.show.legend_value;
-            serie.show.in_chart = serie.show.in_chart === undefined ? DEFAULT_SHOW_IN_CHART : serie.show.in_chart;
-            serie.show.in_header =
-              serie.show.in_header === undefined
-                ? !serie.show.in_chart && serie.show.in_brush
-                  ? false
-                  : DEFAULT_SHOW_IN_HEADER
-                : serie.show.in_header;
-            serie.show.name_in_header =
-              serie.show.name_in_header === undefined ? DEFAULT_SHOW_NAME_IN_HEADER : serie.show.name_in_header;
-            serie.show.null_in_header =
-              serie.show.null_in_header === undefined ? DEFAULT_SHOW_NULL_IN_HEADER : serie.show.null_in_header;
-            serie.show.zero_in_header =
-              serie.show.zero_in_header === undefined ? DEFAULT_SHOW_ZERO_IN_HEADER : serie.show.zero_in_header;
-            serie.show.offset_in_name =
-              serie.show.offset_in_name === undefined ? DEFAULT_SHOW_OFFSET_IN_NAME : serie.show.offset_in_name;
-          }
-          validateInterval(serie.group_by.duration, `series[${index}].group_by.duration`);
-          validateOffset(serie.group_by.offset, `series[${index}].group_by.offset`);
-          if (serie.color_threshold && serie.color_threshold.length > 0) {
-            const sorted: ChartCardColorThreshold[] = JSON.parse(JSON.stringify(serie.color_threshold));
-            sorted.sort((a, b) => (a.value < b.value ? -1 : 1));
-            serie.color_threshold = sorted;
-          }
-
-          if (serie.entity || isComputedSeries(serie)) {
-            const editMode = getLovelace()?.editMode;
-            // disable caching for editor
-
-            const caching = editMode === true ? false : this._config!.cache;
-            const graphEntry = new GraphEntry(
-              index,
-
-              this._graphSpan!,
-
-              caching,
-              serie,
-              this._config?.span,
-            );
-            if (this._hass) graphEntry.hass = this._hass;
-            return graphEntry;
-          }
-          return undefined;
-        });
-        this._config.series_in_graph = [];
-        this._config.series_in_brush = [];
-        this._config.series.forEach((serie, index) => {
-          if (serie.show.in_chart) {
-            this._colors.push(this._headerColors[index]);
-
-            this._config!.series_in_graph.push(serie);
-          }
-          if (this._config?.experimental?.brush && serie.show.in_brush) {
-            this._brushColors.push(this._headerColors[index]);
-
-            this._config!.series_in_brush.push(serie);
-          }
-        });
-        if (this._config.yaxis && this._config.yaxis.length > 1) {
-          if (
-            this._config.series_in_graph.some((serie) => {
-              return !serie.yaxis_id;
-            })
-          ) {
-            throw new Error(t('error.yaxis.missingYaxisId'));
-          }
-          if (
-            this._config.yaxis.some((yaxis) => {
-              return !yaxis.id;
-            })
-          ) {
-            throw new Error(t('error.yaxis.missingId'));
-          }
+      const defColors = newConfig.color_list || DEFAULT_COLORS;
+      const headerColors: string[] = [];
+      const colors: string[] = [];
+      const brushColors: string[] = [];
+      let yAxisConfig: ChartCardYAxis[] | undefined;
+      const editMode = getLovelace()?.editMode;
+      const graphs = newConfig.series.map((serie, index) => {
+        serie.index = index;
+        serie.ignore_history = !!(
+          newConfig.chart_type &&
+          ['donut', 'pie', 'radialBar'].includes(newConfig.chart_type) &&
+          (!serie.group_by || serie.group_by?.func === 'raw') &&
+          !serie.data_generator &&
+          !isComputedSeries(serie) &&
+          !serie.statistics &&
+          !serie.offset
+        );
+        headerColors[index] = serie.color || defColors[index % defColors.length];
+        applySeriesDefaults(serie, index, newConfig.chart_type);
+        if (serie.entity || isComputedSeries(serie)) {
+          // disable caching for editor
+          const caching = editMode === true ? false : newConfig.cache;
+          const graphEntry = new GraphEntry(index, graphSpan, caching, serie, newConfig.span);
+          if (this._hass) graphEntry.hass = this._hass;
+          return graphEntry;
         }
-        if (this._config.yaxis) {
-          const ids = new Set<string>();
-          this._config.yaxis.forEach((axis) => {
-            if (axis.id) {
-              if (ids.has(axis.id)) throw new Error(t('error.yaxis.duplicateId', { id: axis.id }));
-              ids.add(axis.id);
-            }
-            const logarithmic = axis.logarithmic ?? axis.apex_config?.logarithmic ?? false;
-            const base = axis.log_base ?? axis.apex_config?.logBase ?? 10;
-            if (typeof base !== 'number' || !Number.isFinite(base) || base <= 1) {
-              throw new Error(t('error.yaxis.logBase'));
-            }
-            if (logarithmic) {
-              for (const limit of [axis.min, axis.max]) {
-                if (limit === undefined || limit === 'auto') continue;
-                const [value, type] = this._getTypeOfMinMax(limit);
-                if (
-                  type !== minmax_type.ABSOLUTE &&
-                  (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)
-                ) {
-                  throw new Error(t('error.yaxis.logLimit'));
-                }
-              }
-            }
-          });
-          const yAxisConfig = this._generateYAxisConfig(this._config);
-          if (this._config.apex_config) {
-            this._config.apex_config.yaxis = yAxisConfig;
-          } else {
-            this._config.apex_config = {
-              yaxis: yAxisConfig,
-            };
-          }
-          this._yAxisConfig?.forEach((yaxis) => {
-            [yaxis.min, yaxis.min_type] = this._getTypeOfMinMax(yaxis.min);
-            [yaxis.max, yaxis.max_type] = this._getTypeOfMinMax(yaxis.max);
-          });
+        return undefined;
+      });
+      newConfig.series_in_graph = [];
+      newConfig.series_in_brush = [];
+      newConfig.series.forEach((serie, index) => {
+        if (serie.show.in_chart) {
+          colors.push(headerColors[index]);
+          newConfig.series_in_graph.push(serie);
         }
-        this._headerColors = this._headerColors.slice(0, this._config?.series.length);
+        if (newConfig.experimental?.brush && serie.show.in_brush) {
+          brushColors.push(headerColors[index]);
+          newConfig.series_in_brush.push(serie);
+        }
+      });
+      checkYAxes(newConfig);
+      if (newConfig.yaxis) {
+        const generated = generateYAxisConfig(newConfig);
+        yAxisConfig = generated?.yAxes;
+        if (newConfig.apex_config) {
+          newConfig.apex_config.yaxis = generated?.apexYAxes;
+        } else {
+          newConfig.apex_config = { yaxis: generated?.apexYAxes };
+        }
+        yAxisConfig?.forEach((yaxis) => {
+          [yaxis.min, yaxis.min_type] = getTypeOfMinMax(yaxis.min);
+          [yaxis.max, yaxis.max_type] = getTypeOfMinMax(yaxis.max);
+        });
       }
+
+      // Everything is valid: switch the card to the new config
+      this._interval = interval;
+      this._graphSpan = graphSpan;
+      this._offset = offset;
+      this._navigationPeriod = configDup.navigation?.initial ?? 'day';
+      this._navigationAnchor = undefined;
+      this._brushSelectionSpan = brushSelectionSpan;
+      this._seriesOffset = seriesOffset;
+      this._seriesTimeDelta = seriesTimeDelta;
+      this._updateDelay = updateDelay;
+      this._headerColors = headerColors;
+      this._colors = colors;
+      this._brushColors = brushColors;
+      this._yAxisConfig = yAxisConfig;
+      this._graphs = graphs;
+      this._config = newConfig;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       throw new Error(`/// apexcharts-card version ${pjson.version} /// ${e.message}`, { cause: e });
     }
     // Full reset only happens in editor mode
     // this._reset();
-  }
-
-  private _generateYAxisConfig(config: ChartCardConfig): ApexYAxis[] | undefined {
-    if (!config.yaxis) return undefined;
-    const burned: boolean[] = [];
-    this._yAxisConfig = JSON.parse(JSON.stringify(config.yaxis));
-    const yaxisConfig: ApexYAxis[] = config.series_in_graph.map((serie, serieIndex) => {
-      let idx: number;
-      if (config.yaxis?.length !== 1) {
-        idx = config.yaxis!.findIndex((yaxis) => {
-          return yaxis.id === serie.yaxis_id;
-        });
-      } else {
-        idx = 0;
-      }
-      if (idx < 0) {
-        throw new Error(t('error.yaxis.idNotFound', { id: String(serie.yaxis_id) }));
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let yAxisDup: any = JSON.parse(JSON.stringify(config.yaxis![idx]));
-      delete yAxisDup.apex_config;
-      delete yAxisDup.decimals;
-      delete yAxisDup.tick_step;
-      yAxisDup.decimalsInFloat =
-        config.yaxis![idx].decimals === undefined ? DEFAULT_FLOAT_PRECISION : config.yaxis![idx].decimals;
-      yAxisDup.labels = { formatter: yAxisLabelFormatter(yAxisDup.decimalsInFloat) };
-      if (this._yAxisConfig?.[idx].series_id) {
-        this._yAxisConfig?.[idx].series_id?.push(serieIndex);
-      } else {
-        this._yAxisConfig![idx].series_id! = [serieIndex];
-      }
-
-      if (config.yaxis![idx].apex_config) {
-        yAxisDup = mergeDeep(yAxisDup, config.yaxis![idx].apex_config);
-        delete yAxisDup.apex_config;
-      }
-      if (config.yaxis![idx].logarithmic !== undefined) yAxisDup.logarithmic = config.yaxis![idx].logarithmic;
-      if (config.yaxis![idx].log_base !== undefined) yAxisDup.logBase = config.yaxis![idx].log_base;
-      delete yAxisDup.log_base;
-      if (typeof yAxisDup.min !== 'number') delete yAxisDup.min;
-      if (typeof yAxisDup.max !== 'number') delete yAxisDup.max;
-      if (burned[idx]) {
-        yAxisDup.show = false;
-      } else {
-        yAxisDup.show = config.yaxis![idx].show === undefined ? true : config.yaxis![idx].show;
-        burned[idx] = true;
-      }
-      return yAxisDup;
-    });
-    return yaxisConfig;
   }
 
   static get styles(): CSSResultGroup {
@@ -1264,11 +977,7 @@ export class ChartsCard extends LitElement {
   }
 
   private _thresholdGradientSeries(brush: boolean): { serie: ChartCardSeriesConfig; index: number }[] {
-    if (!this._config?.experimental?.color_threshold) return [];
-    if ((brush ? this._config.brush?.apex_config : this._config.apex_config)?.fill !== undefined) return [];
-    return (brush ? this._config.series_in_brush : this._config.series_in_graph)
-      .map((serie, index) => ({ serie, index }))
-      .filter(({ serie }) => serie.color_threshold?.length && [undefined, 'area', 'line'].includes(serie.type));
+    return thresholdGradientSeries(this._config, brush);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1506,117 +1215,13 @@ export class ChartsCard extends LitElement {
         const failure = results[failedIndex];
         if (failure.status === 'rejected') throw failure.reason;
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let graphData: any = { series: [] };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const brushData: any = { series: [] };
+      let graphData: ChartUpdate;
+      let brushData: ChartUpdate = { series: [] };
       let visualEmpty: boolean | undefined;
       if (TIMESERIES_TYPES.includes(this._config.chart_type)) {
-        this._graphs.forEach((graph, index) => {
-          if (!graph) return [];
-          const inHeader = this._config?.series[index].show.in_header;
-          if (inHeader && inHeader !== 'raw') {
-            if (inHeader === 'after_now' || inHeader === 'before_now') {
-              // before_now / after_now
-              this._headerState[index] = graph.nowValue(
-                now.getTime() + (this._seriesOffset[index] ? this._seriesOffset[index] : 0),
-                inHeader === 'before_now',
-              );
-            } else {
-              // not raw
-              this._headerState[index] = graph.lastState;
-            }
-          } else if (inHeader === 'raw' && this._hasNoEntityState(index)) {
-            // Without an entity state, `raw` shows the latest value instead.
-            this._headerState[index] = graph.lastState;
-          }
-          if (!this._config?.series[index].show.in_chart && !this._config?.series[index].show.in_brush) {
-            return;
-          }
-          // Names go with every refresh so a renamed entity, device or area shows up
-          const name = computeName(this._hass, index, this._config?.series, this._entities);
-          if (graph.history.length === 0) {
-            if (this._config?.series[index].show.in_chart) graphData.series.push({ name, data: [] });
-            if (this._config?.series[index].show.in_brush) brushData.series.push({ name, data: [] });
-            return;
-          }
-          let data: EntityCachePoints;
-          const offset =
-            this._serverTimeOffset + (this._seriesOffset[index] || 0) - (this._seriesTimeDelta[index] || 0);
-          if (offset) {
-            data = offsetData(graph.history, offset);
-          } else {
-            data = [...graph.history];
-          }
-          if (this._config?.series[index].type !== 'column' && this._config?.series[index].extend_to) {
-            const lastPoint = data.slice(-1)[0]!;
-            if (
-              this._config?.series[index].extend_to === 'end' &&
-              lastPoint[0] < end.getTime() - this._serverTimeOffset
-            ) {
-              data.push([end.getTime() - this._serverTimeOffset, lastPoint[1]]);
-            } else if (
-              this._config?.series[index].extend_to === 'now' &&
-              lastPoint[0] < now.getTime() - this._serverTimeOffset
-            ) {
-              data.push([now.getTime() - this._serverTimeOffset, lastPoint[1]]);
-            }
-          }
-          const result = { name, data: this._config?.series[index].invert ? this._invertData(data) : data };
-          if (this._config?.series[index].show.in_chart) graphData.series.push(result);
-          if (this._config?.series[index].show.in_brush) brushData.series.push(result);
-          return;
-        });
-        graphData.annotations = this._computeAnnotations(start, end, new Date(now.getTime() - this._serverTimeOffset));
-        if (this._yAxisConfig) {
-          graphData.yaxis = this._computeYAxisAutoMinMax(start, end);
-        }
-        if (!this._apexBrush) {
-          const newMinMax = this._findStartAndEndOfChart(
-            new Date(start.getTime() - this._serverTimeOffset),
-            new Date(end.getTime() - this._serverTimeOffset),
-            false,
-          );
-          graphData.xaxis = {
-            min: newMinMax.start,
-            max: newMinMax.end,
-          };
-        }
+        ({ graphData, brushData } = this._timelineData(start, end, now));
       } else {
-        // No timeline charts
-        graphData = {
-          series: this._graphs.flatMap((graph, index) => {
-            if (!graph) return [];
-            let data: number;
-            // Without an entity state, `raw` also resolves to the latest value.
-            const computedHeader =
-              this._config?.series[index].show.in_header !== 'raw' || this._hasNoEntityState(index);
-            if (graph.history.length === 0) {
-              if (computedHeader) {
-                this._headerState[index] = null;
-              }
-              data = 0;
-            } else {
-              const lastState = graph.lastState;
-              data = lastState || 0;
-              if (computedHeader) {
-                this._headerState[index] = lastState;
-              }
-            }
-            if (!this._config?.series[index].show.in_chart) {
-              return [];
-            }
-            if (this._config?.chart_type === 'radialBar') {
-              return [getPercentFromValue(data, this._config.series[index].min, this._config.series[index].max)];
-            } else {
-              return [data];
-            }
-          }),
-          // Names go with every refresh so a renamed entity, device or area shows up
-          labels: this._config.series_in_graph.map((serie, index) =>
-            computeName(this._hass, index, this._config!.series_in_graph, undefined, seriesState(this._hass, serie)),
-          ),
-        };
+        graphData = this._valueData();
       }
       if (TIMESERIES_TYPES.includes(this._config.chart_type) && this._config.experimental?.hidden_by_default) {
         // Partial series updates otherwise inherit the original hidden flag in ApexCharts.
@@ -1628,23 +1233,8 @@ export class ChartsCard extends LitElement {
           };
         });
       }
-      if (this._config.chart_type === 'rangeArea') {
-        const [lower, upper] = graphData.series as { name: string; data: EntityCachePoints }[];
-        const data = rangeAreaData(lower.data, upper.data);
-        visualEmpty = data.every((point) => point.y[0] === null);
-        graphData.series = [{ name: `${lower.name} - ${upper.name}`, data }];
-      } else if (this._config.chart_type === 'heatmap') {
-        const series = graphData.series as { name: string; data: EntityCachePoints }[];
-        const rows = heatmapData(
-          series.map((serie) => serie.data),
-          this._config.heatmap?.max_cells,
-        );
-        // Native datetime heatmaps position sparse cells by timestamp. Omit
-        // missing cells: native heatmap shading otherwise treats null as zero.
-        graphData.series = rows.map((data, row) => ({
-          name: series[row].name,
-          data: data.filter((point) => point.y !== null),
-        }));
+      if (this._config.chart_type === 'rangeArea' || this._config.chart_type === 'heatmap') {
+        visualEmpty = this._reshapeVisualSeries(graphData);
       }
       if (this._hasSampling()) {
         this._samplingSeries = { main: graphData.series, brush: brushData.series };
@@ -1652,74 +1242,9 @@ export class ChartsCard extends LitElement {
         graphData.series = this._sampleSeries(graphData.series, false, this._readChartRange(chart));
         brushData.series = this._sampleSeries(brushData.series, true);
       }
-      graphData.colors = this._computeChartColors(false);
-      if (
-        this._config.chart_type === 'heatmap' &&
-        !this._config.color_list &&
-        !this._config.series.some((serie) => serie.color)
-      ) {
-        graphData.colors = this._config.series.map(() => graphData.colors[0]);
-      }
-      if (this._apexBrush) {
-        brushData.colors = this._computeChartColors(true);
-      }
-      if (this._config.experimental?.color_threshold && this._config.series.some((serie) => serie.color_threshold)) {
-        graphData.markers = {
-          colors: computeColors(
-            this._config.series_in_graph.flatMap((serie, index) => {
-              if (serie.type === 'column') return [];
-              return [this._colors[index]];
-            }),
-          ),
-        };
-        graphData.legend = { markers: { fillColors: computeColors(this._colors) } };
-        graphData.tooltip = { marker: { fillColors: graphData.legend.markers.fillColors } };
-        const mainFill = this._computeThresholdFill(false);
-        if (mainFill) graphData.fill = mainFill;
-        if (this._apexBrush) {
-          const brushFill = this._computeThresholdFill(true);
-          if (brushFill) brushData.fill = brushFill;
-        }
-      }
-      // graphData.tooltip = { marker: { fillColors: ['#ff0000', '#00ff00'] } };
-      const currentRange = this._apexBrush ? this._readChartRange(this._apexChart) : undefined;
-      const brushRange = this._apexBrush ? this._readChartRange(this._apexBrush) : undefined;
-      const brushIsAtEnd = currentRange && brushRange && currentRange.max === brushRange.max;
+      this._applySeriesColors(graphData, brushData);
       this._headerState = [...this._headerState];
-      // With a brush, the main chart shows the brush selection. Work it out
-      // before updating either chart: without an x range of its own, a data
-      // update would reset the main chart to the full graph span.
-      let brushSelection: { min: number; max: number } | undefined;
-      if (this._apexBrush) {
-        const newMinMax = this._findStartAndEndOfChart(
-          new Date(start.getTime() - this._serverTimeOffset),
-          new Date(end.getTime() - this._serverTimeOffset),
-          true,
-        );
-        brushData.xaxis = {
-          min: newMinMax.start,
-          max: newMinMax.end,
-        };
-        if (this._brushInit && !currentRange) {
-          log('Brush selection bounds are unavailable or invalid; resetting to the latest range.');
-        }
-        if (brushIsAtEnd || !this._brushInit || !currentRange) {
-          brushSelection = {
-            min: Math.max(
-              newMinMax.start,
-              newMinMax.end - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
-            ),
-            max: newMinMax.end,
-          };
-        } else {
-          const selectionWidth = Math.min(currentRange.max - currentRange.min, newMinMax.end - newMinMax.start);
-          const selectionStart = Math.max(newMinMax.start, Math.min(currentRange.min, newMinMax.end - selectionWidth));
-          brushSelection = { min: selectionStart, max: selectionStart + selectionWidth };
-        }
-        if (TIMESERIES_TYPES.includes(this._config.chart_type)) {
-          graphData.xaxis = { ...graphData.xaxis, min: brushSelection.min, max: brushSelection.max };
-        }
-      }
+      const brushSelection = this._brushSelection(start, end, graphData, brushData);
       const chartUpdates: Promise<unknown>[] = [];
       chartUpdates.push(
         this._apexChart?.updateOptions(
@@ -1767,6 +1292,218 @@ export class ChartsCard extends LitElement {
         this._queueResample();
       }
     }
+  }
+
+  // Timeline charts: header states, and the series of the main chart and brush
+  // with their offsets, extend_to and invert applied
+  private _timelineData(start: Date, end: Date, now: Date): { graphData: ChartUpdate; brushData: ChartUpdate } {
+    const graphData: ChartUpdate = { series: [] };
+    const brushData: ChartUpdate = { series: [] };
+    this._graphs!.forEach((graph, index) => {
+      if (!graph) return [];
+      const inHeader = this._config?.series[index].show.in_header;
+      if (inHeader && inHeader !== 'raw') {
+        if (inHeader === 'after_now' || inHeader === 'before_now') {
+          // before_now / after_now
+          this._headerState[index] = graph.nowValue(
+            now.getTime() + (this._seriesOffset[index] ? this._seriesOffset[index] : 0),
+            inHeader === 'before_now',
+          );
+        } else {
+          // not raw
+          this._headerState[index] = graph.lastState;
+        }
+      } else if (inHeader === 'raw' && this._hasNoEntityState(index)) {
+        // Without an entity state, `raw` shows the latest value instead.
+        this._headerState[index] = graph.lastState;
+      }
+      if (!this._config?.series[index].show.in_chart && !this._config?.series[index].show.in_brush) {
+        return;
+      }
+      // Names go with every refresh so a renamed entity, device or area shows up
+      const name = computeName(this._hass, index, this._config?.series, this._entities);
+      if (graph.history.length === 0) {
+        if (this._config?.series[index].show.in_chart) graphData.series.push({ name, data: [] });
+        if (this._config?.series[index].show.in_brush) brushData.series.push({ name, data: [] });
+        return;
+      }
+      let data: EntityCachePoints;
+      const offset = this._serverTimeOffset + (this._seriesOffset[index] || 0) - (this._seriesTimeDelta[index] || 0);
+      if (offset) {
+        data = offsetData(graph.history, offset);
+      } else {
+        data = [...graph.history];
+      }
+      if (this._config?.series[index].type !== 'column' && this._config?.series[index].extend_to) {
+        const lastPoint = data.slice(-1)[0]!;
+        if (this._config?.series[index].extend_to === 'end' && lastPoint[0] < end.getTime() - this._serverTimeOffset) {
+          data.push([end.getTime() - this._serverTimeOffset, lastPoint[1]]);
+        } else if (
+          this._config?.series[index].extend_to === 'now' &&
+          lastPoint[0] < now.getTime() - this._serverTimeOffset
+        ) {
+          data.push([now.getTime() - this._serverTimeOffset, lastPoint[1]]);
+        }
+      }
+      const result = { name, data: this._config?.series[index].invert ? this._invertData(data) : data };
+      if (this._config?.series[index].show.in_chart) graphData.series.push(result);
+      if (this._config?.series[index].show.in_brush) brushData.series.push(result);
+      return;
+    });
+    graphData.annotations = this._computeAnnotations(start, end, new Date(now.getTime() - this._serverTimeOffset));
+    if (this._yAxisConfig) {
+      graphData.yaxis = this._computeYAxisAutoMinMax(start, end);
+    }
+    if (!this._apexBrush) {
+      const newMinMax = this._findStartAndEndOfChart(
+        new Date(start.getTime() - this._serverTimeOffset),
+        new Date(end.getTime() - this._serverTimeOffset),
+        false,
+      );
+      graphData.xaxis = {
+        min: newMinMax.start,
+        max: newMinMax.end,
+      };
+    }
+    return { graphData, brushData };
+  }
+
+  // Pie, donut and radialBar: the latest value of each series, and the header states
+  private _valueData(): ChartUpdate {
+    return {
+      series: this._graphs!.flatMap((graph, index) => {
+        if (!graph) return [];
+        let data: number;
+        // Without an entity state, `raw` also resolves to the latest value.
+        const computedHeader = this._config?.series[index].show.in_header !== 'raw' || this._hasNoEntityState(index);
+        if (graph.history.length === 0) {
+          if (computedHeader) {
+            this._headerState[index] = null;
+          }
+          data = 0;
+        } else {
+          const lastState = graph.lastState;
+          data = lastState || 0;
+          if (computedHeader) {
+            this._headerState[index] = lastState;
+          }
+        }
+        if (!this._config?.series[index].show.in_chart) {
+          return [];
+        }
+        if (this._config?.chart_type === 'radialBar') {
+          return [getPercentFromValue(data, this._config.series[index].min, this._config.series[index].max)];
+        } else {
+          return [data];
+        }
+      }),
+      // Names go with every refresh so a renamed entity, device or area shows up
+      labels: this._config!.series_in_graph.map((serie, index) =>
+        computeName(this._hass, index, this._config!.series_in_graph, undefined, seriesState(this._hass, serie)),
+      ),
+    };
+  }
+
+  // rangeArea and heatmap: turn the series into the chart's own shape. Returns
+  // whether a rangeArea has no data at all.
+  private _reshapeVisualSeries(graphData: ChartUpdate): boolean | undefined {
+    let visualEmpty: boolean | undefined;
+    if (this._config!.chart_type === 'rangeArea') {
+      const [lower, upper] = graphData.series as { name: string; data: EntityCachePoints }[];
+      const data = rangeAreaData(lower.data, upper.data);
+      visualEmpty = data.every((point) => point.y[0] === null);
+      graphData.series = [{ name: `${lower.name} - ${upper.name}`, data }];
+    } else if (this._config!.chart_type === 'heatmap') {
+      const series = graphData.series as { name: string; data: EntityCachePoints }[];
+      const rows = heatmapData(
+        series.map((serie) => serie.data),
+        this._config!.heatmap?.max_cells,
+      );
+      // Native datetime heatmaps position sparse cells by timestamp. Omit
+      // missing cells: native heatmap shading otherwise treats null as zero.
+      graphData.series = rows.map((data, row) => ({
+        name: series[row].name,
+        data: data.filter((point) => point.y !== null),
+      }));
+    }
+    return visualEmpty;
+  }
+
+  // Series colors, and the markers, legend, tooltip and gradient fill of threshold colors
+  private _applySeriesColors(graphData: ChartUpdate, brushData: ChartUpdate): void {
+    const config = this._config!;
+    graphData.colors = this._computeChartColors(false);
+    if (config.chart_type === 'heatmap' && !config.color_list && !config.series.some((serie) => serie.color)) {
+      graphData.colors = config.series.map(() => graphData.colors[0]);
+    }
+    if (this._apexBrush) {
+      brushData.colors = this._computeChartColors(true);
+    }
+    if (config.experimental?.color_threshold && config.series.some((serie) => serie.color_threshold)) {
+      graphData.markers = {
+        colors: computeColors(
+          config.series_in_graph.flatMap((serie, index) => {
+            if (serie.type === 'column') return [];
+            return [this._colors[index]];
+          }),
+        ),
+      };
+      graphData.legend = { markers: { fillColors: computeColors(this._colors) } };
+      graphData.tooltip = { marker: { fillColors: graphData.legend.markers.fillColors } };
+      const mainFill = this._computeThresholdFill(false);
+      if (mainFill) graphData.fill = mainFill;
+      if (this._apexBrush) {
+        const brushFill = this._computeThresholdFill(true);
+        if (brushFill) brushData.fill = brushFill;
+      }
+    }
+  }
+
+  // With a brush: the brush's x range, and the selection the main chart shows
+  private _brushSelection(
+    start: Date,
+    end: Date,
+    graphData: ChartUpdate,
+    brushData: ChartUpdate,
+  ): { min: number; max: number } | undefined {
+    const currentRange = this._apexBrush ? this._readChartRange(this._apexChart!) : undefined;
+    const brushRange = this._apexBrush ? this._readChartRange(this._apexBrush) : undefined;
+    const brushIsAtEnd = currentRange && brushRange && currentRange.max === brushRange.max;
+    // With a brush, the main chart shows the brush selection. Work it out
+    // before updating either chart: without an x range of its own, a data
+    // update would reset the main chart to the full graph span.
+    let brushSelection: { min: number; max: number } | undefined;
+    if (this._apexBrush) {
+      const newMinMax = this._findStartAndEndOfChart(
+        new Date(start.getTime() - this._serverTimeOffset),
+        new Date(end.getTime() - this._serverTimeOffset),
+        true,
+      );
+      brushData.xaxis = {
+        min: newMinMax.start,
+        max: newMinMax.end,
+      };
+      if (this._brushInit && !currentRange) {
+        log('Brush selection bounds are unavailable or invalid; resetting to the latest range.');
+      }
+      if (brushIsAtEnd || !this._brushInit || !currentRange) {
+        brushSelection = {
+          min: Math.max(
+            newMinMax.start,
+            newMinMax.end - (this._brushSelectionSpan ? this._brushSelectionSpan : this._graphSpan / 4),
+          ),
+          max: newMinMax.end,
+        };
+      } else {
+        const selectionWidth = Math.min(currentRange.max - currentRange.min, newMinMax.end - newMinMax.start);
+        const selectionStart = Math.max(newMinMax.start, Math.min(currentRange.min, newMinMax.end - selectionWidth));
+        brushSelection = { min: selectionStart, max: selectionStart + selectionWidth };
+      }
+      if (TIMESERIES_TYPES.includes(this._config!.chart_type)) {
+        graphData.xaxis = { ...graphData.xaxis, min: brushSelection.min, max: brushSelection.max };
+      }
+    }
+    return brushSelection;
   }
 
   // Loads every series. Computed series come last, in config order: each one
@@ -1829,173 +1566,22 @@ export class ChartsCard extends LitElement {
   }
 
   private _computeAnnotations(start: Date, end: Date, now: Date) {
-    return {
-      ...this._computeMinMaxPointsAnnotations(start, end),
-      ...this._computeNowAnnotation(now),
-    };
-  }
-
-  private _computeMinMaxPointsAnnotations(start: Date, end: Date) {
-    const sameDay =
-      start.getFullYear() === end.getFullYear() &&
-      start.getMonth() === end.getMonth() &&
-      start.getDate() === end.getDate();
-    const minMaxPoints = this._config?.series_in_graph.flatMap((serie, index) => {
-      if (serie.show.extremas) {
-        const { min, max } = this._graphs?.[serie.index]?.minMaxWithTimestamp(
-          this._seriesOffset[serie.index]
-            ? new Date(start.getTime() + this._seriesOffset[serie.index]).getTime()
-            : start.getTime(),
-          this._seriesOffset[serie.index]
-            ? new Date(end.getTime() + this._seriesOffset[serie.index]).getTime()
-            : end.getTime(),
-          this._serverTimeOffset - (this._seriesTimeDelta[serie.index] || 0),
-        ) || {
-          min: [0, null],
-          max: [0, null],
-        };
-        const bgColor = computeColor(this._colors[index]);
-        const txtColor = computeTextColor(bgColor);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const extremas: any = [];
-        if (min[0] && ['min', 'min+time', true, 'time'].includes(serie.show.extremas)) {
-          const withTime = serie.show.extremas === 'time' || serie.show.extremas === 'min+time';
-          extremas.push(
-            ...this._getPointAnnotationStyle(
-              min,
-              this._seriesOffset[serie.index],
-              bgColor,
-              txtColor,
-              serie,
-              index,
-              serie.invert,
-              sameDay,
-              withTime,
-            ),
-          );
-        }
-        if (max[0] && ['max', 'max+time', true, 'time'].includes(serie.show.extremas)) {
-          const withTime = serie.show.extremas === 'time' || serie.show.extremas === 'max+time';
-          extremas.push(
-            ...this._getPointAnnotationStyle(
-              max,
-              this._seriesOffset[serie.index],
-              bgColor,
-              txtColor,
-              serie,
-              index,
-              serie.invert,
-              sameDay,
-              withTime,
-            ),
-          );
-        }
-        return extremas;
-      } else {
-        return [];
-      }
-    });
-    return { points: [...(minMaxPoints || []), ...(this._config?.apex_config?.annotations?.points || [])] };
-  }
-
-  private _getPointAnnotationStyle(
-    value: HistoryPoint,
-    offset: number,
-    bgColor: string,
-    txtColor: string,
-    serie: ChartCardSeriesConfig,
-    index: number,
-    invert = false,
-    sameDay: boolean,
-    withTime: boolean,
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const points: any = [];
-    const multiYAxis =
-      this._config?.apex_config?.yaxis &&
-      Array.isArray(this._config.apex_config.yaxis) &&
-      this._config.apex_config.yaxis.length > 1;
-    points.push({
-      x: offset ? value[0] - offset : value[0],
-      y: invert && value[1] ? -value[1] : value[1],
-      seriesIndex: index,
-      yAxisIndex: multiYAxis ? index : 0,
-      marker: {
-        strokeColor: bgColor,
-        fillColor: 'var(--card-background-color)',
-      },
-      label: {
-        text: myFormatNumber(value[1], this._hass?.locale, serie),
-        borderColor: 'var(--card-background-color)',
-        offsetY: (value[1] ?? 0) < 0 ? 30 : 0,
-        borderWidth: 2,
-        style: {
-          background: bgColor,
-          color: txtColor,
+    return computeAnnotations(
+      {
+        config: this._config,
+        hass: this._hass,
+        colors: this._colors,
+        source: {
+          minMax: (serie, from, to, timeOffset) =>
+            this._graphs?.[serie.index]?.minMaxWithTimestamp(from, to, timeOffset),
+          offset: (serie) => this._seriesOffset[serie.index],
+          timeOffset: (serie) => this._serverTimeOffset - (this._seriesTimeDelta[serie.index] || 0),
         },
       },
-    });
-    if (withTime) {
-      let bgColorTime = new TinyColor(computeColor('var(--card-background-color)'));
-      bgColorTime =
-        bgColorTime.isValid && bgColorTime.getLuminance() > 0.5 ? bgColorTime.darken(20) : bgColorTime.lighten(20);
-      const txtColorTime = computeTextColor(bgColorTime.toHexString());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let options: any = { timeStyle: 'medium' };
-      if (!sameDay) {
-        options.dateStyle = 'medium';
-      }
-      options = { ...options, ...(is12Hour(this._config, this._hass) ? { hour12: true } : { hourCycle: 'h23' }) };
-      const lang = getLang(this._config, this._hass);
-      points.push({
-        x: offset ? value[0] - offset : value[0],
-        y: invert && value[1] ? -value[1] : value[1],
-        seriesIndex: index,
-        yAxisIndex: multiYAxis ? index : 0,
-        marker: {
-          size: 0,
-        },
-        label: {
-          text: `${Intl.DateTimeFormat(lang, options).format(value[0])}`,
-          borderColor: 'var(--card-background-color)',
-          offsetY: (value[1] ?? 0) < 0 ? 38 : -22,
-          borderWidth: 0,
-          style: {
-            background: bgColorTime.toHexString(),
-            color: txtColorTime,
-            fontSize: '8px',
-            fontWeight: 200,
-          },
-        },
-      });
-    }
-    return points;
-  }
-
-  private _computeNowAnnotation(now: Date) {
-    if (this._config?.now?.show) {
-      const color = computeColor(this._config.now.color || 'var(--primary-color)');
-      const textColor = computeTextColor(color);
-      return {
-        xaxis: [
-          {
-            x: now.getTime(),
-            strokeDashArray: 3,
-            label: {
-              text: this._config.now.label,
-              borderColor: color,
-              style: {
-                color: textColor,
-                background: color,
-              },
-            },
-            borderColor: color,
-          },
-          ...(this._config?.apex_config?.annotations?.xaxis || []),
-        ],
-      };
-    }
-    return {};
+      start,
+      end,
+      now,
+    );
   }
 
   private _configureSeriesVisibility(layout: ApexOptions): void {
@@ -2038,83 +1624,17 @@ export class ChartsCard extends LitElement {
 
   private _computeYAxisAutoMinMax(start: Date, end: Date) {
     if (!this._config) return;
-    this._yAxisConfig?.map((yaxis) => {
-      if (yaxis.min_type !== minmax_type.FIXED || yaxis.max_type !== minmax_type.FIXED) {
-        const minMax = yaxis.series_id?.map((id) => {
-          const serie = this._config!.series_in_graph[id];
-          if (this._isHiddenInChart(serie)) return undefined;
-          const graphIndex = serie.index;
-          const lMinMax = this._graphs![graphIndex]?.minMaxWithTimestampForYAxis(
-            start.getTime() + (this._seriesOffset[graphIndex] || 0),
-            end.getTime() + (this._seriesOffset[graphIndex] || 0),
-          );
-          if (!lMinMax) return undefined;
-          if (serie.invert) {
-            const cmin = lMinMax.min[1];
-            const cmax = lMinMax.max[1];
-            if (cmin !== null) {
-              lMinMax.max[1] = -cmin;
-            }
-            if (cmax !== null) {
-              lMinMax.min[1] = -cmax;
-            }
-          }
-          return lMinMax;
-        });
-        let min: number | null = null;
-        let max: number | null = null;
-        minMax?.forEach((elt) => {
-          if (!elt) return;
-          if (min === undefined || min === null) {
-            min = elt.min[1];
-          } else if (elt.min[1] !== null && min > elt.min[1]) {
-            min = elt.min[1];
-          }
-          if (max === undefined || max === null) {
-            max = elt.max[1];
-          } else if (elt.max[1] !== null && max < elt.max[1]) {
-            max = elt.max[1];
-          }
-        });
-        const stacked = this._stackTotals(yaxis.series_id, start, end);
-        if (stacked.max !== undefined && (max === null || stacked.max > max)) max = stacked.max;
-        if (stacked.min !== undefined && (min === null || stacked.min < min)) min = stacked.min;
-        const logarithmic = yaxis.logarithmic ?? yaxis.apex_config?.logarithmic ?? false;
-        if (yaxis.align_to !== undefined && !logarithmic) {
-          if (min !== null && yaxis.min_type !== minmax_type.FIXED) {
-            if (min % yaxis.align_to !== 0) {
-              min = min >= 0 ? min - (min % yaxis.align_to) : -(yaxis.align_to + (min % yaxis.align_to) - min);
-            }
-          }
-          if (max !== null && yaxis.max_type !== minmax_type.FIXED) {
-            if (max % yaxis.align_to !== 0) {
-              max = max >= 0 ? yaxis.align_to - (max % yaxis.align_to) + max : (max % yaxis.align_to) - max;
-            }
-          }
-        }
-        yaxis.series_id?.forEach((id) => {
-          const apexYAxis = (this._config!.apex_config!.yaxis as ApexYAxis[])[id];
-          if (yaxis.min_type !== minmax_type.FIXED) {
-            apexYAxis.min =
-              min === null
-                ? yaxis.min_type === minmax_type.SOFT
-                  ? yaxis.min
-                  : undefined
-                : this._getMinMaxBasedOnType(true, min, yaxis.min as number, yaxis.min_type!);
-          }
-          if (yaxis.max_type !== minmax_type.FIXED) {
-            apexYAxis.max =
-              max === null
-                ? yaxis.max_type === minmax_type.SOFT
-                  ? yaxis.max
-                  : undefined
-                : this._getMinMaxBasedOnType(false, max, yaxis.max as number, yaxis.max_type!);
-          }
-        });
-      }
-    });
-    this._yAxisConfig?.forEach((yaxis) => this._applyTickStep(yaxis));
-    return this._config?.apex_config?.yaxis;
+    return computeYAxisAutoMinMax(this._config, this._yAxisConfig, start, end, this._yAxisDataSource());
+  }
+
+  // The card's series data, as the y-axis extremas read it
+  private _yAxisDataSource(): YAxisDataSource {
+    return {
+      isHidden: (serie) => this._isHiddenInChart(serie),
+      minMax: (serie, start, end) => this._graphs![serie.index]?.minMaxWithTimestampForYAxis(start, end),
+      history: (serie) => this._graphs?.[serie.index]?.history ?? [],
+      offset: (serie) => this._seriesOffset[serie.index] || 0,
+    };
   }
 
   private _isHiddenInChart(serie: ChartCardSeriesConfig): boolean {
@@ -2123,259 +1643,25 @@ export class ChartsCard extends LitElement {
       : !!(this._config?.experimental?.hidden_by_default && serie.show.hidden_by_default);
   }
 
-  // Highest positive and lowest negative stack total of the visible range, as
-  // ApexCharts stacks them: per timestamp and stack group; when a chart mixes
-  // series types, only columns stack (`chart.stackOnlyBar`, on by default).
-  private _stackTotals(seriesIds: number[] | undefined, start: Date, end: Date): { min?: number; max?: number } {
-    const config = this._config!;
-    if (!seriesIds || !(config.stacked || config.apex_config?.chart?.stacked)) return {};
-    const onlyColumns =
-      new Set(config.series_in_graph.map((serie) => serie.type)).size > 1 &&
-      config.apex_config?.chart?.stackOnlyBar !== false;
-    // Visible points of each stacked series, on the chart's time axis, per stack group
-    const groups = new Map<string, EntityCachePoints[]>();
-    seriesIds.forEach((id) => {
-      const serie = config.series_in_graph[id];
-      if (this._isHiddenInChart(serie) || (onlyColumns && serie.type !== 'column')) return;
-      const offset = this._seriesOffset[serie.index] || 0;
-      const from = start.getTime() + offset;
-      const to = end.getTime() + offset;
-      const group = serie.type === 'column' ? (serie.stack_group ?? '') : '';
-      const points: EntityCachePoints = (this._graphs?.[serie.index]?.history ?? [])
-        .filter(([timestamp]) => timestamp >= from && timestamp <= to)
-        .map(([timestamp, value]) => [timestamp - offset, value !== null && serie.invert ? -value : value]);
-      groups.set(group, [...(groups.get(group) ?? []), points]);
-    });
-    const totals: [number, number][] = [];
-    groups.forEach((members) => {
-      alignSeries(members).forEach(([, values]) => {
-        const total: [number, number] = [0, 0];
-        values.forEach((value) => {
-          if (value !== null) total[value > 0 ? 0 : 1] += value;
-        });
-        totals.push(total);
-      });
-    });
-    const result: { min?: number; max?: number } = {};
-    totals.forEach(([positive, negative]) => {
-      if (positive > 0 && (result.max === undefined || positive > result.max)) result.max = positive;
-      if (negative < 0 && (result.min === undefined || negative < result.min)) result.min = negative;
-    });
-    return result;
-  }
-
-  // `tick_step`: a tick every N units. Moves the non-fixed extremas outwards to a
-  // multiple of N, then derives ApexCharts' tickAmount from the final range.
-  private _applyTickStep(yaxis: ChartCardYAxis): void {
-    const step = yaxis.tick_step;
-    if (!step || step <= 0 || (yaxis.logarithmic ?? yaxis.apex_config?.logarithmic)) return;
-    yaxis.series_id?.forEach((id) => {
-      const apexYAxis = (this._config!.apex_config!.yaxis as ApexYAxis[])[id];
-      if (typeof apexYAxis.min !== 'number' || typeof apexYAxis.max !== 'number') return;
-      // Rounding guards against floating-point noise (0.30000000000000004 / 0.1)
-      const steps = (value: number) => Math.round((value / step) * 1e9) / 1e9;
-      if (yaxis.min_type !== minmax_type.FIXED) apexYAxis.min = Math.floor(steps(apexYAxis.min)) * step;
-      if (yaxis.max_type !== minmax_type.FIXED) apexYAxis.max = Math.ceil(steps(apexYAxis.max)) * step;
-      const tickAmount = Math.round((apexYAxis.max - apexYAxis.min) / step);
-      // Past MAX_TICK_STEPS labels overlap: keep ApexCharts' own tick count
-      if (tickAmount >= 1 && tickAmount <= MAX_TICK_STEPS) apexYAxis.tickAmount = tickAmount;
-    });
-  }
-
-  private _getMinMaxBasedOnType(isMin: boolean, value: number, configMinMax: number, type: minmax_type): number {
-    switch (type) {
-      case minmax_type.AUTO:
-        return value;
-      case minmax_type.SOFT:
-        if ((isMin && value > configMinMax) || (!isMin && value < configMinMax)) {
-          return configMinMax;
-        } else {
-          return value;
-        }
-      case minmax_type.ABSOLUTE:
-        return value + configMinMax;
-      default:
-        return value;
-    }
-  }
-
-  private _getTypeOfMinMax(value?: 'auto' | number | string): [number | undefined, minmax_type] {
-    const regexFloat = /[+-]?\d+(\.\d+)?/g;
-    if (typeof value === 'number') {
-      return [value, minmax_type.FIXED];
-    } else if (value === undefined || value === 'auto') {
-      return [undefined, minmax_type.AUTO];
-    }
-    if (typeof value === 'string' && value !== 'auto') {
-      const matched = value.match(regexFloat);
-      if (!matched || matched.length !== 1) {
-        throw new Error(t('error.yaxis.badMinMaxFormat', { value }));
-      }
-      const floatValue = parseFloat(matched[0]);
-      if (value.startsWith('~')) {
-        return [floatValue, minmax_type.SOFT];
-      } else if (value.startsWith('|') && value.endsWith('|')) {
-        return [floatValue, minmax_type.ABSOLUTE];
-      }
-    }
-    throw new Error(t('error.yaxis.badMinMaxFormat', { value }));
-  }
-
   private _computeChartColors(brush: boolean): (string | ThresholdColorFn)[] {
-    const colors = brush ? this._brushColors : this._colors;
-    const defaultColors: (string | ThresholdColorFn)[] = computeColors(colors);
-    const series = brush ? this._config?.series_in_brush : this._config?.series_in_graph;
-    series?.forEach((serie, index) => {
-      if (
-        this._config?.experimental?.color_threshold &&
-        (PLAIN_COLOR_TYPES.includes(this._config!.chart_type!) || serie.type === 'column') &&
-        serie.color_threshold &&
-        serie.color_threshold.length > 0
-      ) {
-        defaultColors[index] = function (
-          { value }: { value: number },
-          sortedL = serie.color_threshold!,
-          defColor = colors[index],
-        ) {
-          let returnValue = sortedL[0].color || defColor;
-          sortedL.forEach((color) => {
-            if (value > color.value) returnValue = color.color || defColor;
-          });
-          return computeColor(returnValue);
-        };
-      }
-    });
-    return defaultColors.slice(0, series?.length);
+    return computeChartColors(
+      this._config,
+      brush ? this._config?.series_in_brush : this._config?.series_in_graph,
+      brush ? this._brushColors : this._colors,
+    );
   }
 
   private _computeThresholdFill(brush: boolean): ApexOptions['fill'] {
-    if (!this._config) return undefined;
-    const customFill = brush ? this._config.brush?.apex_config?.fill : this._config.apex_config?.fill;
-    if (customFill !== undefined) return undefined;
-    const series = brush ? this._config.series_in_brush : this._config.series_in_graph;
-    const colors = brush ? this._brushColors : this._colors;
-    return {
-      gradient: {
-        type: 'vertical',
-        colorStops: series.map((serie, index) => {
-          if (!serie.color_threshold || ![undefined, 'area', 'line'].includes(serie.type)) return [];
-          const min = this._graphs?.[serie.index]?.min;
-          const max = this._graphs?.[serie.index]?.max;
-          if (min === undefined || max === undefined) return [];
-          return this._computeFillColorStops(serie, min, max, computeColor(colors[index]), serie.invert) || [];
-        }),
-      },
-    };
-  }
-
-  private _computeFillColorStops(
-    serie: ChartCardSeriesConfig,
-    min: number,
-    max: number,
-    defColor: string,
-    invert = false,
-  ): { offset: number; color: string; opacity: number }[] | undefined {
-    if (!serie.color_threshold) return undefined;
-    const scale = max - min;
-
-    const result = serie.color_threshold.flatMap((thres, index, arr) => {
-      if (
-        (thres.value > max && arr[index - 1] && arr[index - 1].value > max) ||
-        (thres.value < min && arr[index + 1] && arr[index + 1].value < min)
-      ) {
-        return [];
-      }
-      let color: string | undefined = undefined;
-      const defaultOp = serie.opacity !== undefined ? serie.opacity : serie.type === 'area' ? DEFAULT_AREA_OPACITY : 1;
-      let opacity = thres.opacity === undefined ? defaultOp : thres.opacity;
-      if (thres.value > max && arr[index - 1]) {
-        const factor = (max - arr[index - 1].value) / (thres.value - arr[index - 1].value);
-        color = interpolateColor(
-          new TinyColor(arr[index - 1].color || defColor).toHexString(),
-          new TinyColor(thres.color || defColor).toHexString(),
-          factor,
-        );
-
-        const prevOp = arr[index - 1].opacity === undefined ? defaultOp : arr[index - 1].opacity!;
-
-        const curOp = thres.opacity === undefined ? defaultOp : thres.opacity!;
-
-        if (prevOp > curOp) {
-          opacity = (prevOp - curOp) * (1 - factor) + curOp;
-        } else {
-          opacity = (curOp - prevOp) * factor + prevOp;
-        }
-        opacity = opacity < 0 ? -opacity : opacity;
-      } else if (thres.value < min && arr[index + 1]) {
-        const factor = (arr[index + 1].value - min) / (arr[index + 1].value - thres.value);
-        color = interpolateColor(
-          new TinyColor(arr[index + 1].color || defColor).toHexString(),
-          new TinyColor(thres.color || defColor).toHexString(),
-          factor,
-        );
-
-        const nextOp = arr[index + 1].opacity === undefined ? defaultOp : arr[index + 1].opacity!;
-
-        const curOp = thres.opacity === undefined ? defaultOp : thres.opacity!;
-        if (nextOp > curOp) {
-          opacity = (nextOp - curOp) * (1 - factor) + curOp;
-        } else {
-          opacity = (curOp - nextOp) * factor + nextOp;
-        }
-        opacity = opacity < 0 ? -opacity : opacity;
-      }
-      color = color || new TinyColor(thres.color || defColor).toHexString();
-      if ([undefined, 'line'].includes(serie.type)) color = new TinyColor(color).setAlpha(opacity).toHex8String();
-      const position = Math.max(0, Math.min(100, (max - thres.value) * (100 / scale)));
-      return [
-        {
-          color: color || new TinyColor(thres.color || defColor).toHexString(),
-          offset: scale <= 0 ? 0 : invert ? 100 - position : position,
-          opacity,
-        },
-      ];
-    });
-    return invert ? result : result.reverse();
+    return computeThresholdFill(
+      this._config,
+      brush,
+      brush ? this._brushColors : this._colors,
+      (serie) => this._graphs?.[serie.index],
+    );
   }
 
   private _computeHeaderStateColor(serie: ChartCardSeriesConfig, value: number | null): string {
-    let color = '';
-    if (this._config?.header?.colorize_states) {
-      if (
-        this._config.experimental?.color_threshold &&
-        serie.show.header_color_threshold &&
-        serie.color_threshold &&
-        serie.color_threshold.length > 0 &&
-        value !== null
-      ) {
-        const index = serie.color_threshold.findIndex((thres) => {
-          return thres.value > value;
-        });
-        if (index < 0) {
-          color = computeColor(
-            serie.color_threshold[serie.color_threshold.length - 1].color || this._headerColors[serie.index],
-          );
-        } else if (index === 0) {
-          color = computeColor(serie.color_threshold[0].color || this._headerColors[serie.index]);
-        } else {
-          const prev = serie.color_threshold[index - 1];
-          const next = serie.color_threshold[index];
-          if (serie.type === 'column') {
-            color = computeColor(prev.color || this._headerColors[serie.index]);
-          } else {
-            const factor = (value - prev.value) / (next.value - prev.value);
-            color = interpolateColor(
-              computeColor(prev.color || this._headerColors[serie.index]),
-              computeColor(next.color || this._headerColors[serie.index]),
-              factor,
-            );
-          }
-        }
-      } else {
-        return this._headerColors && this._headerColors.length > 0 ? `color: ${this._headerColors[serie.index]};` : '';
-      }
-    }
-    return color ? `color: ${color};` : '';
+    return computeHeaderStateColor(this._config, serie, value, this._headerColors);
   }
 
   private _computeLastState(value: number | null, index: number): string | number | null {
@@ -2537,106 +1823,7 @@ export class ChartsCard extends LitElement {
   }
 
   static getStubConfig(hass: HomeAssistant, entities: string[], entitiesFallback: string[]) {
-    const entityFilter = (stateObj: HassEntity): boolean => {
-      return !isNaN(Number(stateObj.state));
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const _arrayFilter = (array: any[], conditions: Array<(value: any) => boolean>, maxSize: number) => {
-      if (!maxSize || maxSize > array.length) {
-        maxSize = array.length;
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const filteredArray: any[] = [];
-
-      for (let i = 0; i < array.length && filteredArray.length < maxSize; i++) {
-        let meetsConditions = true;
-
-        for (const condition of conditions) {
-          if (!condition(array[i])) {
-            meetsConditions = false;
-            break;
-          }
-        }
-
-        if (meetsConditions) {
-          filteredArray.push(array[i]);
-        }
-      }
-
-      return filteredArray;
-    };
-    const _findEntities = (
-      hass: HomeAssistant,
-      maxEntities: number,
-      entities: string[],
-      entitiesFallback: string[],
-      includeDomains?: string[],
-      entityFilter?: (stateObj: HassEntity) => boolean,
-    ) => {
-      const conditions: Array<(value: string) => boolean> = [];
-
-      if (includeDomains?.length) {
-        conditions.push((eid) => includeDomains!.includes(eid.split('.')[0]));
-      }
-
-      if (entityFilter) {
-        conditions.push((eid) => hass.states[eid] && entityFilter(hass.states[eid]));
-      }
-
-      const entityIds = _arrayFilter(entities, conditions, maxEntities);
-
-      if (entityIds.length < maxEntities && entitiesFallback.length) {
-        const fallbackEntityIds = _findEntities(
-          hass,
-          maxEntities - entityIds.length,
-          entitiesFallback,
-          [],
-          includeDomains,
-          entityFilter,
-        );
-
-        entityIds.push(...fallbackEntityIds);
-      }
-
-      return entityIds;
-    };
-    const includeDomains = ['sensor'];
-    const maxEntities = 2;
-
-    const foundEntities = _findEntities(hass, maxEntities, entities, entitiesFallback, includeDomains, entityFilter);
-    const conf = {
-      header: { show: true, title: 'ApexCharts-Card', show_states: true, colorize_states: true },
-      series: [] as ChartCardSeriesExternalConfig[],
-    };
-    if (foundEntities[0]) {
-      conf.series[0] = {
-        entity: foundEntities[0],
-        data_generator: `// REMOVE ME
-const now = new Date();
-const data = [];
-for(let i = 0; i <= 24; i++) {
-  data.push([now.getTime() - i * 1000 * 60 * 60, Math.floor((Math.random() * 10) + 1)])
-}
-return data.reverse();
-`,
-      };
-    }
-    if (foundEntities[1]) {
-      conf.series[1] = {
-        entity: foundEntities[1],
-        type: 'column',
-        data_generator: `// REMOVE ME
-const now = new Date();
-const data = [];
-for(let i = 0; i <= 24; i++) {
-  data.push([now.getTime() - i * 1000 * 60 * 60, Math.floor((Math.random() * 10) + 1)])
-}
-return data.reverse();
-`,
-      };
-    }
-    return conf;
+    return getStubConfig(hass, entities, entitiesFallback);
   }
 
   static async getConfigElement(): Promise<HTMLElement> {
@@ -2645,81 +1832,4 @@ return data.reverse();
   }
 }
 
-// Configure the preview in the Lovelace card picker
-const NUMERIC_DOMAINS = ['counter', 'input_number', 'number'];
-
-const isNumericEntity = (hass: HomeAssistant, entityId: string): boolean => {
-  const domain = entityId.split('.')[0];
-  if (NUMERIC_DOMAINS.includes(domain)) return true;
-  if (domain !== 'sensor') return false;
-  const stateObj = hass.states[entityId];
-  if (!stateObj) return false;
-  return !!stateObj.attributes.unit_of_measurement || !!stateObj.attributes.state_class;
-};
-
-const getEntitySuggestion = (hass: HomeAssistant, entityId: string) => {
-  if (!isNumericEntity(hass, entityId)) return null;
-  const stateClass = hass.states[entityId]?.attributes.state_class;
-  if (stateClass === 'total' || stateClass === 'total_increasing') {
-    return [
-      {
-        label: 'Last 7 days',
-        config: {
-          type: 'custom:apexcharts-card',
-          graph_span: '7d',
-          span: { end: 'day' },
-          series: [{ entity: entityId, type: 'column', statistics: { type: 'change', period: 'day' } }],
-        },
-      },
-      {
-        label: 'Last 30 days',
-        config: {
-          type: 'custom:apexcharts-card',
-          graph_span: '30d',
-          span: { end: 'day' },
-          series: [{ entity: entityId, type: 'column', statistics: { type: 'change', period: 'day' } }],
-        },
-      },
-    ];
-  }
-  if (stateClass === 'measurement') {
-    return [
-      {
-        label: 'Last 24 hours',
-        config: {
-          type: 'custom:apexcharts-card',
-          graph_span: '24h',
-          series: [{ entity: entityId, statistics: { type: 'mean', period: 'hour' } }],
-        },
-      },
-      {
-        label: 'Last 7 days',
-        config: {
-          type: 'custom:apexcharts-card',
-          graph_span: '7d',
-          span: { end: 'day' },
-          series: [{ entity: entityId, statistics: { type: 'mean', period: 'day' } }],
-        },
-      },
-    ];
-  }
-  return {
-    config: {
-      type: 'custom:apexcharts-card',
-      graph_span: '24h',
-      series: [{ entity: entityId, group_by: { func: 'avg' } }],
-    },
-  };
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).customCards = (window as any).customCards || [];
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).customCards.push({
-  type: 'apexcharts-card',
-  name: 'ApexCharts Card',
-  preview: true,
-  description: 'A graph card based on ApexCharts',
-  documentationURL: 'https://github.com/foXaCe/apexcharts-card',
-  getEntitySuggestion,
-});
+registerCustomCard();

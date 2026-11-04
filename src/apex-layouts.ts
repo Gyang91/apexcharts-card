@@ -40,21 +40,28 @@ const THEME_GRID = {
   strokeDashArray: 3,
 };
 
+// ApexCharts locale of the chart: the card's `locale`, else the HA language, else English
+function chartLocale(config: ChartCardConfig, hass: HomeAssistant | undefined) {
+  const locales = getLocales();
+  return {
+    locales: [
+      (config.locale && locales[config.locale]) || (hass?.language && locales[hass.language]) || getDefaultLocale(),
+    ],
+    defaultLocale:
+      (config.locale && locales[config.locale] && config.locale) ||
+      (hass?.language && locales[hass.language] && hass.language) ||
+      'en',
+  };
+}
+
 export function getLayoutConfig(
   config: ChartCardConfig,
   hass: HomeAssistant | undefined = undefined,
   graphs: (GraphEntry | undefined)[] | undefined,
 ): unknown {
-  const locales = getLocales();
   const def = {
     chart: {
-      locales: [
-        (config.locale && locales[config.locale]) || (hass?.language && locales[hass.language]) || getDefaultLocale(),
-      ],
-      defaultLocale:
-        (config.locale && locales[config.locale] && config.locale) ||
-        (hass?.language && locales[hass.language] && hass.language) ||
-        'en',
+      ...chartLocale(config, hass),
       type: config.chart_type || DEFAULT_SERIE_TYPE,
       stacked: config?.stacked,
       ...THEME_CHART,
@@ -154,16 +161,9 @@ export function getBrushLayoutConfig(
   hass: HomeAssistant | undefined = undefined,
   id: string,
 ): unknown {
-  const locales = getLocales();
   const def = {
     chart: {
-      locales: [
-        (config.locale && locales[config.locale]) || (hass?.language && locales[hass.language]) || getDefaultLocale(),
-      ],
-      defaultLocale:
-        (config.locale && locales[config.locale] && config.locale) ||
-        (hass?.language && locales[hass.language] && hass.language) ||
-        'en',
+      ...chartLocale(config, hass),
       type: config.chart_type || DEFAULT_SERIE_TYPE,
       stacked: config?.stacked,
       ...THEME_CHART,
