@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.17.0](https://github.com/Gyang91/apexcharts-card/compare/v2.16.7...v2.17.0) (2026-11-10)
+
+
+### Features
+
+* clearer calendar navigation above the chart ([#45](https://github.com/Gyang91/apexcharts-card/issues/45)) ([e1a13b9](https://github.com/Gyang91/apexcharts-card/commit/e1a13b9bb7c56aad8b543a47fdf373d35f257c55))
+
 ## [2.16.7](https://github.com/Gyang91/apexcharts-card/compare/v2.16.6...v2.16.7) (2026-11-04)
 
 
