@@ -521,8 +521,15 @@ export const stylesApex: CSSResultGroup = css`
     opacity: 1;
   }
 
+  /* ApexCharts 5 colours the tooltip through --apx-tt-* variables (title, arrow, muted
+     text) with its own light/dark palette. Point them at the HA theme too, or the title
+     stays dark slate on a dark card. */
   .apexcharts-tooltip.apexcharts-theme-light,
   .apexcharts-tooltip.apexcharts-theme-dark {
+    --apx-tt-bg: var(--card-background-color);
+    --apx-tt-border: var(--divider-color);
+    --apx-tt-color: var(--primary-text-color);
+    --apx-tt-color-muted: var(--secondary-text-color);
     color: var(--primary-text-color);
     border: 1px solid var(--divider-color);
     background: var(--card-background-color);
