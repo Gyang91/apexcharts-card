@@ -78,17 +78,18 @@ works the same way (both read `.pre-commit-config.yaml`).
 3. Use [Conventional Commits](https://www.conventionalcommits.org/) for your commit
    messages (`feat:`, `fix:`, `docs:`, `chore:` …). This drives the automated changelog
    and version bump.
-4. Open a pull request against `main`. Pull requests from branches of this repository
-   are merged automatically once every check on their last commit has passed
-   (`.github/workflows/automerge.yml`). Open it as a draft, or add the `no-automerge`
-   label, to keep it open. Pull requests from forks are never merged automatically.
+4. Open a pull request against `main`. The repository owner's pull requests are
+   rebased onto `main` automatically once every check has passed
+   (`.github/workflows/auto-merge.yml`); Dependabot's are squash-merged. Open it as a
+   draft, or add the `no-automerge` label, to keep it open. Pull requests from forks
+   and from other authors are never merged automatically.
 
 ## Releases
 
 Releases are automated with [release-please](https://github.com/googleapis/release-please).
 Merging conventional commits into `main` maintains a release pull request; `release.yml`
 tests, merges and tags it and uploads the `apexcharts-card.js` asset, without a manual step.
-After an automatic merge, `automerge.yml` starts `release.yml` itself: merges made with
+After an automatic merge, `auto-merge.yml` starts `release.yml` itself: merges made with
 `GITHUB_TOKEN` trigger no push workflows, `workflow_dispatch` is the exception.
 
 ## Dependency management
@@ -97,6 +98,6 @@ This repo uses **Dependabot** (`.github/dependabot.yml`). It opens dependency up
 pull requests every Monday. Updates of libraries shipped in the card are titled
 `fix(deps): ...`, so merging one publishes a release; build tool and workflow updates
 (`chore(deps)`, `ci(deps)`) do not.
-Green Dependabot pull requests are merged automatically like any other branch of this
-repository. GitHub gives workflows started by Dependabot a read-only token in some cases;
-such a pull request then stays open for a manual merge.
+Green Dependabot pull requests are squash-merged automatically, and a `fix(deps)` one
+publishes a release. GitHub gives workflows started by Dependabot a read-only token in
+some cases; such a pull request then stays open for a manual merge.

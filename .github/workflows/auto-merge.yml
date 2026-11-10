@@ -1,0 +1,82 @@
+name: Auto-merge
+
+# Merge pull requests on their own once every check is green:
+# - the repository owner's pull requests (rebase, so each commit reaches the
+#   changelog), then start the Release workflow;
+# - Dependabot's pull requests (squash), then start the Release workflow too:
+#   updates of libraries shipped in the card are `fix(deps)` and publish a
+#   release; build tool and workflow updates are not released.
+# Skipped: drafts, pull requests labelled `no-automerge`, pull requests from
+# forks and everyone else's pull requests. release-please's own pull request
+# is merged by release.yml.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: write # start the Release workflow
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-merge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  merge:
+    name: Merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Merge once all checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          PR_JSON=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open \
+            --json number,author,headRefOid,isDraft,labels,headRepositoryOwner \
+            --jq "[.[] | select(.headRefOid == \"$SHA\")] | first // empty")
+          if [ -z "$PR_JSON" ]; then
+            echo "No open pull request for $BRANCH at $SHA"
+            exit 0
+          fi
+          PR=$(jq -r .number <<<"$PR_JSON")
+          AUTHOR=$(jq -r .author.login <<<"$PR_JSON")
+          HEAD_OWNER=$(jq -r .headRepositoryOwner.login <<<"$PR_JSON")
+
+          if [ "$HEAD_OWNER" != "$OWNER" ]; then
+            echo "#$PR comes from a fork: not merged automatically"; exit 0
+          fi
+          if [ "$(jq -r .isDraft <<<"$PR_JSON")" = "true" ]; then
+            echo "#$PR is a draft: not merged automatically"; exit 0
+          fi
+          if jq -e '.labels[] | select(.name == "no-automerge")' <<<"$PR_JSON" >/dev/null; then
+            echo "#$PR is labelled no-automerge: not merged automatically"; exit 0
+          fi
+          case "$AUTHOR" in
+            "$OWNER") METHOD=--rebase ;;
+            app/dependabot) METHOD=--squash ;;
+            *) echo "#$PR by $AUTHOR: not merged automatically"; exit 0 ;;
+          esac
+
+          # Wait for the other checks (CodeQL, Security audit); stop on any failure.
+          gh pr checks "$PR" --repo "$REPO" --watch --interval 20 --fail-fast
+          # Delete the head branch here: the repository's "Automatically
+          # delete head branches" setting does not apply to merges made with
+          # GITHUB_TOKEN.
+          gh pr merge "$PR" --repo "$REPO" "$METHOD" --match-head-commit "$SHA" \
+            --delete-branch
+
+          # A merge made with GITHUB_TOKEN starts no push workflows, so start
+          # Release explicitly; it decides whether there is anything to release.
+          gh workflow run release.yml --repo "$REPO" --ref main
+          # For the same reason, run CI on main so the README badge reflects
+          # the merged code instead of an older run.
+          gh workflow run ci.yml --repo "$REPO" --ref main
