@@ -1,0 +1,87 @@
+name: Auto-merge
+
+# Merges a pull request once every check on its head commit has passed, then
+# starts the release. Runs whenever one of the pull request workflows below
+# finishes; the last one to finish does the merge.
+#
+# Merged automatically: pull requests from branches of this repository that are
+# not drafts and do not carry the `no-automerge` label. Never: pull requests
+# from forks (workflow_run lists no pull request for them) and release-please's
+# own pull request (release.yml merges that one).
+#
+# A merge made with GITHUB_TOKEN starts no push workflows, so release.yml and
+# CI on main would not run. workflow_dispatch is the exception: both are
+# started explicitly after the merge.
+#
+# This job never checks out or runs pull request code; it only reads check
+# results and calls the GitHub API.
+
+on:
+  workflow_run:
+    workflows: [CI, CodeQL, Security audit]
+    types: [completed]
+
+permissions:
+  actions: write # start release.yml and CI on main
+  checks: read
+  contents: write # squash-merge
+  pull-requests: write
+
+concurrency:
+  group: automerge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    name: Merge when green
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      !startsWith(github.event.workflow_run.head_branch, 'release-please--')
+    steps:
+      - name: Merge if every check passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          PR=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number,headRefOid \
+            --jq ".[] | select(.headRefOid == \"$SHA\") | .number")
+          if [ -z "$PR" ]; then echo "No open pull request at $SHA (newer commit pushed?)"; exit 0; fi
+
+          INFO=$(gh pr view "$PR" --repo "$REPO" --json isDraft,labels,baseRefName)
+          if [ "$(jq -r .isDraft <<<"$INFO")" = true ]; then echo "#$PR is a draft"; exit 0; fi
+          if [ "$(jq -r .baseRefName <<<"$INFO")" != main ]; then echo "#$PR does not target main"; exit 0; fi
+          if jq -e '.labels[] | select(.name == "no-automerge")' <<<"$INFO" >/dev/null; then
+            echo "#$PR has the no-automerge label"; exit 0
+          fi
+
+          # Every check run on the head commit: wait while any is still running,
+          # stop on any result other than success, neutral or skipped.
+          RUNS=$(gh api --paginate "repos/$REPO/commits/$SHA/check-runs" --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv')
+          echo "$RUNS"
+          if [ -z "$RUNS" ]; then echo "No checks found"; exit 0; fi
+          if awk -F'\t' '$2 != "completed"' <<<"$RUNS" | grep -q .; then
+            echo "Checks still running: the next finished workflow tries again"; exit 0
+          fi
+          if awk -F'\t' '$3 != "success" && $3 != "neutral" && $3 != "skipped"' <<<"$RUNS" | grep -q .; then
+            echo "A check did not pass: not merging #$PR"; exit 0
+          fi
+
+          gh pr merge "$PR" --repo "$REPO" --squash --match-head-commit "$SHA"
+          echo "Merged #$PR"
+          echo "MERGED=1" >> "$GITHUB_ENV"
+
+      - name: Start the release and CI on main
+        if: env.MERGED == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh workflow run release.yml --repo "$REPO" --ref main
+          gh workflow run ci.yml --repo "$REPO" --ref main
