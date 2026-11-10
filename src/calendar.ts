@@ -48,6 +48,50 @@ export function navigationRange(
   return { start: new Date(start), end: new Date(nextPeriodStart(start, period, timeZone)) };
 }
 
+// Label for the navigation period starting at `start`, in the card's language.
+// The current and previous period get a word ("Today", "Last week", "This month")
+// plus the date it stands for as `detail` ("Mon, Nov 10", "Nov 3 – 9",
+// "November 2026"); periods further back are named by their date only. The year
+// is added only outside the current year.
+export function navigationLabel(
+  start: number,
+  period: NavigationPeriod,
+  now: number,
+  timeZone: string | undefined,
+  lang: string,
+): { label: string; detail?: string } {
+  const current = startOfPeriod(now, period, timeZone);
+  const back = start === current ? 0 : nextPeriodStart(start, period, timeZone) === current ? 1 : undefined;
+  const yearOf = (ts: number) => new Intl.DateTimeFormat('en', { timeZone, year: 'numeric' }).format(ts);
+  const year = yearOf(start) === yearOf(now) ? {} : { year: 'numeric' as const };
+  let date: string;
+  if (period === 'day') {
+    date = new Intl.DateTimeFormat(lang, {
+      timeZone,
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      ...year,
+    }).format(start);
+  } else if (period === 'week') {
+    const last = nextPeriodStart(start, period, timeZone) - 1;
+    date = new Intl.DateTimeFormat(lang, { timeZone, day: 'numeric', month: 'short', ...year }).formatRange(
+      start,
+      last,
+    );
+  } else {
+    // The detail under "This month" carries the year, so it reads as a date, not a word.
+    date = new Intl.DateTimeFormat(lang, {
+      timeZone,
+      month: 'long',
+      ...(back === undefined ? year : { year: 'numeric' as const }),
+    }).format(start);
+  }
+  if (back === undefined) return { label: date };
+  const word = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' }).format(-back, period);
+  return { label: word.charAt(0).toLocaleUpperCase(lang) + word.slice(1), detail: date };
+}
+
 // Start of the period after the one starting at `start`. Rounding again keeps
 // boundaries on the calendar when a period started late, e.g. a day whose
 // midnight was skipped by clocks going forward.

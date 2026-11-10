@@ -1,57 +1,134 @@
 import { css, CSSResultGroup } from 'lit';
 
 export const stylesApex: CSSResultGroup = css`
+  /* Calendar navigation: date stepper (‹ label ›) and a compact period switch on one row,
+     wrapping to two on narrow cards. Its own grid area keeps it above the chart (or below,
+     with navigation.position: bottom) instead of falling into an implicit row. */
   .time-navigation {
-    padding: 8px 12px;
-    color: var(--secondary-text-color);
+    grid-area: nav;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--p-space-1) var(--p-space-2);
+    padding: var(--p-space-2) var(--p-space-3) 0;
+    min-width: 0;
+    color: var(--primary-text-color);
   }
-  .time-navigation-buttons {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-    gap: 4px;
-  }
-  .time-navigation-group {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
+  .time-navigation.bottom {
+    padding: 0 var(--p-space-3) var(--p-space-2);
   }
   .time-navigation button {
     box-sizing: border-box;
-    min-width: 44px;
-    min-height: 44px;
-    overflow-wrap: anywhere;
-    padding: 6px 10px;
-    cursor: pointer;
-    border: 1px solid var(--divider-color);
-    border-radius: 8px;
-    background: var(--card-background-color);
-    color: var(--primary-text-color);
+    margin: 0;
+    border: 0;
+    background: none;
+    color: inherit;
     font: inherit;
-  }
-  .time-navigation button[aria-pressed='true'] {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .time-navigation button:focus-visible {
     outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
+    outline-offset: 1px;
   }
-  .time-navigation button:disabled {
-    opacity: 0.5;
+  .time-navigation-step {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .time-navigation-arrow {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: var(--secondary-text-color);
+  }
+  .time-navigation-arrow svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+  }
+  .time-navigation-arrow:hover:not(:disabled),
+  .time-navigation-label:is(button):hover {
+    background: color-mix(in oklab, var(--primary-text-color) 8%, transparent);
+  }
+  .time-navigation-arrow:disabled {
+    opacity: 0.3;
     cursor: default;
   }
-  .time-navigation-range {
-    margin-top: 6px;
-    font-size: 0.85em;
+  .time-navigation-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    padding: 2px 8px;
+    border-radius: 8px;
+    line-height: 1.2;
   }
-
-  @container (max-width: 164px) {
-    .time-navigation-group {
-      display: flex;
-      flex-wrap: wrap;
+  .time-navigation-name,
+  .time-navigation-detail {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .time-navigation-name {
+    font-weight: 500;
+    font-size: 1.05em;
+  }
+  .time-navigation-detail {
+    font-size: 0.78em;
+    color: var(--secondary-text-color);
+  }
+  .time-navigation-periods {
+    flex: none;
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--primary-text-color) 7%, transparent);
+  }
+  .time-navigation-periods button {
+    min-height: 32px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    color: var(--secondary-text-color);
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+  /* The selected period is a filled accent pill, like HA's own toggle groups: readable at a
+     glance on dark and light themes alike. */
+  .time-navigation-periods button[aria-pressed='true'] {
+    background: var(--primary-color);
+    color: var(--text-primary-color, #fff);
+    font-weight: 500;
+  }
+  /* The full date range is announced to screen readers and shown as a tooltip on the label. */
+  .time-navigation-range {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* Phone-sized cards: period switch full width on top, then ‹ label › with the label centred
+     (the pattern of Apple Health); wider cards keep both on one row. */
+  @container (max-width: 420px) {
+    .time-navigation-periods {
+      order: -1;
+      flex: 1 1 100%;
     }
-    .time-navigation-group button {
-      flex: 1 1 44px;
+    .time-navigation-periods button {
+      flex: 1 1 0;
+      padding: 4px 6px;
+    }
+    .time-navigation-step {
+      flex: 1 1 100%;
+      justify-content: space-between;
     }
   }
 
@@ -138,15 +215,22 @@ export const stylesApex: CSSResultGroup = css`
 
   .wrapper {
     display: grid;
-    grid-template-areas: 'header' 'graph';
+    grid-template-areas: 'header' 'nav' 'graph';
     /* minmax(0, 1fr), not 1fr: a track cannot shrink below its content's min-content width,
        so a chart wider than the card would keep the header and #graph at that width (#160). */
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: min-content 1fr;
+    grid-template-rows: min-content min-content 1fr;
+  }
+  .wrapper.nav-bottom {
+    grid-template-areas: 'header' 'graph' 'nav';
+    grid-template-rows: min-content 1fr min-content;
+  }
+  ha-card.section .wrapper.nav-bottom {
+    grid-template-rows: min-content minmax(0, 1fr) min-content;
   }
   ha-card.section .wrapper {
     flex: 1 1 auto;
-    grid-template-rows: min-content minmax(0, 1fr);
+    grid-template-rows: min-content min-content minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
   }

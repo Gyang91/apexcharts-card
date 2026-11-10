@@ -2,7 +2,8 @@ export const fr: Record<string, string> = {
   'navigation.label': 'Période du graphique',
   'navigation.previous': 'Période précédente',
   'navigation.next': 'Période suivante',
-  'navigation.current': 'Actuelle',
+  'navigation.current': 'Revenir à la période actuelle',
+  'navigation.period': 'Période',
   'error.navigation.span':
     'navigation.show ne peut pas être combiné avec span ; la navigation utilise les limites du calendrier.',
   'error.navigation.timeline': 'La navigation exige un graphique chronologique.',

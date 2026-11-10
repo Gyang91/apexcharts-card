@@ -302,7 +302,7 @@ Everything documented below keeps working as before; this fork adds:
 - **Smaller card** (about 1.5 MB instead of 2.1 MB): time zone rules come from the browser instead of a bundled database; `moment.tz()` still works in [`data_generator`](#data_generator-option).
 - **Maintenance**: automatic releases, CI, CodeQL, a daily dependency audit (npm audit and OSV-Scanner) and Dependabot updates.
 - **Adaptive large-history rendering**: opt-in [`downsample`](#large-history-performance) retains spikes/gaps and restores local detail on zoom, brush selection and resize without fetching history again.
-- **Calendar navigation**: optional day/week/month, previous/next and current-period controls, following the dashboard time zone.
+- **Calendar navigation**: optional day/week/month switch with previous/next and plain-language period labels, following the dashboard time zone.
 - **Explicit editor presets**: temperature, power and consumption starters without replacing your entity IDs.
 - **Computed series**: [`compute`](#compute-option) calculates a series from other series of the card (net power, totals, ratios), without a template sensor.
 - **Selected visual insights**: paired range-area bands and aggregated heatmaps with enforced cell budgets, using the existing ApexCharts runtime.
@@ -324,7 +324,7 @@ The screenshots below are actual card/editor renders from generated browser fixt
 
 ## Calendar navigation
 
-![Calendar navigation with day/week/month presets, previous/next buttons and the selected date range](docs/calendar-navigation.png)
+![Calendar navigation above the chart: previous/next around the period label, and a day/week/month switch](docs/calendar-navigation.png)
 
 Enable **Calendar navigation** in the visual editor's General tab, or configure:
 
@@ -342,10 +342,13 @@ series:
 ```
 
 - `navigation.show` defaults to `false`; `navigation.initial` defaults to `day` and accepts `day`, `week`, `month`.
+- `navigation.position` is `top` (default, between header and chart) or `bottom` (under the chart).
+- **Layout:** ‹ label › on the left, the day/week/month switch on the right; the selected period is a filled pill in the theme's primary color. On cards up to 420px wide the switch takes its own full-width row above ‹ label ›.
+- **Label:** the current and previous period read as words with their date underneath (*Today · Tue, Nov 10*, *Last week · Nov 2 – 8*, *This month · November 2026*). Older periods show only their date (*Sat, Nov 7*, *Oct 19 – 25*, *September*); the year appears only outside the current year. Words and dates follow the card's language. Tapping the label of a past period returns to the current one; the full range is its tooltip and is announced to screen readers.
 - Periods are complete calendar days, ISO weeks (Monday start) or months in the dashboard's display time zone. DST days can be 23/25 hours; months are not fixed 30-day windows.
-- **Previous/next** moves by one selected calendar period. **Current** returns to the current period. Selecting day/week/month also returns to its current period. Future periods are allowed for integration-supplied forecasts.
+- **Previous/next** moves by one selected calendar period. Selecting day/week/month returns to its current period. **Next** stops at the current period, because history and statistics never lie in the future. If any series uses `data_generator` (forecasts), future periods stay reachable.
 - When enabled, navigation determines the requested range instead of `graph_span`. Combining it with `span` is rejected to avoid ambiguous offsets; enabling the editor switch removes existing `span` settings.
-- Works with timeline charts, including statistics, range bands and heatmaps. Buttons have keyboard focus styles, labels, 44px touch targets and busy-state disabling. On narrow cards, the period and navigation controls align in two rows and wrap further if needed.
+- Works with timeline charts, including statistics, range bands and heatmaps. Buttons have keyboard focus styles and accessible names; arrows are 40px, period buttons 32px high. Controls stay usable while data loads: a click during a load changes the label at once and the chart reloads when that load ends.
 - Changing range discards the series' incremental history before loading the new range. Navigation does not retain a growing cache of visited periods or add polling. Shared statistics caches remain bounded. Dense month views should use suitable statistics/grouping and optional sampling.
 - Returning to a dashboard preserves the selected period within the same card instance; a new card/configuration starts at `initial`. Header actions and sensor values retain their documented behavior.
 
@@ -606,7 +609,7 @@ The card strictly validates all the options available (but not for the `apex_con
 | `hours_12` | boolean | | v1.8.0 | If undefined, it will follow Home-Assistant's user time format. If `true`, it will force time to be displayed in 12h format. If `false` it will force the time to be displayed in 24h format. |
 | `cache` | boolean | `true` | v1.0.0 | Use in-browser data caching to reduce the load on Home Assistant's server |
 | `downsample` | boolean | `false` | v2.11.0 | Optional width-aware line/area sampling with adaptive zoom/brush detail. Calculations retain full history. See [Large-history performance](#large-history-performance) for exclusions and trade-offs. |
-| `navigation` | object | | v2.12.0 | Optional calendar controls: `{show: true, initial: day}`. See [Calendar navigation](#calendar-navigation). |
+| `navigation` | object | | v2.12.0 | Optional calendar controls: `{show: true, initial: day, position: top}`. See [Calendar navigation](#calendar-navigation). |
 | `heatmap` | object | | v2.12.0 | Heatmap cell budget: `{max_cells: 512}`; hard maximum 2,048. Requires `chart_type: heatmap`. See [Bounded heatmaps](#bounded-heatmaps). |
 | `stacked` | boolean | `false` | v1.0.0 | Enable if you want the data to be stacked on the graph |
 | `layout` | string | | v1.0.0 | See [layouts](#layouts) |

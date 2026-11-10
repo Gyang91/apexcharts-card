@@ -1,6 +1,6 @@
 // Calendar periods (group_by.period) and time-weighted averages (time_avg).
 import GraphEntry from '../src/graphEntry';
-import { formatPeriod, periodBoundaries, startOfPeriod } from '../src/calendar';
+import { formatPeriod, navigationLabel, periodBoundaries, startOfPeriod } from '../src/calendar';
 import { add, computeTimezoneDiffWithLocal, endOf, startOf } from '../src/zone';
 import { mkHass, mkState } from './fixtures/hass';
 
@@ -235,5 +235,37 @@ describe('group_by.func diff_inc', () => {
     await inc._updateHistory(new Date(t0 - HOUR), new Date(t0 + HOUR));
     await diff._updateHistory(new Date(t0 - HOUR), new Date(t0 + HOUR));
     expect(inc.history).toEqual(diff.history);
+  });
+});
+
+describe('navigation labels', () => {
+  // Tuesday 10 Nov 2026, 14:00 in Berlin
+  const now = Date.parse('2026-11-10T13:00Z');
+  const day = (iso: string) => startOfPeriod(Date.parse(iso), 'day', TZ);
+  const week = (iso: string) => startOfPeriod(Date.parse(iso), 'week', TZ);
+  const month = (iso: string) => startOfPeriod(Date.parse(iso), 'month', TZ);
+  // Intl puts thin spaces around range dashes; compare with plain spaces.
+  const label = (...args: Parameters<typeof navigationLabel>) => {
+    const { label: text, detail } = navigationLabel(...args);
+    return [text, detail].filter(Boolean).join(' | ').replace(/\s/g, ' ');
+  };
+
+  it('names the current and previous period in words, with the date it stands for', () => {
+    expect(label(day('2026-11-10T12:00Z'), 'day', now, TZ, 'en')).toBe('Today | Tue, Nov 10');
+    expect(label(day('2026-11-09T12:00Z'), 'day', now, TZ, 'en')).toBe('Yesterday | Mon, Nov 9');
+    expect(label(week('2026-11-10T12:00Z'), 'week', now, TZ, 'en')).toBe('This week | Nov 9 – 15');
+    expect(label(week('2026-11-03T12:00Z'), 'week', now, TZ, 'en')).toBe('Last week | Nov 2 – 8');
+    expect(label(month('2026-11-10T12:00Z'), 'month', now, TZ, 'en')).toBe('This month | November 2026');
+    expect(label(month('2026-10-10T12:00Z'), 'month', now, TZ, 'en')).toBe('Last month | October 2026');
+    expect(label(day('2026-11-10T12:00Z'), 'day', now, TZ, 'de')).toBe('Heute | Di., 10. Nov.');
+  });
+
+  it('names older periods by their date only, with the year only outside the current one', () => {
+    expect(label(day('2026-11-07T12:00Z'), 'day', now, TZ, 'en')).toBe('Sat, Nov 7');
+    expect(label(day('2025-12-31T12:00Z'), 'day', now, TZ, 'en')).toBe('Wed, Dec 31, 2025');
+    expect(label(week('2026-10-21T12:00Z'), 'week', now, TZ, 'en')).toBe('Oct 19 – 25');
+    expect(label(week('2026-10-28T12:00Z'), 'week', now, TZ, 'en')).toBe('Oct 26 – Nov 1');
+    expect(label(month('2026-09-10T12:00Z'), 'month', now, TZ, 'en')).toBe('September');
+    expect(label(month('2025-10-10T12:00Z'), 'month', now, TZ, 'en')).toBe('October 2025');
   });
 });
