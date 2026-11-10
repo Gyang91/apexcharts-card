@@ -39,7 +39,7 @@ import {
   isUsingServerTimezone,
 } from './utils';
 import { getStatisticsMetadata } from './recorder';
-import { addPeriods, displayTimeZone, navigationRange } from './calendar';
+import { addPeriods, displayTimeZone, navigationLabel, navigationRange, startOfPeriod } from './calendar';
 import { computeTimezoneDiffWithLocal, endOf, startOf } from './zone';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions } from 'apexcharts';
@@ -172,6 +172,9 @@ export class ChartsCard extends LitElement {
   private _navigationPeriod: NavigationPeriod = 'day';
 
   private _navigationAnchor?: number;
+
+  // A navigation click arrived while data was loading: reload once that load ends.
+  private _navigationPending = false;
 
   private _seriesTimeDelta: number[] = [];
 
@@ -533,6 +536,7 @@ export class ChartsCard extends LitElement {
     const wrapperClasses: ClassInfo = {
       wrapper: true,
       'with-header': this._config.header?.show || true,
+      'nav-bottom': this._config.navigation?.show === true && this._config.navigation.position === 'bottom',
     };
     const haCardClasses: ClassInfo = {
       section: fillHeight,
@@ -603,65 +607,104 @@ export class ChartsCard extends LitElement {
   private _renderNavigation(): TemplateResult {
     if (!this._config?.navigation?.show) return html``;
     const { start, end } = this._getSpanDates();
-    const formatter = new Intl.DateTimeFormat(getLang(this._config, this._hass), {
-      timeZone: displayTimeZone(this._hass),
+    const timeZone = displayTimeZone(this._hass);
+    const lang = getLang(this._config, this._hass);
+    const now = Date.now();
+    const period = this._navigationPeriod;
+    const atCurrent = start.getTime() >= startOfPeriod(now, period, timeZone);
+    const { label, detail } = navigationLabel(start.getTime(), period, now, timeZone, lang);
+    const text = html`<span class="time-navigation-name">${label}</span>${
+        detail ? html`<span class="time-navigation-detail">${detail}</span>` : ''
+      }`;
+    const range = new Intl.DateTimeFormat(lang, {
+      timeZone,
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-    });
-    const busy = this._updating || !this._dataLoaded;
-    return html` <nav class="time-navigation" aria-label=${t('navigation.label')}>
-      <div class="time-navigation-buttons">
-        <div class="time-navigation-group">
-          ${(['day', 'week', 'month'] as const).map(
-            (period) => html`
-              <button
+    }).formatRange(start, new Date(end.getTime() - 1));
+    // Controls stay enabled while data loads: a click during a load is applied when it ends.
+    return html` <nav
+      class=${classMap({ 'time-navigation': true, bottom: this._config.navigation.position === 'bottom' })}
+      aria-label=${t('navigation.label')}
+    >
+      <div class="time-navigation-step">
+        <button
+          type="button"
+          class="time-navigation-arrow"
+          aria-label=${t('navigation.previous')}
+          @click=${() => this._navigate(period, -1)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18Z" />
+          </svg>
+        </button>
+        ${
+          atCurrent
+            ? html`<span class="time-navigation-label" title=${range}>${text}</span>`
+            : html`<button
                 type="button"
-                aria-pressed=${this._navigationPeriod === period}
-                ?disabled=${busy}
-                @click=${() => this._navigate(period)}
+                class="time-navigation-label"
+                title=${`${range} · ${t('navigation.current')}`}
+                @click=${() => this._navigate(period, 0)}
               >
-                ${t(`common.period.${period}`)}
-              </button>
-            `,
-          )}
-        </div>
-        <div class="time-navigation-group">
-          <button
-            type="button"
-            aria-label=${t('navigation.previous')}
-            ?disabled=${busy}
-            @click=${() => this._navigate(this._navigationPeriod, -1)}
-          >
-            &#x2039;
-          </button>
-          <button type="button" ?disabled=${busy} @click=${() => this._navigate(this._navigationPeriod, 0)}>
-            ${t('navigation.current')}
-          </button>
-          <button
-            type="button"
-            aria-label=${t('navigation.next')}
-            ?disabled=${busy}
-            @click=${() => this._navigate(this._navigationPeriod, 1)}
-          >
-            &#x203a;
-          </button>
-        </div>
+                ${text}
+              </button>`
+        }
+        <button
+          type="button"
+          class="time-navigation-arrow"
+          aria-label=${t('navigation.next')}
+          ?disabled=${atCurrent && !this._navigationToFuture()}
+          @click=${() => this._navigate(period, 1)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18Z" />
+          </svg>
+        </button>
       </div>
-      <div class="time-navigation-range" role="status" aria-live="polite">
-        ${formatter.format(start)} &ndash; ${formatter.format(new Date(end.getTime() - 1))}
+      <div class="time-navigation-periods" role="group" aria-label=${t('navigation.period')}>
+        ${(['day', 'week', 'month'] as const).map(
+          (p) => html`
+            <button type="button" aria-pressed=${period === p} @click=${() => this._navigate(p)}>
+              ${t(`common.period.${p}`)}
+            </button>
+          `,
+        )}
       </div>
+      <span class="time-navigation-range" role="status" aria-live="polite">${range}</span>
     </nav>`;
   }
 
+  // Changes the period at once (the label updates immediately). While data loads, the
+  // reload for the new period waits for that load to end (see _updateData).
   private async _navigate(period: NavigationPeriod, direction?: number): Promise<void> {
-    if (!this._config?.navigation?.show || this._updating || !this._apexChart) return;
+    if (!this._config?.navigation?.show || !this._apexChart) return;
     const timeZone = displayTimeZone(this._hass);
+    const start = this._getSpanDates().start.getTime();
+    if (
+      direction === 1 &&
+      !this._navigationToFuture() &&
+      start >= startOfPeriod(Date.now(), this._navigationPeriod, timeZone)
+    )
+      return;
     this._navigationAnchor =
       direction === undefined || direction === 0
         ? undefined
-        : addPeriods(this._getSpanDates().start.getTime(), this._navigationPeriod, direction, timeZone);
+        : addPeriods(start, this._navigationPeriod, direction, timeZone);
     this._navigationPeriod = period;
+    this.requestUpdate();
+    if (this._updating) this._navigationPending = true;
+    else await this._reloadNavigation();
+  }
+
+  // History and statistics never lie in the future; forecasts come from data_generator.
+  // Without one, the next arrow stops at the current period.
+  private _navigationToFuture(): boolean {
+    return this._config?.series.some((serie) => serie.data_generator) ?? false;
+  }
+
+  private async _reloadNavigation(): Promise<void> {
+    this._navigationPending = false;
     this._graphs?.forEach((graph) => graph?.resetHistory());
     this._brushInit = false;
     this._updating = true;
@@ -1276,7 +1319,8 @@ export class ChartsCard extends LitElement {
     } finally {
       if (current()) {
         this._updating = false;
-        this._queueResample();
+        if (this._navigationPending) void this._reloadNavigation();
+        else this._queueResample();
       }
     }
   }

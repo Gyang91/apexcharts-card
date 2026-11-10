@@ -40,6 +40,7 @@ export const ChartCardExternalConfig = t.iface([], {
   "navigation": t.opt(t.iface([], {
     "show": t.opt("boolean"),
     "initial": t.opt("NavigationPeriod"),
+    "position": t.opt(t.union(t.lit('top'), t.lit('bottom'))),
   })),
   "heatmap": t.opt(t.iface([], {
     "max_cells": t.opt("number"),

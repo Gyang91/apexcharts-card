@@ -68,7 +68,7 @@ describe('calendar navigation', () => {
     expect(result._renderNavigation().strings.join('')).toBe('');
   });
 
-  it('resets cached history on navigation, ignores busy clicks and returns to current period', async () => {
+  it('resets cached history on navigation, keeps clicks made while loading and returns to current period', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-30T12:00Z'));
     const result = card({ navigation: { show: true } });
@@ -80,13 +80,66 @@ describe('calendar navigation', () => {
     await result._navigate('day', -1);
     expect(result._getSpanDates().start.getTime()).toBeLessThan(Date.parse('2026-10-30T00:00Z'));
     expect(result._graphs[0].resetHistory).toHaveBeenCalledOnce();
+    // A click while a load runs takes effect at once and reloads when that load ends.
     result._updating = true;
     await result._navigate('month');
-    expect(result._navigationPeriod).toBe('day');
-    result._updating = false;
-    await result._navigate('month', 0);
-    expect(result._navigationAnchor).toBeUndefined();
     expect(result._navigationPeriod).toBe('month');
+    expect(result._navigationPending).toBe(true);
+    expect(result._updateData).toHaveBeenCalledOnce();
+    await result._reloadNavigation();
+    expect(result._navigationPending).toBe(false);
+    expect(result._updateData).toHaveBeenCalledTimes(2);
+    await result._navigate('week', -1);
+    await result._navigate('week', 0);
+    expect(result._navigationAnchor).toBeUndefined();
+    expect(result._navigationPeriod).toBe('week');
+  });
+
+  it('never steps into the future', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-30T12:00Z'));
+    const result = card({ navigation: { show: true } });
+    result._apexChart = {};
+    result._graphs = [{ resetHistory: vi.fn() }];
+    result._updateData = vi.fn(async () => {
+      result._updating = false;
+    });
+    await result._navigate('day', 1);
+    expect(result._navigationAnchor).toBeUndefined();
+    expect(result._updateData).not.toHaveBeenCalled();
+    await result._navigate('day', -1);
+    await result._navigate('day', 1);
+    expect(result._getSpanDates().start.getTime()).toBe(navigationRange(Date.now(), 'day', undefined).start.getTime());
+  });
+
+  it('still steps into the future when a series can supply forecasts', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-30T12:00Z'));
+    const result = card({
+      navigation: { show: true },
+      series: [{ entity: 'sensor.forecast', data_generator: 'return [];' }],
+    });
+    result._apexChart = {};
+    result._graphs = [{ resetHistory: vi.fn() }];
+    result._updateData = vi.fn(async () => {
+      result._updating = false;
+    });
+    await result._navigate('day', 1);
+    expect(result._getSpanDates().start.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('shows the current period as plain text with the next arrow off, and accepts position', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-30T12:00Z'));
+    const top = card({ navigation: { show: true } });
+    const markup = (r: AnyCard) =>
+      JSON.stringify(r._renderNavigation(), (_k, v) => (typeof v === 'function' ? undefined : v));
+    // At the current period the label is plain text and the next arrow is disabled.
+    expect(markup(top)).toContain('<span class=\\"time-navigation-label\\"');
+    expect(top._renderNavigation().values[6]).toBe(true);
+    expect(top._config.navigation.position).toBeUndefined();
+    const bottom = card({ navigation: { show: true, position: 'bottom' } });
+    expect(bottom._config.navigation.position).toBe('bottom');
   });
 
   it('rejects ambiguous span and non-timeline navigation', () => {

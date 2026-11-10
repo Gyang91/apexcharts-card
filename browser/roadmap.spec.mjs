@@ -92,10 +92,16 @@ test('calendar controls browse periods, reset current, resize and reconnect', as
   await page.getByRole('button', { name: 'Month', exact: true }).click();
   await page.waitForFunction(() => !window.card._updating);
   expect(await page.evaluate(() => window.card._navigationPeriod)).toBe('month');
+  // These series come from data_generator, which may hold forecasts: the next arrow stays on.
+  await expect(page.getByRole('button', { name: 'Next period' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Previous period' }).click();
+  await page.getByRole('button', { name: 'Previous period' }).click();
+  await page.waitForFunction(() => !window.card._updating && !window.card._navigationPending);
   await page.getByRole('button', { name: 'Next period' }).click();
-  await page.waitForFunction(() => !window.card._updating);
-  await page.getByRole('button', { name: 'Current', exact: true }).click();
-  await page.waitForFunction(() => !window.card._updating);
+  await page.waitForFunction(() => !window.card._updating && !window.card._navigationPending);
+  // The label takes you back to the current period.
+  await page.locator('button.time-navigation-label').click();
+  await page.waitForFunction(() => !window.card._updating && !window.card._navigationPending);
   expect(await page.evaluate(() => window.card._navigationAnchor)).toBeUndefined();
   await capture(page, 'calendar-navigation');
   await page.setViewportSize({ width: 360, height: 740 });
@@ -110,7 +116,7 @@ test('calendar controls browse periods, reset current, resize and reconnect', as
   expect(errors).toEqual([]);
 });
 
-test('calendar controls form accessible, aligned rows on narrow cards', async ({ page }) => {
+test('calendar controls sit above the chart, fit narrow cards and keep a sensible tab order', async ({ page }) => {
   await mount(page, {
     navigation: { show: true, initial: 'week' },
     series: [
@@ -121,57 +127,49 @@ test('calendar controls form accessible, aligned rows on narrow cards', async ({
     ],
   });
   const geometry = () =>
-    page.locator('.time-navigation-buttons').evaluate((container) => {
-      const bounds = container.getBoundingClientRect();
+    page.locator('.time-navigation').evaluate((nav) => {
+      const box = (el) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+      };
+      const root = nav.getRootNode();
       return {
-        bounds: { left: bounds.left, right: bounds.right },
-        buttons: Array.from(container.querySelectorAll('button'), (button) => {
-          const rect = button.getBoundingClientRect();
-          return {
-            left: rect.left,
-            right: rect.right,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-            clientWidth: button.clientWidth,
-            scrollWidth: button.scrollWidth,
-          };
-        }),
+        nav: box(nav),
+        graph: box(root.querySelector('#graph-wrapper')),
+        step: box(nav.querySelector('.time-navigation-step')),
+        periods: box(nav.querySelector('.time-navigation-periods')),
+        arrows: Array.from(nav.querySelectorAll('.time-navigation-arrow'), box),
+        periodButtons: Array.from(nav.querySelectorAll('.time-navigation-periods button'), (b) => ({
+          ...box(b),
+          overflow: b.scrollWidth > b.clientWidth + 1,
+        })),
       };
     });
-  const expectAccessible = ({ bounds, buttons }) => {
-    expect(buttons).toHaveLength(6);
-    for (const button of buttons) {
-      expect(button.width).toBeGreaterThanOrEqual(44);
-      expect(button.height).toBeGreaterThanOrEqual(44);
-      expect(button.left).toBeGreaterThanOrEqual(bounds.left - 1);
-      expect(button.right).toBeLessThanOrEqual(bounds.right + 1);
-      expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth + 1);
+  const expectFits = (g) => {
+    expect(g.nav.bottom).toBeLessThanOrEqual(g.graph.top + 1);
+    for (const arrow of g.arrows) {
+      expect(arrow.width).toBeGreaterThanOrEqual(40);
+      expect(arrow.height).toBeGreaterThanOrEqual(40);
     }
-  };
-  const expectAligned = ({ bounds, buttons }) => {
-    expectAccessible({ bounds, buttons });
-    expect(buttons[0].top).toBeCloseTo(buttons[1].top, 0);
-    expect(buttons[0].top).toBeCloseTo(buttons[2].top, 0);
-    expect(buttons[3].top).toBeGreaterThan(buttons[0].top);
-    expect(buttons[3].top).toBeCloseTo(buttons[4].top, 0);
-    expect(buttons[3].top).toBeCloseTo(buttons[5].top, 0);
-    for (let column = 0; column < 3; column++) {
-      expect(buttons[column].left).toBeCloseTo(buttons[column + 3].left, 0);
+    for (const button of g.periodButtons) {
+      expect(button.height).toBeGreaterThanOrEqual(32);
+      expect(button.overflow).toBe(false);
+      expect(button.left).toBeGreaterThanOrEqual(g.nav.left - 1);
+      expect(button.right).toBeLessThanOrEqual(g.nav.right + 1);
     }
   };
 
-  for (const width of [100, 150, 164]) {
+  for (const width of [200, 260, 320, 440, 520, 700]) {
     await page.evaluate((cardWidth) => {
       document.querySelector('#dashboard').style.width = `${cardWidth}px`;
     }, width);
-    expectAccessible(await geometry());
-  }
-  for (const width of [165, 180, 220, 280, 320, 332, 440, 520]) {
-    await page.evaluate((cardWidth) => {
-      document.querySelector('#dashboard').style.width = `${cardWidth}px`;
-    }, width);
-    expectAligned(await geometry());
+    const g = await geometry();
+    expectFits(g);
+    // Wide cards: stepper and period switch on one row. Phone-sized: switch on top, full width.
+    if (width <= 420) {
+      expect(g.periods.bottom).toBeLessThanOrEqual(g.step.top + 1);
+      expect(g.periods.width).toBeGreaterThan(g.nav.width - 40);
+    } else expect(Math.abs(g.step.top + g.step.height / 2 - (g.periods.top + g.periods.height / 2))).toBeLessThan(4);
   }
 
   await page.evaluate(() => {
@@ -185,14 +183,7 @@ test('calendar controls form accessible, aligned rows on narrow cards', async ({
     window.card.requestUpdate();
   });
   await expect(page.getByRole('button', { name: 'Semaine', exact: true })).toBeVisible();
-  expectAligned(await geometry());
-
-  await page.evaluate(() => {
-    document.querySelector('#dashboard').style.width = '540px';
-  });
-  const wideFrench = await geometry();
-  expectAccessible(wideFrench);
-  expect(wideFrench.buttons.every((button) => Math.abs(button.top - wideFrench.buttons[0].top) < 1)).toBe(true);
+  expectFits(await geometry());
 
   await page.evaluate(() => {
     document.querySelector('#dashboard').style.width = '700px';
@@ -204,16 +195,29 @@ test('calendar controls form accessible, aligned rows on narrow cards', async ({
     };
     window.card.requestUpdate();
   });
-  await expect(page.getByRole('button', { name: 'Week', exact: true })).toBeVisible();
-  const wide = await geometry();
-  expectAccessible(wide);
-  expect(wide.buttons.every((button) => Math.abs(button.top - wide.buttons[0].top) < 1)).toBe(true);
   await expect(page.getByRole('button', { name: 'Week', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Week', exact: true }).focus();
+  // Tab order: previous, next (the label is plain text at the current period), then the periods.
+  await page.getByRole('button', { name: 'Previous period' }).focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Month', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Next period' })).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Previous period' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Day', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Week', exact: true })).toBeFocused();
+});
+
+test('navigation.position bottom puts the controls under the chart', async ({ page }) => {
+  await mount(page, {
+    navigation: { show: true, position: 'bottom' },
+    series: [{ entity: 'sensor.temp', data_generator: 'return [[start.getTime(), 18], [end.getTime(), 20]];' }],
+  });
+  const [nav, graph] = await page
+    .locator('.time-navigation')
+    .evaluate((el) => [
+      el.getBoundingClientRect().top,
+      el.getRootNode().querySelector('#graph-wrapper').getBoundingClientRect().bottom,
+    ]);
+  expect(nav).toBeGreaterThanOrEqual(graph - 1);
 });
 
 test('renders integration-supplied range bounds with both headers and missing intervals', async ({ page }) => {

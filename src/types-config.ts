@@ -34,6 +34,8 @@ export interface ChartCardExternalConfig {
   navigation?: {
     show?: boolean;
     initial?: NavigationPeriod;
+    // Above the chart (default) or below it
+    position?: 'top' | 'bottom';
   };
   heatmap?: {
     max_cells?: number;
