@@ -41,9 +41,9 @@
   },
   "homepage": "https://github.com/Gyang91/apexcharts-card#readme",
   "dependencies": {
-    "@ctrl/tinycolor": "^4.2.2",
+    "@ctrl/tinycolor": "^4.3.0",
     "@material/mwc-ripple": "^0.27.0",
-    "apexcharts": "^8.7.0",
+    "apexcharts": "^8.8.2",
     "custom-card-helpers": "^2.0.0",
     "lit": "^3.3.3",
     "localforage": "^1.10.0",
