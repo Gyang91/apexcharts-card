@@ -49,6 +49,7 @@ jobs:
           npm ci
           npm test
           npm run build
+          npm run check:bundle
       # Checks on a pull request opened by github-actions[bot] wait for approval
       # and would expire as failed once it is merged: approve them so they run.
       - name: Approve the release pull request's checks
