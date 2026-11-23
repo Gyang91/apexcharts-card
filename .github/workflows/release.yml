@@ -18,7 +18,7 @@ jobs:
   release-please:
     name: Release PR
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     outputs:
       release_created: ${{ steps.release.outputs.release_created || steps.auto-release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name || steps.auto-release.outputs.tag_name }}
@@ -51,24 +51,51 @@ jobs:
           npm run build
           npm run check:bundle
       # Checks on a pull request opened by github-actions[bot] wait for approval
-      # and would expire as failed once it is merged: approve them so they run.
-      - name: Approve the release pull request's checks
+      # and would expire as failed once it is merged: approve them so they run,
+      # then wait for every check on the pull request's head commit to pass
+      # before merging. A failing check stops the release here.
+      - name: Approve the release pull request's checks and wait for them
+        id: checks
         if: ${{ steps.release.outputs.pr }}
         # env is evaluated even when the step is skipped: pass the raw output
         # and parse it in the script (fromJSON('') would fail every run)
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           PR: ${{ steps.release.outputs.pr }}
         run: |
-          BRANCH=$(jq -r .headBranchName <<<"$PR")
-          for id in $(gh api "repos/${{ github.repository }}/actions/runs?branch=$BRANCH&status=action_required" --jq '.workflow_runs[].id'); do
-            gh api -X POST "repos/${{ github.repository }}/actions/runs/$id/approve" || echo "Could not approve run $id"
+          NUMBER=$(jq -r .number <<<"$PR")
+          SHA=$(gh pr view "$NUMBER" --repo "$REPO" --json headRefOid --jq .headRefOid)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+          # Runs can appear a little after the push: keep approving until the
+          # CI run for this commit exists and no run still waits for approval.
+          for attempt in $(seq 1 30); do
+            PENDING=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&status=action_required" --jq '.workflow_runs[].id')
+            for id in $PENDING; do
+              gh api -X POST "repos/$REPO/actions/runs/$id/approve" || echo "Could not approve run $id"
+            done
+            CI_STATUS=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&event=pull_request" \
+              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml")] | first | .status // empty')
+            if [ -z "$PENDING" ] && [ -n "$CI_STATUS" ] && [ "$CI_STATUS" != "action_required" ] && [ "$CI_STATUS" != "waiting" ]; then
+              break
+            fi
+            if [ "$attempt" = 30 ]; then
+              echo "::error::No running CI for $SHA after 5 minutes (status: ${CI_STATUS:-none})"
+              exit 1
+            fi
+            sleep 10
           done
+
+          gh pr checks "$NUMBER" --repo "$REPO" --watch --interval 20 --fail-fast
       - name: Merge the release pull request
         if: ${{ steps.release.outputs.pr }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh pr merge "${{ fromJSON(steps.release.outputs.pr).number }}" --squash --repo "${{ github.repository }}"
+        # --match-head-commit: merge only the commit whose checks passed.
+        run: >-
+          gh pr merge "${{ fromJSON(steps.release.outputs.pr).number }}" --squash
+          --repo "${{ github.repository }}" --match-head-commit "${{ steps.checks.outputs.sha }}"
       - uses: googleapis/release-please-action@v5
         id: auto-release
         if: ${{ steps.release.outputs.pr }}
