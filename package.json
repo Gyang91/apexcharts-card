@@ -56,7 +56,7 @@
     "ts-interface-checker": "^1.0.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@eslint/js": "^10.0.1",
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-json": "^6.1.0",
@@ -66,18 +66,18 @@
     "@types/js-yaml": "^4.0.9",
     "@types/moment-duration-format": "^2.2.7",
     "@types/spark-md5": "^3.0.5",
-    "@vitest/coverage-v8": "^5.1.0",
-    "eslint": "^10.14.0",
+    "@vitest/coverage-v8": "^5.1.1",
+    "eslint": "^10.15.0",
     "happy-dom": "^21.0.4",
-    "home-assistant-js-websocket": "^9.8.1",
+    "home-assistant-js-websocket": "^9.9.0",
     "js-yaml": "^5.5.0",
     "prettier": "^3.10.1",
-    "rollup": "^4.68.3",
+    "rollup": "^4.68.7",
     "rollup-plugin-serve": "^3.0.0",
     "ts-interface-builder": "^0.3.3",
     "tslib": "^2.9.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.2",
+    "typescript-eslint": "^8.73.0",
     "vitest": "^5.0.5"
   },
   "overrides": {
