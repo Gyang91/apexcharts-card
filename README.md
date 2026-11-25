@@ -436,6 +436,7 @@ series:
 - **Cells on the hour**: `period: hour` makes each cell a clock hour (21:00–22:00). `duration: 1h` counts hours back from now instead, so the cells start at odd minutes (21:17–22:17).
 - **Time axis**: each cell sits in the middle of its bucket by default (`group_by.align: middle`), so the time labels line up with the cells. Keep that default for heatmaps.
 - **24-hour time**: set `hours_12: false` to show 21:00 instead of 9:00 PM (or `true` for the opposite); by default the card follows your Home Assistant profile's time format.
+- **Tooltip**: hovering a cell shows the time it covers, such as `Tue, Nov 24, 21:00 – 22:00`, or the days, month or year for longer buckets. It needs every row to use the same buckets. A `tooltip.x.formatter` of your own in `apex_config` still takes precedence: remove it to get this one.
 
 For energy patterns, use energy counters with `statistics: {type: change, period: hour}`. For occupancy, transform the source state into numeric 0/1 and use an appropriate aggregate; `avg` of event samples is not a time-occupancy percentage—use `time_avg` when you need time weighting.
 

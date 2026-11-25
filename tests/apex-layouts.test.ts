@@ -90,6 +90,39 @@ describe('getLayoutConfig', () => {
     }
   });
 
+  it('shows the time range of a heatmap cell in its tooltip', () => {
+    const config = internalConfig({
+      chart_type: 'heatmap',
+      hours_12: false,
+      series: [{ entity: 'sensor.a', group_by: { func: 'avg', period: 'hour' } }],
+    });
+    const layout = getLayoutConfig(config, { ...mkHass(), language: 'en' } as never, []) as AnyRec;
+    expect(layout.tooltip.x.show).toBe(true);
+    const cellMiddle = new Date('2026-11-24T21:30:00').getTime();
+    expect(layout.tooltip.x.formatter(cellMiddle)).toMatch(/^Tue, Nov 24, 21:00\s?–\s?22:00$/);
+  });
+
+  it('keeps the tooltip of other charts, and of heatmaps whose rows bucket differently', () => {
+    const line = getLayoutConfig(
+      internalConfig({ series: [{ entity: 'sensor.a', group_by: { func: 'avg', duration: '1h' } }] }),
+      mkHass(),
+      [],
+    ) as AnyRec;
+    expect(line.tooltip.x?.show).not.toBe(true);
+    const mixed = getLayoutConfig(
+      internalConfig({
+        chart_type: 'heatmap',
+        series: [
+          { entity: 'sensor.a', group_by: { func: 'avg', period: 'hour' } },
+          { entity: 'sensor.b', group_by: { func: 'avg', duration: '1h' } },
+        ],
+      }),
+      mkHass(),
+      [],
+    ) as AnyRec;
+    expect(mixed.tooltip.x?.show).not.toBe(true);
+  });
+
   it('keeps time labels when series use different periods or none', () => {
     const config = internalConfig({
       series: [

@@ -1,4 +1,5 @@
 import { HomeAssistant } from 'custom-card-helpers';
+import { bucketRange, chartBuckets, formatBucketRange } from './bucket-range';
 import parse from 'parse-duration';
 import {
   DEFAULT_AREA_OPACITY,
@@ -137,6 +138,8 @@ export function getLayoutConfig(
     };
     if (config.chart_type === 'heatmap') {
       visual.plotOptions = { heatmap: { radius: 2, enableShades: true, distributed: false } };
+      // ApexCharts hides a heatmap's x in the tooltip: show the cell's time range
+      if (chartBuckets(config)) visual.tooltip = { shared: false, x: { show: true } };
     }
     return mergeDeep(mergeDeep(def, visual), config.apex_config ? evalApexConfig(config.apex_config) : {});
   }
@@ -362,6 +365,12 @@ function getXTooltipFormatter(
 ): ((val: number, _a: any, _b: any) => string) | undefined {
   if (config.apex_config?.tooltip?.x?.format) return undefined;
   const lang = getLang(config, hass);
+  // A heatmap cell stands for a bucket: show the time range it covers
+  const buckets = config.chart_type === 'heatmap' ? chartBuckets(config) : undefined;
+  if (buckets) {
+    const hours12 = is12Hour(config, hass);
+    return (val: number) => formatBucketRange(bucketRange(val, buckets), buckets, lang, hours12);
+  }
   const period = getCommonPeriod(config);
   if (period) return periodFormatter(period, lang, is12Hour(config, hass));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
