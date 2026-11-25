@@ -323,6 +323,85 @@ test('renders bounded aggregated heatmaps and reports over-budget data without t
   expect(errors).toEqual([]);
 });
 
+for (const group_by of [
+  { func: 'avg', period: 'hour' },
+  { func: 'avg', duration: '1h' },
+]) {
+  test(`heatmap time labels line up with the cells (${group_by.period ? 'period' : 'duration'} buckets)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 900, height: 600 });
+    await mount(page, {
+      chart_type: 'heatmap',
+      graph_span: '24h',
+      hours_12: false,
+      apex_config: { chart: { animations: { enabled: false } } },
+      series: ['Living', 'Bath'].map((name) => ({
+        entity: 'sensor.temp',
+        name,
+        group_by,
+        data_generator:
+          'const out = []; for (let t = start.getTime(); t < end.getTime(); t += 600000) out.push([t, 20 + Math.sin(t / 7e6) * 3]); return out;',
+      })),
+    });
+    await expect(page.locator('.apexcharts-heatmap-series').first()).toBeVisible();
+    const measure = () =>
+      page.evaluate((hourBuckets) => {
+        const root = window.card.shadowRoot;
+        const box = (el) => el.getBoundingClientRect();
+        const cells = [...root.querySelector('.apexcharts-heatmap-series').querySelectorAll('rect')].map(box);
+        const left = cells[0].left;
+        const width = (cells.at(-1).right - left) / cells.length;
+        // The first bucket starts with the chart's window, or at the first full hour for
+        // calendar hours (a partial hour is left out); not read from the cell timestamps,
+        // which are what is under test
+        const windowStart = window.card._getSpanDates().start;
+        const firstStart = new Date(windowStart);
+        if (hourBuckets) {
+          firstStart.setMinutes(0, 0, 0);
+          if (firstStart.getTime() < windowStart.getTime() - 1) firstStart.setHours(firstStart.getHours() + 1);
+        }
+        // a label may mark a time just before the first cell (ApexCharts' last tick before the axis)
+        let minutes = firstStart.getHours() * 60 + firstStart.getMinutes() - 60;
+        let day = 0;
+        return (
+          [...root.querySelectorAll('.apexcharts-xaxis-label')]
+            .filter((label) => /\d\d:\d\d/.test(label.textContent))
+            .map((label) => {
+              // labels run left to right: a smaller clock time is the next day
+              const [hour, minute] = label.textContent
+                .match(/(\d\d):(\d\d)/)
+                .slice(1)
+                .map(Number);
+              if (hour * 60 + minute + day * 1440 < minutes) day++;
+              minutes = hour * 60 + minute + day * 1440;
+              const startMinutes = firstStart.getHours() * 60 + firstStart.getMinutes();
+              return {
+                text: label.textContent,
+                // position along the row in cells, and the label's time in hours after the first cell starts
+                actual: (box(label).left + box(label).width / 2 - left) / width,
+                expected: (minutes - startMinutes) / 60,
+              };
+            })
+            // a label more than half a cell beside the grid counts as misplaced
+            .map((label) =>
+              label.actual < -0.5 || label.actual > cells.length + 0.5 ? { ...label, expected: Infinity } : label,
+            )
+        );
+      }, !!group_by.period);
+    // ApexCharts redraws the axis once the data arrives: measure until it has
+    await expect
+      .poll(
+        async () => {
+          const labels = await measure();
+          return labels.length > 2 ? Math.max(...labels.map((label) => Math.abs(label.actual - label.expected))) : 1;
+        },
+        { timeout: 5000 },
+      )
+      .toBeLessThan(0.1);
+  });
+}
+
 test('editor presets require a click and preserve entity identity through the real editor', async ({ page }) => {
   await mount(page, {});
   await page.evaluate(async () => {

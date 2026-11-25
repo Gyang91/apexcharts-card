@@ -65,3 +65,16 @@ export function heatmapData(rows: EntityCachePoints[], limit = DEFAULT_HEATMAP_C
   if (columns.length * rows.length > limit) throw new Error(t('error.heatmap.budget', { limit }));
   return rows.map((_, row) => columns.map(([x, values]) => ({ x, y: values[row] })));
 }
+
+/**
+ * x-axis range of a heatmap: from the start of its first cell to the end of its
+ * last. Cells are centred on their timestamps (bucket middles) and laid out
+ * side by side, so the time axis must span the cells, not the chart's window:
+ * else a label lands beside the grid for a partial bucket that is not drawn.
+ */
+export function heatmapXRange(columns: number[]): { min: number; max: number } | undefined {
+  if (columns.length < 2) return undefined;
+  let step = Infinity;
+  for (let i = 1; i < columns.length; i++) step = Math.min(step, columns[i] - columns[i - 1]);
+  return { min: columns[0] - step / 2, max: columns[columns.length - 1] + step / 2 };
+}

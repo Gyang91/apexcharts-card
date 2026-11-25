@@ -124,11 +124,21 @@ export function nearestPeriodStart(ts: number, period: CalendarPeriod, timeZone:
 }
 
 // Short label of the period starting at `ts`, in the user's language
-export function formatPeriod(ts: number, period: CalendarPeriod, lang: string, timeZone: string | undefined): string {
+// `hour12` follows the card's `hours_12`; undefined keeps the language's clock
+export function formatPeriod(
+  ts: number,
+  period: CalendarPeriod,
+  lang: string,
+  timeZone: string | undefined,
+  hour12?: boolean,
+): string {
   const options: Intl.DateTimeFormatOptions = { timeZone };
   switch (period) {
-    case 'hour':
-      return new Intl.DateTimeFormat(lang, { ...options, hour: 'numeric', minute: '2-digit' }).format(ts);
+    case 'hour': {
+      const clock: Intl.DateTimeFormatOptions =
+        hour12 === undefined ? {} : hour12 ? { hour12: true } : { hourCycle: 'h23' };
+      return new Intl.DateTimeFormat(lang, { ...options, ...clock, hour: 'numeric', minute: '2-digit' }).format(ts);
+    }
     case 'day':
     case 'week':
       return new Intl.DateTimeFormat(lang, { ...options, day: 'numeric', month: 'short' }).format(ts);

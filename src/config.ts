@@ -202,6 +202,9 @@ export function applySeriesDefaults(
     serie.group_by.func = serie.group_by.func || DEFAULT_FUNC;
     serie.group_by.fill = serie.group_by.fill || DEFAULT_GROUP_BY_FILL;
   }
+  // ApexCharts centres a heatmap cell on its timestamp: put it in the middle of
+  // its bucket, as statistics are, so the time axis lines up with the cells
+  if (chartType === 'heatmap' && !serie.group_by.align) serie.group_by.align = 'middle';
   if (!serie.show) {
     serie.show = {
       in_legend: DEFAULT_SHOW_IN_LEGEND,

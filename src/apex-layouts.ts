@@ -257,6 +257,9 @@ function getLabels(config: ChartCardConfig, hass: HomeAssistant | undefined) {
   }
 }
 
+// Periods whose labels ApexCharts' own datetime ticks already show
+const NATIVE_TICK_PERIODS: CalendarPeriod[] = ['hour', 'day'];
+
 // The calendar period every series of the chart is grouped by, if they share one
 function getCommonPeriod(config: ChartCardConfig): CalendarPeriod | undefined {
   const series = config.series_in_graph || [];
@@ -269,10 +272,14 @@ function getCommonPeriod(config: ChartCardConfig): CalendarPeriod | undefined {
 // Display timestamps are already shifted to the displayed time zone, so
 // period labels are formatted in the browser's time zone.
 // The x axis passes (value, timestamp); the tooltip passes (value, options).
-function periodFormatter(period: CalendarPeriod, lang: string): (value: number, timestamp?: unknown) => string {
+function periodFormatter(
+  period: CalendarPeriod,
+  lang: string,
+  hours12: boolean,
+): (value: number, timestamp?: unknown) => string {
   return (value, timestamp) => {
     const ts = typeof timestamp === 'number' ? timestamp : value;
-    return formatPeriod(nearestPeriodStart(ts, period, undefined), period, lang, undefined);
+    return formatPeriod(nearestPeriodStart(ts, period, undefined), period, lang, undefined, hours12);
   };
 }
 
@@ -286,7 +293,12 @@ function getXAxis(config: ChartCardConfig, hass: HomeAssistant | undefined) {
       labels: {
         datetimeUTC: false,
         datetimeFormatter: getDateTimeFormatter(hours12),
-        formatter: period ? periodFormatter(period, getLang(config, hass)) : undefined,
+        // ApexCharts only puts ticks on round times without a formatter of ours, so
+        // hours and days keep its labels; longer periods need period names
+        formatter:
+          period && !NATIVE_TICK_PERIODS.includes(period)
+            ? periodFormatter(period, getLang(config, hass), hours12)
+            : undefined,
       },
       axisBorder: { color: 'var(--divider-color)' },
       axisTicks: { color: 'var(--divider-color)' },
@@ -351,7 +363,7 @@ function getXTooltipFormatter(
   if (config.apex_config?.tooltip?.x?.format) return undefined;
   const lang = getLang(config, hass);
   const period = getCommonPeriod(config);
-  if (period) return periodFormatter(period, lang);
+  if (period) return periodFormatter(period, lang, is12Hour(config, hass));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let hours12: any = undefined;
   hours12 = is12Hour(config, hass) ? { hour12: true } : { hourCycle: 'h23' };

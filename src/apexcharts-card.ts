@@ -76,7 +76,7 @@ import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import type { SamplingRange } from './downsample';
 import { hasSampling, sampleSeries, SamplingSeries } from './sampling';
-import { assertHeatmapBudget, heatmapData, rangeAreaData } from './visual-data';
+import { assertHeatmapBudget, heatmapData, heatmapXRange, rangeAreaData } from './visual-data';
 
 // Options passed to ApexCharts' updateOptions on each refresh
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1456,6 +1456,8 @@ export class ChartsCard extends LitElement {
         name: series[row].name,
         data: data.filter((point) => point.y !== null),
       }));
+      const range = heatmapXRange(rows[0]?.map((point) => point.x) ?? []);
+      if (range) graphData.xaxis = { ...graphData.xaxis, ...range };
     }
     return visualEmpty;
   }
