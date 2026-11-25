@@ -112,6 +112,13 @@ describe('calendar periods', () => {
     expect(formatPeriod(july, 'month', 'en', TZ)).toBe('Jul 2026');
     expect(formatPeriod(july, 'day', 'en', TZ)).toBe('Jul 1');
   });
+
+  it('formats hours on the card clock when hours_12 is set, else the language clock', () => {
+    const evening = berlin('2026-07-01T21:00:00', '+02:00');
+    expect(formatPeriod(evening, 'hour', 'en', TZ, false)).toBe('21:00');
+    expect(formatPeriod(evening, 'hour', 'de', TZ, true)).toMatch(/^9:00\s?(PM|pm|p\.m\.)$/);
+    expect(formatPeriod(evening, 'hour', 'de', TZ)).toBe('21:00');
+  });
 });
 
 function makeEntry(groupBy: AnyRec, points: [number, number][]): GraphEntry {

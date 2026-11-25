@@ -423,17 +423,21 @@ series:
     name: Living room
     group_by:
       func: avg
-      duration: 1h
+      period: hour
       fill: 'null'
   - entity: sensor.bedroom_temperature
     name: Bedroom
     group_by:
       func: avg
-      duration: 1h
+      period: hour
       fill: 'null'
 ```
 
-For energy patterns, use energy counters with `statistics: {type: change, period: hour, align: start}`. For occupancy, transform the source state into numeric 0/1 and use an appropriate aggregate; `avg` of event samples is not a time-occupancy percentage—use `time_avg` when you need time weighting.
+- **Cells on the hour**: `period: hour` makes each cell a clock hour (21:00–22:00). `duration: 1h` counts hours back from now instead, so the cells start at odd minutes (21:17–22:17).
+- **Time axis**: each cell sits in the middle of its bucket by default (`group_by.align: middle`), so the time labels line up with the cells. Keep that default for heatmaps.
+- **24-hour time**: set `hours_12: false` to show 21:00 instead of 9:00 PM (or `true` for the opposite); by default the card follows your Home Assistant profile's time format.
+
+For energy patterns, use energy counters with `statistics: {type: change, period: hour}`. For occupancy, transform the source state into numeric 0/1 and use an appropriate aggregate; `avg` of event samples is not a time-occupancy percentage—use `time_avg` when you need time weighting.
 
 The screenshot uses explicit temperature colors (blue/teal/yellow/orange), rather than the default single-color intensity scale. Add this optional block to the example above to get those bands; adapt the thresholds to your units and use case:
 

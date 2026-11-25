@@ -63,6 +63,33 @@ describe('getLayoutConfig', () => {
     expect(layout.xaxis.labels.formatter(new Date('2026-01-01T00:00:00').getTime())).toBe('2026');
   });
 
+  it('keeps ApexCharts time ticks for hour and day periods, so labels sit on round times', () => {
+    for (const period of ['hour', 'day']) {
+      const config = internalConfig({ series: [{ entity: 'sensor.a', group_by: { func: 'avg', period } }] });
+      const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+      expect(layout.xaxis.labels.formatter).toBeUndefined();
+      // the tooltip still names the period
+      expect(typeof layout.tooltip.x.formatter).toBe('function');
+    }
+  });
+
+  it('follows hours_12 in hour period labels', () => {
+    const ts = new Date('2026-07-15T21:00:00').getTime();
+    for (const [hours_12, expected] of [
+      [false, /^21:00$/],
+      [true, /^9:00\s?(PM|pm|p\.m\.)$/],
+    ] as const) {
+      const config = internalConfig({
+        hours_12,
+        series: [{ entity: 'sensor.a', group_by: { func: 'avg', period: 'hour' } }],
+      });
+      const layout = getLayoutConfig(config, { ...mkHass(), language: 'en' } as never, []) as AnyRec;
+      expect(layout.tooltip.x.formatter(ts)).toMatch(expected);
+      // a cell in the middle of its hour is labelled with the hour it starts
+      expect(layout.tooltip.x.formatter(ts + 30 * 60 * 1000)).toMatch(expected);
+    }
+  });
+
   it('keeps time labels when series use different periods or none', () => {
     const config = internalConfig({
       series: [

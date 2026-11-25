@@ -914,3 +914,29 @@ describe('setConfig on a card that already has a config', () => {
     expect({ config: card._config, graphs: card._graphs, span: card._graphSpan, colors: card._colors }).toEqual(before);
   });
 });
+
+describe('heatmap cells', () => {
+  const T = 'custom:apexcharts-card';
+  const card = async (series: object[]) => {
+    await customElements.whenDefined('apexcharts-card');
+    const c: AnyCard = document.createElement('apexcharts-card');
+    c.setConfig({ type: T, chart_type: 'heatmap', series });
+    return c;
+  };
+
+  it('sit in the middle of their bucket by default, like statistics, so the time axis lines up', async () => {
+    const c = await card([
+      { entity: 'sensor.a', group_by: { func: 'avg', duration: '1h' } },
+      { entity: 'sensor.b', group_by: { func: 'avg', period: 'hour', align: 'start' } },
+    ]);
+    expect(c._config.series[0].group_by.align).toBe('middle');
+    expect(c._config.series[1].group_by.align).toBe('start');
+  });
+
+  it('leave other chart types as they were', async () => {
+    await customElements.whenDefined('apexcharts-card');
+    const c: AnyCard = document.createElement('apexcharts-card');
+    c.setConfig({ type: T, series: [{ entity: 'sensor.a', group_by: { func: 'avg', duration: '1h' } }] });
+    expect(c._config.series[0].group_by.align).toBeUndefined();
+  });
+});

@@ -1,7 +1,7 @@
 import '../src/apexcharts-card';
 import '../src/editor/tabs/general-tab';
 import { navigationRange } from '../src/calendar';
-import { rangeAreaData, heatmapData, assertHeatmapBudget } from '../src/visual-data';
+import { rangeAreaData, heatmapData, assertHeatmapBudget, heatmapXRange } from '../src/visual-data';
 import { applyPreset } from '../src/editor/presets';
 import { mkHass, mkState } from './fixtures/hass';
 import { setLocale } from '../src/localize';
@@ -390,5 +390,20 @@ describe('explicit editor presets', () => {
     editor._navigationChanged(new CustomEvent('value-changed', { detail: { value: true } }));
     expect(changed.mock.calls[1][0].detail.config.navigation).toEqual({ show: true, initial: 'week' });
     expect(changed.mock.calls[1][0].detail.config.span).toBeUndefined();
+  });
+});
+
+describe('heatmap x range', () => {
+  const HOUR = 3600 * 1000;
+  it('spans the drawn cells: half a step before the first middle to half a step after the last', () => {
+    const middles = [0.5, 1.5, 2.5].map((h) => h * HOUR);
+    expect(heatmapXRange(middles)).toEqual({ min: 0, max: 3 * HOUR });
+  });
+  it('uses the smallest step, so a missing column does not widen the cells', () => {
+    expect(heatmapXRange([0.5 * HOUR, 1.5 * HOUR, 4.5 * HOUR])).toEqual({ min: 0, max: 5 * HOUR });
+  });
+  it('leaves the axis alone with fewer than two columns', () => {
+    expect(heatmapXRange([HOUR])).toBeUndefined();
+    expect(heatmapXRange([])).toBeUndefined();
   });
 });
