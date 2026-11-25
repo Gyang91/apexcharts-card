@@ -28,6 +28,7 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
 - [How-to guides](#how-to-guides)
   - [Show a sensor over the last 24 hours](#show-a-sensor-over-the-last-24-hours)
   - [Show energy used per day](#show-energy-used-per-day)
+  - [Show room temperatures as a heatmap](#show-room-temperatures-as-a-heatmap)
   - [Compare today with yesterday](#compare-today-with-yesterday)
   - [Put two units on one chart](#put-two-units-on-one-chart)
   - [Calculate a value from other sensors](#calculate-a-value-from-other-sensors)
@@ -170,6 +171,49 @@ series:
 - `statistics` reads Home Assistant's hourly long-term statistics, which are kept for years, instead of the recent history, which the recorder keeps for 10 days by default.
 - For weeks, months or years, change `graph_span`, `span.end` and `statistics.period` together, for example `12month`, `month` and `month`.
 
+### Show room temperatures as a heatmap
+
+One row per room and one cell per hour of the last day, colored by temperature band, like a timetable of where it was warm or cold:
+
+```yaml
+type: custom:apexcharts-card
+chart_type: heatmap
+graph_span: 24h
+hours_12: false
+header:
+  show: true
+  title: Room temperatures
+heatmap:
+  color_ranges:
+    - value: 0
+      color: '#3498db'
+      name: Cool
+    - value: 20
+      color: '#5fa772'
+      name: Comfort
+    - value: 22
+      color: '#d8b13a'
+      name: Warm
+    - value: 23
+      color: '#e0772f'
+      name: Hot
+series:
+  - entity: sensor.living_room_temperature
+    name: Living room
+    group_by:
+      func: avg
+      period: hour
+  - entity: sensor.bedroom_temperature
+    name: Bedroom
+    group_by:
+      func: avg
+      period: hour
+```
+
+- `period: hour` makes each cell a clock hour, so the time labels sit on the cell edges and the tooltip shows the hour a cell covers (`Tue, Nov 24, 21:00 – 22:00`).
+- Each color band runs from its `value` up to the next band; the lowest also covers everything below. The visual editor's **Display** tab has the same bands under **Heatmap Color Bands**. See [Color bands](#color-bands).
+- Every row needs the same grouping. For a week, use `graph_span: 7d` with `period: day`, or keep hours and raise `heatmap.max_cells`: rows × hours must stay within it (default 512). See [Bounded heatmaps](#bounded-heatmaps).
+
 ### Compare today with yesterday
 
 The same sensor twice, the second one moved forward by a day, so today and yesterday share the time axis:
@@ -306,7 +350,8 @@ Everything documented below keeps working as before; this fork adds:
 - **Calendar navigation**: optional day/week/month switch with previous/next and plain-language period labels, following the dashboard time zone.
 - **Explicit editor presets**: temperature, power and consumption starters without replacing your entity IDs.
 - **Computed series**: [`compute`](#compute-option) calculates a series from other series of the card (net power, totals, ratios), without a template sensor.
-- **Selected visual insights**: paired range-area bands and aggregated heatmaps with enforced cell budgets, using the existing ApexCharts runtime.
+- **Range-area bands**: a shaded band between two series, such as a min/max or forecast envelope.
+- **Heatmaps**: one row per sensor and one cell per hour, day or longer, with [color bands](#color-bands) and a legend (also in the visual editor), a tooltip naming the time each cell covers (`Tue, Nov 24, 21:00 – 22:00`), time labels that line up with the cells, and enforced cell budgets.
 
 ## Feature guide
 
@@ -319,7 +364,7 @@ Everything documented below keeps working as before; this fork adds:
 | Configure common charts quickly | [Editor starter presets](#visual-editor-starter-presets) | Explicit action; review the aggregation and source requirements before saving. |
 | Net power, totals or ratios of several sensors | [Computed series](#compute-option) | Calculated from the series the card already loads; no extra requests and no helper entity. |
 | See a min/max or forecast envelope | [Range-area bands](#range-area-bands) | Two supplied bounds with matching timestamps; no forecasting engine. |
-| Spot hourly/daily patterns across rooms | [Bounded heatmaps](#bounded-heatmaps) | Aggregate first; default 512 cells, hard maximum 2,048. Missing cells are not zero. |
+| Spot hourly/daily patterns across rooms | [Bounded heatmaps](#bounded-heatmaps), [how-to](#show-room-temperatures-as-a-heatmap) | Aggregate first, with `group_by.period: hour` for cells on the hour; [color bands](#color-bands) for value ranges. Default 512 cells, hard maximum 2,048. Missing cells are not zero. |
 
 The screenshots below are actual card/editor renders from generated browser fixtures, **not live HA measurements**. Chart examples show colorful light/dark variants, like the existing gallery. Colors can be selected per series with `color` or through `color_list`. Existing chart examples remain in [Examples](#examples-1).
 
