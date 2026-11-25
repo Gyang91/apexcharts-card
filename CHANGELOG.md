@@ -4,6 +4,14 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.17.4](https://github.com/Gyang91/apexcharts-card/compare/v2.17.3...v2.17.4) (2026-11-25)
+
+
+### Bug Fixes
+
+* heatmap time labels line up with the cells ([e39d353](https://github.com/Gyang91/apexcharts-card/commit/e39d35348c837f75fb9beb42d66d9a7fea886bd4))
+* the first bucket of the window is no longer dropped ([0638199](https://github.com/Gyang91/apexcharts-card/commit/063819980f64b0b8bf61d73cc0fb07e0acc74749))
+
 ## [2.17.3](https://github.com/Gyang91/apexcharts-card/compare/v2.17.2...v2.17.3) (2026-11-23)
 
 
