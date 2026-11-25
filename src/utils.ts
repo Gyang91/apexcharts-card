@@ -45,6 +45,21 @@ const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 // 'concat' appends the source items, 'byIndex' merges item by item in place.
 type ArrayMerge = 'concat' | 'byIndex';
 
+function copyOwnProperties<T extends object>(source: T): T {
+  const copy = {} as T;
+  Reflect.ownKeys(source).forEach((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key);
+    if (!descriptor?.enumerable) return;
+    Object.defineProperty(copy, key, {
+      value: Reflect.get(source, key),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  });
+  return copy;
+}
+
 /**
  * Deep merge of `source` into `target`, shared by mergeDeep and
  * mergeDeepConfig. Mutates `target`; nested objects are copied before being
@@ -67,7 +82,7 @@ function mergeDeepWith(target: any, source: any, arrays: ArrayMerge): any {
       target[key] =
         arrays === 'concat' ? targetValue.concat(sourceValue) : mergeDeepWith(targetValue, sourceValue, arrays);
     } else if (isObject(targetValue) && isObject(sourceValue)) {
-      target[key] = mergeDeepWith(Object.assign({}, targetValue), sourceValue, arrays);
+      target[key] = mergeDeepWith(copyOwnProperties(targetValue), sourceValue, arrays);
     } else {
       target[key] = sourceValue;
     }
