@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.18.0](https://github.com/Gyang91/apexcharts-card/compare/v2.17.4...v2.18.0) (2026-11-25)
+
+
+### Features
+
+* heatmap tooltip shows the time range of the cell ([84990cd](https://github.com/Gyang91/apexcharts-card/commit/84990cd4847babc20d1114a0b2087d359b740091))
+
 ## [2.17.4](https://github.com/Gyang91/apexcharts-card/compare/v2.17.3...v2.17.4) (2026-11-25)
 
 
