@@ -68,7 +68,7 @@ describe('group_by bucketing', () => {
       ],
       { type, group_by: { duration: '1h', offset: '+0h', func: 'sum', fill: 'null', align } },
     );
-    await entry._updateHistory(new Date(T0), new Date(T0 + 3 * HOUR));
+    await entry._updateHistory(new Date(T0 + HOUR), new Date(T0 + 3 * HOUR));
     expect(entry.history).toEqual([[timestamp, 5]]);
   });
 
@@ -94,8 +94,9 @@ describe('group_by bucketing', () => {
     await unsorted._updateHistory(new Date(T0), new Date(T0 + 4 * HOUR));
 
     expect(unsorted.history).toEqual(sorted.history);
-    // The empty middle hour (fill: null) has no value, not 0
-    expect(sorted.history.map(([, v]) => v)).toEqual([4, null, 8]);
+    // The first hour (from the start of the window) is kept; the empty hour
+    // (fill: null) has no value, not 0
+    expect(sorted.history.map(([, v]) => v)).toEqual([3, 4, null, 8]);
   });
 
   it('buckets a day of 5-second samples quickly', async () => {
@@ -108,5 +109,34 @@ describe('group_by bucketing', () => {
 
     expect(entry.history.every(([, v]) => v === HOUR / 5000)).toBe(true);
     expect(elapsed).toBeLessThan(500);
+  });
+});
+
+describe('first bucket of the window', () => {
+  const HOUR_MS = 3600 * 1000;
+  const T = Date.UTC(2026, 6, 1, 0, 0, 0);
+  const hourly = (n: number): [number, number][] =>
+    Array.from({ length: n }, (_, i) => [T + i * HOUR_MS + 60_000, i + 1]);
+
+  it('keeps every hour of an exact window, like span start: day', async () => {
+    const entry = makeEntry(hourly(24), { group_by: { duration: '1h', offset: '+0h', func: 'avg', fill: 'null' } });
+    await entry._updateHistory(new Date(T), new Date(T + 24 * HOUR_MS));
+    expect(entry.history.map(([, v]) => v)).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+  });
+
+  it('keeps every hour of a rolling window, which starts 1 ms after a boundary', async () => {
+    const entry = makeEntry(hourly(24), { group_by: { duration: '1h', offset: '+0h', func: 'avg', fill: 'null' } });
+    await entry._updateHistory(new Date(T + 1), new Date(T + 24 * HOUR_MS));
+    expect(entry.history).toHaveLength(24);
+    expect(entry.history[0][1]).toBe(1);
+  });
+
+  it('still drops a bucket that starts before the window', async () => {
+    // 5-hour buckets ending at the window end: the first one starts 1 hour early
+    const entry = makeEntry(hourly(24), { group_by: { duration: '5h', offset: '+0h', func: 'avg', fill: 'null' } });
+    await entry._updateHistory(new Date(T), new Date(T + 24 * HOUR_MS));
+    expect(entry.history).toHaveLength(4);
+    // columns sit in the middle of their bucket: the first kept bucket is 4 h to 9 h
+    expect(entry.history[0][0]).toBe(T + 6.5 * HOUR_MS);
   });
 });

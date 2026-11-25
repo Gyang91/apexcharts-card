@@ -188,8 +188,7 @@ describe('group_by.func time_avg', () => {
       [t0 + 54 * MIN, 30],
       [t0 + 59 * MIN, 30],
     ]);
-    // fixed-duration buckets drop the first (partial) bucket: start one hour early
-    await entry._updateHistory(new Date(t0 - HOUR), new Date(t0 + HOUR));
+    await entry._updateHistory(new Date(t0), new Date(t0 + HOUR));
 
     expect(entry.history).toHaveLength(1);
     expect(entry.history[0][1]).toBeCloseTo(21, 6);
@@ -202,7 +201,7 @@ describe('group_by.func time_avg', () => {
       [t0, 10],
       [t0 + 90 * MIN, 40],
     ]);
-    await entry._updateHistory(new Date(t0 - HOUR), new Date(t0 + 2 * HOUR));
+    await entry._updateHistory(new Date(t0), new Date(t0 + 2 * HOUR));
 
     expect(entry.history.map(([, v]) => v)).toEqual([10, 25]);
   });
@@ -219,7 +218,7 @@ describe('group_by.func diff_inc', () => {
       [t0 + 40 * MIN, 2], // reset
       [t0 + 50 * MIN, 4],
     ]);
-    await entry._updateHistory(new Date(t0 - HOUR), new Date(t0 + HOUR));
+    await entry._updateHistory(new Date(t0), new Date(t0 + HOUR));
     expect(entry.history.map(([, v]) => v)).toEqual([20 + 5 + 25 + 2 + 2]);
   });
 

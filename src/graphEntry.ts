@@ -734,8 +734,9 @@ export default class GraphEntry {
       }
     });
     // Drop the first bucket when it starts before the range (partial), and the
-    // closing boundary. Fixed-duration buckets always start one step early.
-    if (!this._config.group_by.period || buckets[0]?.timestamp < start.getTime()) buckets.shift();
+    // closing boundary. A rolling window starts 1 ms after a bucket boundary
+    // (graph_span + 1 ms), so a bucket starting there is complete and kept.
+    if (buckets[0]?.timestamp < start.getTime() - 1) buckets.shift();
     buckets.pop();
     // Remove nulls at the end
     while (
