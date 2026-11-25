@@ -12,7 +12,8 @@ export const editorStyles = css`
     cursor: pointer;
     font: inherit;
   }
-  .preset-actions p {
+  .preset-actions p,
+  .hint {
     color: var(--secondary-text-color);
     font-size: 0.9em;
   }

@@ -44,6 +44,7 @@ export const ChartCardExternalConfig = t.iface([], {
   })),
   "heatmap": t.opt(t.iface([], {
     "max_cells": t.opt("number"),
+    "color_ranges": t.opt(t.array("ChartCardHeatmapColorRange")),
   })),
   "stacked": t.opt("boolean"),
   "layout": t.opt("string"),
@@ -272,6 +273,12 @@ export const HapticType = t.union(t.lit('success'), t.lit('warning'), t.lit('fai
 
 export const ActionConfig = t.union("ToggleActionConfig", "CallServiceActionConfig", "NavigateActionConfig", "UrlActionConfig", "MoreInfoActionConfig", "NoActionConfig", "CustomActionConfig", "ToggleMenuActionConfig");
 
+export const ChartCardHeatmapColorRange = t.iface([], {
+  "value": "number",
+  "color": "string",
+  "name": t.opt("string"),
+});
+
 const exportedTypeSuite: t.ITypeSuite = {
   ChartCardExternalConfig,
   ChartCardChartType,
@@ -308,5 +315,6 @@ const exportedTypeSuite: t.ITypeSuite = {
   RestrictionConfig,
   HapticType,
   ActionConfig,
+  ChartCardHeatmapColorRange,
 };
 export default exportedTypeSuite;

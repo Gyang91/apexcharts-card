@@ -1,7 +1,7 @@
 import { LitElement, html, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
-import { ChartCardExternalConfig, ChartCardHeaderExternalConfig } from '../../types-config';
+import { ChartCardExternalConfig, ChartCardHeaderExternalConfig, ChartCardHeatmapColorRange } from '../../types-config';
 import { computeHelper, computeLabel } from '../helpers';
 import { editorStyles } from '../styles';
 import { NOW_SCHEMA, SHOW_BOOL_FIELDS } from '../schemas/display';
@@ -21,6 +21,7 @@ import { getApexValue, setApexValue, setApexValues } from '../apex-config-utils'
 import { t } from '../localize';
 import '../components/header-editor';
 import '../components/color-list-editor';
+import '../components/color-threshold-editor';
 import '../components/bool-grid';
 import '../components/annotations-editor';
 
@@ -108,6 +109,15 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     ev.stopPropagation();
     const value = ev.detail.value as string[] | undefined;
     this._fire({ color_list: value });
+  };
+
+  // Heatmap colour bands, keeping the other heatmap options
+  private _heatmapBandsChanged = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    const bands = ev.detail.value as ChartCardHeatmapColorRange[];
+    const heatmap = { ...this.config?.heatmap, color_ranges: bands.length ? bands : undefined };
+    if (!heatmap.color_ranges) delete heatmap.color_ranges;
+    this._fire({ heatmap: Object.keys(heatmap).length ? heatmap : undefined });
   };
 
   private _appearanceChanged = (ev: CustomEvent): void => {
@@ -590,6 +600,20 @@ export class ApexChartsCardEditorDisplay extends LitElement {
             ></apexcharts-card-annotations-editor>
           </div>
         </ha-expansion-panel>
+
+        ${
+          cfg.chart_type === 'heatmap'
+            ? html`<ha-expansion-panel outlined header=${t('display.panel.heatmapBands')} expanded>
+                <p class="hint">${t('display.heatmapBands.helper')}</p>
+                <apexcharts-card-color-threshold-editor
+                  .thresholds=${cfg.heatmap?.color_ranges || []}
+                  .third=${'name'}
+                  .addLabel=${t('display.heatmapBands.add')}
+                  @value-changed=${this._heatmapBandsChanged}
+                ></apexcharts-card-color-threshold-editor>
+              </ha-expansion-panel>`
+            : ''
+        }
 
         <ha-expansion-panel outlined header=${t('display.panel.colorPalette')}>
           <apexcharts-card-color-list-editor

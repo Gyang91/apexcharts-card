@@ -39,6 +39,7 @@ export interface ChartCardExternalConfig {
   };
   heatmap?: {
     max_cells?: number;
+    color_ranges?: ChartCardHeatmapColorRange[];
   };
   stacked?: boolean;
   layout?: string;
@@ -285,3 +286,11 @@ export declare type ActionConfig =
   | NoActionConfig
   | CustomActionConfig
   | ToggleMenuActionConfig;
+
+// A heatmap colour band: from `value` up to the next band's value. The lowest
+// band also covers everything below it.
+export interface ChartCardHeatmapColorRange {
+  value: number;
+  color: string;
+  name?: string;
+}

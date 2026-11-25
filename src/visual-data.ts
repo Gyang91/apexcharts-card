@@ -1,7 +1,7 @@
 import type { EntityCachePoints } from './types';
 import { t } from './localize';
 import { alignSeries } from './align';
-import type { ChartCardSeriesExternalConfig } from './types-config';
+import type { ChartCardHeatmapColorRange, ChartCardSeriesExternalConfig } from './types-config';
 import { addPeriods, startOfPeriod } from './calendar';
 import parse from 'parse-duration';
 
@@ -77,4 +77,29 @@ export function heatmapXRange(columns: number[]): { min: number; max: number } |
   let step = Infinity;
   for (let i = 1; i < columns.length; i++) step = Math.min(step, columns[i] - columns[i - 1]);
   return { min: columns[0] - step / 2, max: columns[columns.length - 1] + step / 2 };
+}
+
+/**
+ * ApexCharts colour-scale ranges for `heatmap.color_ranges`: each band runs
+ * from its value up to just below the next band's, the lowest one from -∞ and
+ * the highest to +∞, so every value gets a band. Bands without a name are
+ * named after their limits ("< 20", "20 – 22", "≥ 23") for the legend.
+ */
+export function heatmapColorScale(
+  bands: ChartCardHeatmapColorRange[],
+  color: (value: string) => string = (value) => value,
+): { from: number; to: number; color: string; name: string }[] {
+  const sorted = [...bands].sort((a, b) => a.value - b.value);
+  return sorted.map((band, i) => {
+    const next = sorted[i + 1];
+    const name =
+      band.name ?? (i === 0 && next ? `< ${next.value}` : next ? `${band.value} – ${next.value}` : `≥ ${band.value}`);
+    return {
+      from: i === 0 ? -Number.MAX_VALUE : band.value,
+      // ApexCharts' ranges include both ends: stop just below the next band
+      to: next ? next.value - Math.max(Math.abs(next.value), 1) * 1e-9 : Number.MAX_VALUE,
+      color: color(band.color),
+      name,
+    };
+  });
 }
