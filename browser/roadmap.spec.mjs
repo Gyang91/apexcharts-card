@@ -263,36 +263,30 @@ test('renders bounded aggregated heatmaps and reports over-budget data without t
   page.on('pageerror', (error) => errors.push(error.message));
   await mount(page, {
     chart_type: 'heatmap',
-    apex_config: {
-      chart: { animations: { enabled: false } },
-      plotOptions: {
-        heatmap: {
-          enableShades: false,
-          colorScale: {
-            ranges: [
-              { from: -100, to: 14.999, color: '#3498db', name: 'Cool' },
-              { from: 15, to: 17.999, color: '#00bfa5', name: 'Mild' },
-              { from: 18, to: 20.999, color: '#ffca28', name: 'Comfort' },
-              { from: 21, to: 100, color: '#ff7043', name: 'Warm' },
-            ],
-          },
-        },
-      },
-    },
+    apex_config: { chart: { animations: { enabled: false } } },
+    hours_12: false,
     header: { show: true, title: 'Hourly room temperatures', show_states: false },
-    heatmap: { max_cells: 100 },
+    heatmap: {
+      max_cells: 100,
+      color_ranges: [
+        { value: 0, color: '#3498db', name: 'Cool' },
+        { value: 15, color: '#00bfa5', name: 'Mild' },
+        { value: 18, color: '#ffca28', name: 'Comfort' },
+        { value: 21, color: '#ff7043', name: 'Warm' },
+      ],
+    },
     series: [
       {
         entity: 'sensor.temp',
         name: 'Living room',
-        group_by: { func: 'avg', duration: '1h', fill: 'null' },
+        group_by: { func: 'avg', period: 'hour', fill: 'null' },
         data_generator:
           'return Array.from({length: 24}, (_, i) => [start.getTime() + i * 3600000, i === 3 ? null : i === 1 ? 0 : 18 + Math.sin(i / 3) * 5]);',
       },
       {
         entity: 'sensor.temp',
         name: 'Bedroom',
-        group_by: { func: 'avg', duration: '1h', fill: 'null' },
+        group_by: { func: 'avg', period: 'hour', fill: 'null' },
         data_generator:
           'return Array.from({length: 24}, (_, i) => [start.getTime() + i * 3600000, 16 + Math.sin(i / 3) * 4]);',
       },
@@ -434,7 +428,8 @@ test('heatmap tooltip shows the time range of the hovered cell', async ({ page }
       await cell.hover();
       return page.evaluate(() => window.card.shadowRoot.querySelector('.apexcharts-tooltip-title')?.textContent ?? '');
     })
-    .toMatch(new RegExp(`${expected[0]}\\s?–\\s?${expected[1]}$`));
+    // a range over midnight names both dates: "Tue, Nov 24, 23:00 – Wed, Nov 25, 00:00"
+    .toMatch(new RegExp(`${expected[0]}\\s?–\\s?(\\w+, \\w+ \\d+, )?${expected[1]}$`));
 });
 
 test('heatmap colour bands colour each cell by its value and list the bands in the legend', async ({ page }) => {
@@ -454,9 +449,9 @@ test('heatmap colour bands colour each cell by its value and list the bands in t
         entity: 'sensor.temp',
         name: 'Living',
         group_by: { func: 'avg', period: 'hour' },
-        // one hour below 20, one in 20-22, the rest above 22
+        // by clock hour, so every band appears whatever the time: 15, 21, 25, 15, ...
         data_generator:
-          'const out = []; let i = 0; for (let t = start.getTime(); t < end.getTime(); t += 600000) out.push([t, i++ < 6 ? 15 : i <= 12 ? 21 : 25]); return out;',
+          'const out = []; for (let t = start.getTime(); t < end.getTime(); t += 600000) out.push([t, [15, 21, 25][new Date(t).getHours() % 3]]); return out;',
       },
     ],
   });
