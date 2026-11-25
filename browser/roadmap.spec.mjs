@@ -402,6 +402,41 @@ for (const group_by of [
   });
 }
 
+test('heatmap tooltip shows the time range of the hovered cell', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 });
+  await mount(page, {
+    chart_type: 'heatmap',
+    graph_span: '24h',
+    hours_12: false,
+    apex_config: { chart: { animations: { enabled: false } } },
+    series: [
+      {
+        entity: 'sensor.temp',
+        name: 'Living',
+        group_by: { func: 'avg', period: 'hour' },
+        data_generator:
+          'const out = []; for (let t = start.getTime(); t < end.getTime(); t += 600000) out.push([t, 20]); return out;',
+      },
+    ],
+  });
+  const cell = page.locator('apexcharts-card .apexcharts-heatmap-series rect').first();
+  await expect(cell).toBeVisible();
+  const expected = await page.evaluate(() => {
+    // the first drawn cell is the first full hour of the window
+    const first = new Date(window.card._getSpanDates().start);
+    if (first.getMinutes() || first.getSeconds() || first.getMilliseconds())
+      first.setHours(first.getHours() + 1, 0, 0, 0);
+    const pad = (n) => String(n).padStart(2, '0');
+    return [first.getHours(), (first.getHours() + 1) % 24].map((h) => pad(h) + ':00');
+  });
+  await expect
+    .poll(async () => {
+      await cell.hover();
+      return page.evaluate(() => window.card.shadowRoot.querySelector('.apexcharts-tooltip-title')?.textContent ?? '');
+    })
+    .toMatch(new RegExp(`${expected[0]}\\s?–\\s?${expected[1]}$`));
+});
+
 test('editor presets require a click and preserve entity identity through the real editor', async ({ page }) => {
   await mount(page, {});
   await page.evaluate(async () => {
