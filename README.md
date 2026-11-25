@@ -41,6 +41,7 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
 - [Visual-editor starter presets](#visual-editor-starter-presets)
 - [Range-area bands](#range-area-bands)
 - [Bounded heatmaps](#bounded-heatmaps)
+  - [Color bands](#color-bands)
 - [Reliability and data status](#reliability-and-data-status)
 - [Large-history performance](#large-history-performance)
 - [Installation](#installation)
@@ -440,27 +441,35 @@ series:
 
 For energy patterns, use energy counters with `statistics: {type: change, period: hour}`. For occupancy, transform the source state into numeric 0/1 and use an appropriate aggregate; `avg` of event samples is not a time-occupancy percentage—use `time_avg` when you need time weighting.
 
-The screenshot uses explicit temperature colors (blue/teal/yellow/orange), rather than the default single-color intensity scale. Add this optional block to the example above to get those bands; adapt the thresholds to your units and use case:
-
-```yaml
-apex_config:
-  plotOptions:
-    heatmap:
-      enableShades: false
-      colorScale:
-        ranges:
-          - {from: -100, to: 14.999, color: '#3498db', name: Cool}
-          - {from: 15, to: 17.999, color: '#00bfa5', name: Mild}
-          - {from: 18, to: 20.999, color: '#ffca28', name: Comfort}
-          - {from: 21, to: 100, color: '#ff7043', name: Warm}
-```
-
 - `heatmap.max_cells` defaults to **512**, configurable from **1 to 2,048**. The limit is rows multiplied by the union of timestamp columns, including missing cells.
 - Oversized projected bucket ranges are rejected **before recorder requests**. Actual aligned data is checked again before rendering. An error asks for a shorter range/coarser aggregation; nothing is silently truncated.
 - Missing/non-finite cells are omitted from painting, not colored as zero. Zero remains valid. Use matching aggregation periods, alignments and units for meaningful cross-row comparison.
-- Heatmaps use a shared numeric color scale by default; per-row colors or native `apex_config.plotOptions.heatmap.colorScale` ranges can customize it. Rows compare entities, rather than automatically pivoting one entity into a day-by-hour calendar.
+- Heatmaps use a shared numeric color scale by default; [color bands](#color-bands), per-row colors or native `apex_config.plotOptions.heatmap.colorScale` ranges can customize it. Rows compare entities, rather than automatically pivoting one entity into a day-by-hour calendar.
 - Native datetime cells preserve timestamp spacing. A selected month with hourly buckets may exceed the budget: switch to daily statistics/grouping or a shorter range.
 - Card-managed multi-axes, stacking, brush, initially hidden series, thresholds, inversion, extrema annotations and data labels are deliberately excluded. No sampling or automatic unit conversion is performed, and `extend_to` is disabled.
+
+### Color bands
+
+By default, cells are shaded by value in one color. To give value ranges their own colors instead, as in the screenshot, add `heatmap.color_ranges`, or use the **Heatmap Color Bands** panel in the visual editor's **Display** tab:
+
+```yaml
+heatmap:
+  color_ranges:
+    - value: 15
+      color: '#00bfa5'
+      name: Mild
+    - value: 18
+      color: '#ffca28'
+      name: Comfort
+    - value: 21
+      color: '#ff7043'
+      name: Warm
+```
+
+- Each band colors the cells from its `value` up to the next band's value. The lowest band also covers everything below it, and the highest everything above, so every cell gets a color with no gaps between bands.
+- `name` is shown in the legend, which appears with the bands. Without a name, the band is named after its limits, such as `< 18`, `18 – 21` or `≥ 21`.
+- `color` accepts any CSS color, including theme variables like `var(--state-climate-cool-color)`.
+- If you already set `apex_config.plotOptions.heatmap.colorScale.ranges` yourself, that keeps working; use either that or `color_ranges`, not both.
 
 Neither visual mode adds a runtime library, forecasting service or extra polling. Cell limits bound heatmap rendering, **not every possible source-history response**; prefer long-term statistics for large ranges.
 
@@ -615,7 +624,7 @@ The card strictly validates all the options available (but not for the `apex_con
 | `cache` | boolean | `true` | v1.0.0 | Use in-browser data caching to reduce the load on Home Assistant's server |
 | `downsample` | boolean | `false` | v2.11.0 | Optional width-aware line/area sampling with adaptive zoom/brush detail. Calculations retain full history. See [Large-history performance](#large-history-performance) for exclusions and trade-offs. |
 | `navigation` | object | | v2.12.0 | Optional calendar controls: `{show: true, initial: day, position: top}`. See [Calendar navigation](#calendar-navigation). |
-| `heatmap` | object | | v2.12.0 | Heatmap cell budget: `{max_cells: 512}`; hard maximum 2,048. Requires `chart_type: heatmap`. See [Bounded heatmaps](#bounded-heatmaps). |
+| `heatmap` | object | | v2.12.0 | Heatmap options: cell budget `max_cells` (default 512, hard maximum 2,048) and `color_ranges` (v2.19.0, see [Color bands](#color-bands)). Requires `chart_type: heatmap`. See [Bounded heatmaps](#bounded-heatmaps). |
 | `stacked` | boolean | `false` | v1.0.0 | Enable if you want the data to be stacked on the graph |
 | `layout` | string | | v1.0.0 | See [layouts](#layouts) |
 | `header` | object | | v1.0.0 | See [header](#header-options) |

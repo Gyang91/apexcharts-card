@@ -336,6 +336,10 @@ export const fr: Record<string, string> = {
   'display.panel.chartBackground': 'Arrière-plan du graphique',
   'display.panel.annotations': 'Annotations',
   'display.panel.colorPalette': 'Palette de couleurs',
+  'display.panel.heatmapBands': 'Bandes de couleur de la heatmap',
+  'display.heatmapBands.helper':
+    'Chaque bande colore les cases à partir de sa valeur jusqu’à la bande suivante. La bande la plus basse couvre aussi tout ce qui est en dessous. Le nom est affiché dans la légende.',
+  'display.heatmapBands.add': 'Ajouter une bande',
   'display.annotations.xaxis': 'Annotations de l’axe X',
   'display.annotations.yaxis': 'Annotations de l’axe Y',
   'display.header.titleActions': 'Actions du titre',

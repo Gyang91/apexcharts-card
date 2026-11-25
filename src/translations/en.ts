@@ -336,6 +336,10 @@ export const en: Record<string, string> = {
   'display.panel.chartBackground': 'Chart Background',
   'display.panel.annotations': 'Annotations',
   'display.panel.colorPalette': 'Color Palette',
+  'display.panel.heatmapBands': 'Heatmap Color Bands',
+  'display.heatmapBands.helper':
+    'Each band colors the cells from its value up to the next band. The lowest band also covers everything below it. The name is shown in the legend.',
+  'display.heatmapBands.add': 'Add band',
   'display.annotations.xaxis': 'X-Axis Annotations',
   'display.annotations.yaxis': 'Y-Axis Annotations',
   'display.header.titleActions': 'Title Actions',

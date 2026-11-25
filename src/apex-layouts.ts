@@ -14,6 +14,7 @@ import {
 import { ChartCardConfig } from './types';
 import type { CalendarPeriod } from './types-config';
 import {
+  computeColor,
   computeName,
   computeUom,
   getLang,
@@ -28,6 +29,7 @@ import { layoutMinimal } from './layouts/minimal';
 import { getLocales, getDefaultLocale } from './locales';
 import { t } from './localize';
 import GraphEntry from './graphEntry';
+import { heatmapColorScale } from './visual-data';
 
 // Follow the Home Assistant theme: axis labels and legend in the secondary
 // text color and the theme font, grid and axis lines in the divider color.
@@ -138,6 +140,24 @@ export function getLayoutConfig(
     };
     if (config.chart_type === 'heatmap') {
       visual.plotOptions = { heatmap: { radius: 2, enableShades: true, distributed: false } };
+      const bands = config.heatmap?.color_ranges;
+      if (bands?.length) {
+        // Fixed colour bands replace the shaded scale, and the legend lists them
+        visual.plotOptions = {
+          heatmap: {
+            radius: 2,
+            enableShades: false,
+            distributed: false,
+            colorScale: { ranges: heatmapColorScale(bands, computeColor) },
+          },
+        };
+        // Legend entries are the bands, not the series: show each band's name
+        visual.legend = {
+          show: true,
+          formatter: (name: string) => name,
+          markers: { size: DEFAULT_LEGEND_MARKER_WIDTH },
+        };
+      }
       // ApexCharts hides a heatmap's x in the tooltip: show the cell's time range
       if (chartBuckets(config)) visual.tooltip = { shared: false, x: { show: true } };
     }

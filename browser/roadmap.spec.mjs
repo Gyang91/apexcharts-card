@@ -437,6 +437,56 @@ test('heatmap tooltip shows the time range of the hovered cell', async ({ page }
     .toMatch(new RegExp(`${expected[0]}\\s?–\\s?${expected[1]}$`));
 });
 
+test('heatmap colour bands colour each cell by its value and list the bands in the legend', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 });
+  await mount(page, {
+    chart_type: 'heatmap',
+    graph_span: '6h',
+    apex_config: { chart: { animations: { enabled: false } } },
+    heatmap: {
+      color_ranges: [
+        { value: 20, color: '#00ff00', name: 'Comfort' },
+        { value: 22, color: '#ff0000' },
+      ],
+    },
+    series: [
+      {
+        entity: 'sensor.temp',
+        name: 'Living',
+        group_by: { func: 'avg', period: 'hour' },
+        // one hour below 20, one in 20-22, the rest above 22
+        data_generator:
+          'const out = []; let i = 0; for (let t = start.getTime(); t < end.getTime(); t += 600000) out.push([t, i++ < 6 ? 15 : i <= 12 ? 21 : 25]); return out;',
+      },
+    ],
+  });
+  await expect(page.locator('apexcharts-card .apexcharts-heatmap-series rect').first()).toBeVisible();
+  const result = await page.evaluate(() => {
+    const root = window.card.shadowRoot;
+    const cells = [...root.querySelector('.apexcharts-heatmap-series').querySelectorAll('rect')];
+    const values = window.card._apexChart.w.config.series[0].data.map((point) => point.y);
+    return {
+      // colours come back resolved (rgb): compare them as the browser normalises them
+      cells: cells.map((cell, i) => {
+        const probe = document.createElement('span');
+        probe.style.color = cell.getAttribute('fill');
+        document.body.appendChild(probe);
+        const fill = getComputedStyle(probe).color;
+        probe.remove();
+        return { value: values[i], fill };
+      }),
+      legend: [...root.querySelectorAll('.apexcharts-legend-text')].map((text) => text.textContent),
+    };
+  });
+  // the lowest band also covers values below it
+  for (const cell of result.cells) {
+    expect(cell.fill, String(cell.value)).toBe(cell.value >= 22 ? 'rgb(255, 0, 0)' : 'rgb(0, 255, 0)');
+  }
+  expect(result.cells.some((cell) => cell.value < 20)).toBe(true);
+  expect(result.cells.some((cell) => cell.value >= 22)).toBe(true);
+  expect(result.legend).toEqual(['Comfort', '≥ 22']);
+});
+
 test('editor presets require a click and preserve entity identity through the real editor', async ({ page }) => {
   await mount(page, {});
   await page.evaluate(async () => {
