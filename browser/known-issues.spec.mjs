@@ -92,15 +92,18 @@ for (const sparse of [false, true]) {
     const result = await page.evaluate(() => {
       const chart = window.card._apexChart;
       const { minX, maxX, gridWidth } = chart.w.globals;
-      const data = chart.w.config.series[0].data;
+      // bars with a value, in order, and the data points they draw
+      const data = chart.w.config.series[0].data.filter(([, value]) => value !== null);
       const bars = [...window.card.shadowRoot.querySelectorAll('.apexcharts-bar-area')];
       const pixel = (timestamp) => ((timestamp - minX) / (maxX - minX)) * gridWidth;
+      // the six hourly buckets of the 6h window end at groupingEnd
+      const windowStart = window.groupingEnd - 6 * 3600000;
       return bars
         .filter((bar) => bar.getBBox().height > 0)
         .map((bar, i) => {
           const box = bar.getBBox();
           const [timestamp, value] = data[i];
-          const bucketStart = window.groupingEnd - (5 - i) * 3600000;
+          const bucketStart = windowStart + Math.floor((timestamp - windowStart) / 3600000) * 3600000;
           return {
             value,
             widthFraction: box.width / (pixel(bucketStart + 3600000) - pixel(bucketStart)),
@@ -111,8 +114,9 @@ for (const sparse of [false, true]) {
           };
         });
     });
-    expect(result).toHaveLength(sparse ? 1 : 5);
-    expect(result.map((bar) => bar.value)).toEqual(sparse ? [2] : [2, 3, 4, 5, 6]);
+    // every hour of the window has its column, the first one included
+    expect(result).toHaveLength(sparse ? 1 : 6);
+    expect(result.map((bar) => bar.value)).toEqual(sparse ? [2] : [1, 2, 3, 4, 5, 6]);
     for (const bar of result) {
       expect(bar.midpointError).toBeLessThan(1);
       expect(bar.centerError).toBeLessThan(1);
