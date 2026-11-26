@@ -11,13 +11,9 @@ import { computeEntityName } from '../../entity-name';
 import { DEFAULT_COLORS } from '../../const';
 import { editorStyles } from '../styles';
 import { t } from '../localize';
+import { listControls } from './list-controls';
 import './series-item-editor';
 
-const ICON_UP = 'M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z';
-const ICON_DOWN = 'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z';
-const ICON_DELETE = 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
-const ICON_EXPAND = 'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z';
-const ICON_COLLAPSE = 'M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z';
 const ICON_ADD = 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z';
 
 @customElement('apexcharts-card-series-editor')
@@ -183,31 +179,16 @@ export class ApexChartsCardSeriesEditor extends LitElement {
                 <span class="color-swatch" style="background: ${this._seriesSwatch(s, i)};"></span>
                 <span class="item-name">${this._displayName(s)}</span>
                 ${s.type ? html`<span class="type-badge">${s.type}</span>` : nothing}
-                <div class="item-controls" @click=${(ev: Event) => ev.stopPropagation()}>
-                  <ha-icon-button
-                    .path=${ICON_UP}
-                    .label=${t('common.moveUp')}
-                    .disabled=${i === 0 || isDraft}
-                    @click=${() => this._move(i, -1)}
-                  ></ha-icon-button>
-                  <ha-icon-button
-                    .path=${ICON_DOWN}
-                    .label=${t('common.moveDown')}
-                    .disabled=${i === renderedSeries.length - 1 || isDraft}
-                    @click=${() => this._move(i, 1)}
-                  ></ha-icon-button>
-                  <ha-icon-button
-                    .path=${ICON_DELETE}
-                    .label=${t('common.delete')}
-                    .disabled=${!removable}
-                    @click=${() => this._remove(i)}
-                  ></ha-icon-button>
-                  <ha-icon-button
-                    .path=${expanded ? ICON_COLLAPSE : ICON_EXPAND}
-                    .label=${expanded ? t('common.collapse') : t('common.expand')}
-                    @click=${() => this._toggle(i)}
-                  ></ha-icon-button>
-                </div>
+                ${listControls({
+                  index: i,
+                  count: renderedSeries.length,
+                  expanded,
+                  movable: !isDraft,
+                  removable,
+                  onMove: (delta) => this._move(i, delta),
+                  onRemove: () => this._remove(i),
+                  onToggle: () => this._toggle(i),
+                })}
               </div>
               ${
                 expanded
