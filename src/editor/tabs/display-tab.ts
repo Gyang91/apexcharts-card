@@ -1,4 +1,4 @@
-import { LitElement, html, TemplateResult, CSSResultGroup } from 'lit';
+import { LitElement, html, nothing, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { ChartCardExternalConfig, ChartCardHeaderExternalConfig, ChartCardHeatmapColorRange } from '../../types-config';
@@ -19,6 +19,7 @@ import { BoolField } from '../components/bool-grid';
 import { AnnotationItem } from '../components/annotations-editor';
 import { getApexValue, setApexValue, setApexValues } from '../apex-config-utils';
 import { t } from '../localize';
+import { supports } from '../support';
 import '../components/header-editor';
 import '../components/color-list-editor';
 import '../components/color-threshold-editor';
@@ -457,30 +458,34 @@ export class ApexChartsCardEditorDisplay extends LitElement {
           ></apexcharts-card-header-editor>
         </ha-expansion-panel>
 
-        <ha-expansion-panel outlined header=${t('display.panel.nowMarker')}>
-          <div class="section">
-            <apexcharts-card-bool-grid
-              .fields=${nowShowFields}
-              .columns=${1}
-              @value-changed=${this._nowShowChanged}
-            ></apexcharts-card-bool-grid>
-            <apexcharts-card-color-input
-              .value=${cfg.now?.color}
-              @value-changed=${(ev: CustomEvent) => {
-                ev.stopPropagation();
-                this._setNow({ color: ev.detail.value });
-              }}
-            ></apexcharts-card-color-input>
-            <ha-form
-              .hass=${this.hass}
-              .data=${{ label: cfg.now?.label || '' }}
-              .schema=${NOW_SCHEMA}
-              .computeLabel=${computeLabel}
-              .computeHelper=${computeHelper}
-              @value-changed=${this._nowChanged}
-            ></ha-form>
-          </div>
-        </ha-expansion-panel>
+        ${
+          supports(cfg, 'now')
+            ? html`<ha-expansion-panel outlined header=${t('display.panel.nowMarker')}>
+                <div class="section">
+                  <apexcharts-card-bool-grid
+                    .fields=${nowShowFields}
+                    .columns=${1}
+                    @value-changed=${this._nowShowChanged}
+                  ></apexcharts-card-bool-grid>
+                  <apexcharts-card-color-input
+                    .value=${cfg.now?.color}
+                    @value-changed=${(ev: CustomEvent) => {
+                      ev.stopPropagation();
+                      this._setNow({ color: ev.detail.value });
+                    }}
+                  ></apexcharts-card-color-input>
+                  <ha-form
+                    .hass=${this.hass}
+                    .data=${{ label: cfg.now?.label || '' }}
+                    .schema=${NOW_SCHEMA}
+                    .computeLabel=${computeLabel}
+                    .computeHelper=${computeHelper}
+                    @value-changed=${this._nowChanged}
+                  ></ha-form>
+                </div>
+              </ha-expansion-panel>`
+            : nothing
+        }
 
         <ha-expansion-panel outlined header=${t('display.panel.showOptions')}>
           <apexcharts-card-bool-grid
@@ -511,23 +516,27 @@ export class ApexChartsCardEditorDisplay extends LitElement {
           ></ha-form>
         </ha-expansion-panel>
 
-        <ha-expansion-panel outlined header=${t('display.panel.grid')}>
-          <div class="section">
-            <apexcharts-card-bool-grid
-              .fields=${gridBoolFields}
-              .columns=${2}
-              @value-changed=${this._gridBoolChanged}
-            ></apexcharts-card-bool-grid>
-            <ha-form
-              .hass=${this.hass}
-              .data=${gridSelectData}
-              .schema=${getGridSchema()}
-              .computeLabel=${computeLabel}
-              .computeHelper=${computeHelper}
-              @value-changed=${this._gridSelectChanged}
-            ></ha-form>
-          </div>
-        </ha-expansion-panel>
+        ${
+          supports(cfg, 'grid')
+            ? html`<ha-expansion-panel outlined header=${t('display.panel.grid')}>
+                <div class="section">
+                  <apexcharts-card-bool-grid
+                    .fields=${gridBoolFields}
+                    .columns=${2}
+                    @value-changed=${this._gridBoolChanged}
+                  ></apexcharts-card-bool-grid>
+                  <ha-form
+                    .hass=${this.hass}
+                    .data=${gridSelectData}
+                    .schema=${getGridSchema()}
+                    .computeLabel=${computeLabel}
+                    .computeHelper=${computeHelper}
+                    @value-changed=${this._gridSelectChanged}
+                  ></ha-form>
+                </div>
+              </ha-expansion-panel>`
+            : nothing
+        }
 
         <ha-expansion-panel outlined header=${t('display.panel.legend')}>
           <div class="section">
@@ -573,16 +582,20 @@ export class ApexChartsCardEditorDisplay extends LitElement {
           ></apexcharts-card-bool-grid>
         </ha-expansion-panel>
 
-        <ha-expansion-panel outlined header=${t('display.panel.markers')}>
-          <ha-form
-            .hass=${this.hass}
-            .data=${markersData}
-            .schema=${getMarkersSchema()}
-            .computeLabel=${computeLabel}
-            .computeHelper=${computeHelper}
-            @value-changed=${this._markersChanged}
-          ></ha-form>
-        </ha-expansion-panel>
+        ${
+          supports(cfg, 'markers')
+            ? html`<ha-expansion-panel outlined header=${t('display.panel.markers')}>
+                <ha-form
+                  .hass=${this.hass}
+                  .data=${markersData}
+                  .schema=${getMarkersSchema()}
+                  .computeLabel=${computeLabel}
+                  .computeHelper=${computeHelper}
+                  @value-changed=${this._markersChanged}
+                ></ha-form>
+              </ha-expansion-panel>`
+            : nothing
+        }
 
         <ha-expansion-panel outlined header=${t('display.panel.chartBackground')}>
           <ha-form
@@ -595,23 +608,26 @@ export class ApexChartsCardEditorDisplay extends LitElement {
           ></ha-form>
         </ha-expansion-panel>
 
-        <ha-expansion-panel outlined header=${t('display.panel.annotations')}>
-          <div class="section">
-            <div style="font-weight: 500; margin-top: 4px;">${t('display.annotations.xaxis')}</div>
-            <apexcharts-card-annotations-editor
-              axis="xaxis"
-              .items=${xAnnotations}
-              @value-changed=${(ev: CustomEvent) => this._annotationsChanged('xaxis', ev)}
-            ></apexcharts-card-annotations-editor>
-            <div style="font-weight: 500; margin-top: 12px;">${t('display.annotations.yaxis')}</div>
-            <apexcharts-card-annotations-editor
-              axis="yaxis"
-              .items=${yAnnotations}
-              @value-changed=${(ev: CustomEvent) => this._annotationsChanged('yaxis', ev)}
-            ></apexcharts-card-annotations-editor>
-          </div>
-        </ha-expansion-panel>
-
+        ${
+          supports(cfg, 'annotations')
+            ? html`<ha-expansion-panel outlined header=${t('display.panel.annotations')}>
+                <div class="section">
+                  <div style="font-weight: 500; margin-top: 4px;">${t('display.annotations.xaxis')}</div>
+                  <apexcharts-card-annotations-editor
+                    axis="xaxis"
+                    .items=${xAnnotations}
+                    @value-changed=${(ev: CustomEvent) => this._annotationsChanged('xaxis', ev)}
+                  ></apexcharts-card-annotations-editor>
+                  <div style="font-weight: 500; margin-top: 12px;">${t('display.annotations.yaxis')}</div>
+                  <apexcharts-card-annotations-editor
+                    axis="yaxis"
+                    .items=${yAnnotations}
+                    @value-changed=${(ev: CustomEvent) => this._annotationsChanged('yaxis', ev)}
+                  ></apexcharts-card-annotations-editor>
+                </div>
+              </ha-expansion-panel>`
+            : nothing
+        }
         ${
           cfg.chart_type === 'heatmap'
             ? html`<ha-expansion-panel outlined header=${t('display.panel.heatmapBands')} expanded>

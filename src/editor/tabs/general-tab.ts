@@ -18,6 +18,7 @@ import { BoolField } from '../components/bool-grid';
 import { HaFormSchema } from '../types';
 import { t } from '../localize';
 import { applyPreset, EditorPreset } from '../presets';
+import { Feature, supports } from '../support';
 
 interface FormData {
   graph_span?: string;
@@ -188,6 +189,7 @@ export class ApexChartsCardEditorGeneral extends LitElement {
   protected render(): TemplateResult {
     if (!this.config || !this.hass) return html``;
     const data = this._formData();
+    // Only the switches this chart type uses (see support.ts)
     const stackedFields: BoolField[] = [
       {
         name: 'stacked',
@@ -200,30 +202,9 @@ export class ApexChartsCardEditorGeneral extends LitElement {
         helper: t('helper.downsample'),
         value: this.config.downsample ?? false,
       },
-    ];
+    ].filter((field) => supports(this.config, field.name as Feature));
     return html`
       <div class="section">
-        <div class="preset-actions">
-          <strong>${t('preset.title')}</strong>
-          <p>${t('preset.helper')}</p>
-          ${(['temperature', 'power', 'consumption'] as const).map(
-            (preset) => html`
-              <button type="button" @click=${() => this._applyPreset(preset)}>${t(`preset.${preset}`)}</button>
-            `,
-          )}
-        </div>
-        <apexcharts-card-bool-grid
-          .fields=${[
-            {
-              name: 'navigation',
-              label: t('field.navigation'),
-              helper: t('helper.navigation'),
-              value: this.config.navigation?.show ?? false,
-            },
-          ]}
-          .columns=${1}
-          @value-changed=${this._navigationChanged}
-        ></apexcharts-card-bool-grid>
         <div>
           <div style="font-size: 0.85em; color: var(--secondary-text-color); margin-bottom: 4px;">
             ${t('general.chartType')}
@@ -233,6 +214,31 @@ export class ApexChartsCardEditorGeneral extends LitElement {
             @value-changed=${this._chartTypeChanged}
           ></apexcharts-card-chart-type-picker>
         </div>
+        <div class="preset-actions">
+          <strong>${t('preset.title')}</strong>
+          <p>${t('preset.helper')}</p>
+          ${(['temperature', 'power', 'consumption'] as const).map(
+            (preset) => html`
+              <button type="button" @click=${() => this._applyPreset(preset)}>${t(`preset.${preset}`)}</button>
+            `,
+          )}
+        </div>
+        ${
+          supports(this.config, 'navigation')
+            ? html`<apexcharts-card-bool-grid
+                .fields=${[
+                  {
+                    name: 'navigation',
+                    label: t('field.navigation'),
+                    helper: t('helper.navigation'),
+                    value: this.config.navigation?.show ?? false,
+                  },
+                ]}
+                .columns=${1}
+                @value-changed=${this._navigationChanged}
+              ></apexcharts-card-bool-grid>`
+            : nothing
+        }
         <ha-form
           .hass=${this.hass}
           .data=${data}
@@ -242,11 +248,15 @@ export class ApexChartsCardEditorGeneral extends LitElement {
           @value-changed=${this._onValueChanged}
         ></ha-form>
         <div class="layout-stacked-row">
-          <apexcharts-card-bool-grid
-            .fields=${stackedFields}
-            .columns=${1}
-            @value-changed=${this._boolChanged}
-          ></apexcharts-card-bool-grid>
+          ${
+            stackedFields.length
+              ? html`<apexcharts-card-bool-grid
+                  .fields=${stackedFields}
+                  .columns=${1}
+                  @value-changed=${this._boolChanged}
+                ></apexcharts-card-bool-grid>`
+              : nothing
+          }
           <ha-form
             .hass=${this.hass}
             .data=${data}

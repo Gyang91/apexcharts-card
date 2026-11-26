@@ -8,6 +8,7 @@ import { BEHAVIOR_SCHEMA, BRUSH_SCHEMA, EXPERIMENTAL_BOOL_FIELDS } from '../sche
 import { HaFormSchema } from '../types';
 import { BoolField } from '../components/bool-grid';
 import { t } from '../localize';
+import { supports } from '../support';
 import '../components/yaml-editor';
 import '../components/bool-grid';
 
@@ -128,7 +129,10 @@ export class ApexChartsCardEditorAdvanced extends LitElement {
         value: cfg.cache !== false,
       },
     ];
-    const expFields: BoolField[] = EXPERIMENTAL_BOOL_FIELDS.map((name) => ({
+    // Experimental switches this chart type can use (see support.ts); the rest always apply
+    const expFields: BoolField[] = EXPERIMENTAL_BOOL_FIELDS.filter(
+      (name) => name === 'disable_config_validation' || supports(cfg, name),
+    ).map((name) => ({
       name,
       label: computeLabel({ name } as HaFormSchema),
       value: !!(exp as Record<string, unknown>)[name],
@@ -163,7 +167,7 @@ export class ApexChartsCardEditorAdvanced extends LitElement {
         </ha-expansion-panel>
 
         ${
-          exp.brush
+          exp.brush && supports(cfg, 'brush')
             ? html`
                 <ha-expansion-panel outlined header=${t('advanced.panel.brush')}>
                   <ha-form

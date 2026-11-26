@@ -490,4 +490,6 @@ export const fr: Record<string, string> = {
   'yaxis.limit.soft.max.helper': 'Finit ici, ou plus haut si les données montent, ex. : 30',
   'yaxis.limit.padding.min.helper': 'Ajouté à la valeur la plus basse, ex. : -5 pour 5 en dessous',
   'yaxis.limit.padding.max.helper': 'Ajouté à la valeur la plus haute, ex. : 10 pour 10 au-dessus',
+  'editor.unsupported': 'Ce type de graphique ne peut pas utiliser :',
+  'editor.unsupported.remove': 'Les supprimer',
 };

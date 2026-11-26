@@ -1,7 +1,8 @@
 import { css } from 'lit';
 
 export const editorStyles = css`
-  .preset-actions button {
+  .preset-actions button,
+  .unsupported button {
     min-height: 44px;
     margin: 4px;
     padding: 8px 12px;
@@ -409,6 +410,19 @@ export const editorStyles = css`
   }
 
   /* Validation */
+  .unsupported {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.15);
+    color: var(--primary-text-color);
+  }
+  .unsupported span {
+    flex: 1;
+  }
   .validation-error {
     color: var(--error-color);
     font-size: 0.85em;
