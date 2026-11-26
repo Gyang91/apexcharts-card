@@ -1,3 +1,4 @@
+import { stable } from '../helpers';
 import { LitElement, html, nothing, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import parse from 'parse-duration';
@@ -535,8 +536,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
                   ></apexcharts-card-color-input>
                   <ha-form
                     .hass=${this.hass}
-                    .data=${{ label: cfg.now?.label || '' }}
-                    .schema=${NOW_SCHEMA}
+                    .data=${stable({ label: cfg.now?.label || '' })}
+                    .schema=${stable(NOW_SCHEMA)}
                     .computeLabel=${computeLabel}
                     .computeHelper=${computeHelper}
                     @value-changed=${this._nowChanged}
@@ -554,8 +555,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
           ></apexcharts-card-bool-grid>
           <ha-form
             .hass=${this.hass}
-            .data=${{ appearance: cfg.appearance || 'premium' }}
-            .schema=${[
+            .data=${stable({ appearance: cfg.appearance || 'premium' })}
+            .schema=${stable([
               {
                 name: 'appearance',
                 selector: {
@@ -568,7 +569,7 @@ export class ApexChartsCardEditorDisplay extends LitElement {
                   },
                 },
               },
-            ]}
+            ])}
             .computeLabel=${computeLabel}
             .computeHelper=${computeHelper}
             @value-changed=${this._appearanceChanged}
@@ -586,8 +587,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
                   ></apexcharts-card-bool-grid>
                   <ha-form
                     .hass=${this.hass}
-                    .data=${gridSelectData}
-                    .schema=${getGridSchema()}
+                    .data=${stable(gridSelectData)}
+                    .schema=${stable(getGridSchema())}
                     .computeLabel=${computeLabel}
                     .computeHelper=${computeHelper}
                     @value-changed=${this._gridSelectChanged}
@@ -606,8 +607,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
             ></apexcharts-card-bool-grid>
             <ha-form
               .hass=${this.hass}
-              .data=${legendSelectData}
-              .schema=${getLegendSchema()}
+              .data=${stable(legendSelectData)}
+              .schema=${stable(getLegendSchema())}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._legendSelectChanged}
@@ -619,8 +620,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
           <div class="section">
             <ha-form
               .hass=${this.hass}
-              .data=${tooltipData}
-              .schema=${getTooltipSchema()}
+              .data=${stable(tooltipData)}
+              .schema=${stable(getTooltipSchema())}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._tooltipChanged}
@@ -646,8 +647,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
             ? html`<ha-expansion-panel outlined header=${t('display.panel.markers')}>
                 <ha-form
                   .hass=${this.hass}
-                  .data=${markersData}
-                  .schema=${getMarkersSchema()}
+                  .data=${stable(markersData)}
+                  .schema=${stable(getMarkersSchema())}
                   .computeLabel=${computeLabel}
                   .computeHelper=${computeHelper}
                   @value-changed=${this._markersChanged}
@@ -659,8 +660,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
         <ha-expansion-panel outlined header=${t('display.panel.chartBackground')}>
           <ha-form
             .hass=${this.hass}
-            .data=${chartColorsData}
-            .schema=${getChartColorsSchema()}
+            .data=${stable(chartColorsData)}
+            .schema=${stable(getChartColorsSchema())}
             .computeLabel=${computeLabel}
             .computeHelper=${computeHelper}
             @value-changed=${this._chartColorsChanged}
@@ -707,8 +708,8 @@ export class ApexChartsCardEditorDisplay extends LitElement {
                     cfg.experimental?.brush
                       ? html`<ha-form
                           .hass=${this.hass}
-                          .data=${cfg.brush || {}}
-                          .schema=${BRUSH_SCHEMA}
+                          .data=${stable(cfg.brush || {})}
+                          .schema=${stable(BRUSH_SCHEMA)}
                           .computeLabel=${computeLabel}
                           .computeHelper=${computeHelper}
                           @value-changed=${this._brushChanged}

@@ -1,3 +1,4 @@
+import { stable } from '../helpers';
 import { LitElement, html, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
@@ -70,13 +71,13 @@ export class ApexChartsCardActionsEditor extends LitElement {
             ? html`
                 <ha-form
                   .hass=${this.hass}
-                  .data=${{ entity: a.entity || '' }}
-                  .schema=${[
+                  .data=${stable({ entity: a.entity || '' })}
+                  .schema=${stable([
                     {
                       name: 'entity',
                       selector: { entity: {} },
                     } as unknown as import('../types').HaFormSchema,
-                  ]}
+                  ])}
                   .computeLabel=${(s: { name: string }) => (s.name === 'entity' ? t('action.entityOverride') : s.name)}
                   @value-changed=${(ev: CustomEvent) => {
                     ev.stopPropagation();

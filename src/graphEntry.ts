@@ -77,7 +77,8 @@ export default class GraphEntry {
 
   private _updating = false;
 
-  private _cache: boolean;
+  // 'read': use the browser cache but don't write to it (edit mode)
+  private _cache: boolean | 'read';
 
   private _graphSpan: number;
 
@@ -119,7 +120,7 @@ export default class GraphEntry {
   constructor(
     index: number,
     graphSpan: number,
-    cache: boolean,
+    cache: boolean | 'read',
     config: ChartCardSeriesConfig,
     span: ChartCardSpanExtConfig | undefined,
   ) {
@@ -191,7 +192,7 @@ export default class GraphEntry {
     return new Date(changed).getTime() > ts;
   }
 
-  set cache(cache: boolean) {
+  set cache(cache: boolean | 'read') {
     this._cache = this._config.statistics ? false : cache;
   }
 
@@ -511,7 +512,7 @@ export default class GraphEntry {
           };
         }
 
-        if (this._cache) {
+        if (this._cache === true) {
           // Written in the background: the next refresh reads memory, not the cache
           this._setCache(this._entityID, history, this._useCompress).catch((err) => {
             log(err);

@@ -24,7 +24,11 @@ function seriesConfig(extra: AnyRec = {}): AnyRec {
   };
 }
 
-function makeEntry(config: AnyRec, callWS: (msg: AnyRec) => Promise<unknown>, cache = false): GraphEntry {
+function makeEntry(
+  config: AnyRec,
+  callWS: (msg: AnyRec) => Promise<unknown>,
+  cache: boolean | 'read' = false,
+): GraphEntry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const entry = new GraphEntry(0, 24 * HOUR, cache, config as any, undefined);
   const hass = mkHass({ [config.entity]: mkState(config.entity, '21', { unit_of_measurement: '°C' }) }) as AnyRec;
@@ -410,5 +414,31 @@ describe('min and max', () => {
     const entry = withHistory(history);
     expect(entry.min).toBe(-5);
     expect(entry.max).toBe(5000);
+  });
+});
+
+describe('browser cache in the editor preview', () => {
+  it('reads the cache but does not write to it', async () => {
+    const getItem = vi.spyOn(localForage, 'getItem').mockResolvedValue({
+      span: 24 * HOUR,
+      card_version: pjson.version,
+      last_fetched: new Date(),
+      data: [
+        [T0, 20.5],
+        [T0 + HOUR, 21],
+      ],
+    });
+    const setItem = vi.spyOn(localForage, 'setItem').mockImplementation(async (_key, value) => value);
+    try {
+      const callWS = vi.fn(async () => ({ [ENTITY]: rows.slice(1) }));
+      const entry = makeEntry(seriesConfig(), callWS, 'read');
+      await entry._updateHistory(new Date(T0), new Date(T0 + 3 * HOUR));
+      expect(getItem).toHaveBeenCalled();
+      expect(entry.history[0]).toEqual([T0, 20.5]);
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
   });
 });

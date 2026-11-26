@@ -1,3 +1,4 @@
+import { stable } from '../helpers';
 import { LitElement, html, TemplateResult, nothing, CSSResultGroup } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
@@ -283,8 +284,8 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
       <div class="section">
         <ha-form
           .hass=${this.hass}
-          .data=${this._formData()}
-          .schema=${getSchema({ min: this._limit('min').mode, max: this._limit('max').mode })}
+          .data=${stable(this._formData())}
+          .schema=${stable(getSchema({ min: this._limit('min').mode, max: this._limit('max').mode }))}
           .computeLabel=${computeLabel}
           .computeHelper=${computeHelper}
           @value-changed=${this._onChange}

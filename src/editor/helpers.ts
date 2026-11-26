@@ -336,3 +336,15 @@ export function filterSchema(schema: HaFormSchema[], keep: (name: string) => boo
     return inner.length ? [{ ...field, schema: inner }] : [];
   });
 }
+
+// One object per distinct content, so a re-render hands ha-form the object it already has:
+// a new schema or data object makes it rebuild every field
+const stableCache = new Map<string, unknown>();
+export function stable<T>(value: T): T {
+  const key = JSON.stringify(value);
+  const known = stableCache.get(key);
+  if (known !== undefined) return known as T;
+  if (stableCache.size > 500) stableCache.clear();
+  stableCache.set(key, value);
+  return value;
+}
