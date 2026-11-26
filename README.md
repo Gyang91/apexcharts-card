@@ -637,26 +637,20 @@ In the UI:
 
 ## Data processing steps
 
-Each series goes through these steps, in this order:
+Each series goes through five steps, from left to right:
 
-![How a series' data is processed: source, transform, fill_raw, group_by, header value, offsets, extend_to, invert, chart shape, downsample](docs/data_processing_chart.png)
+![Five steps: get the data, clean up values, group by time, prepare for display, chart](docs/data_processing_chart.png)
 
-1. **Source**, one per series:
-   - recent history from Home Assistant (the default);
-   - [`statistics`](#statistics-options): long-term statistics, with empty periods padded;
-   - `ignore_history`: the current state only;
-   - [`data_generator`](#data_generator-option): its points are used as returned;
-   - a [computed series](#compute-option): built from the processed data of the series above it, with their offsets applied.
-2. **`transform`, then `fill_raw`**: for history, statistics and `ignore_history`. Not for `data_generator` or computed series.
-3. **[`group_by`](#group_by-options)**, unless `func` is `raw`: points go into buckets (calendar `period`, or `duration` with its `offset`), each bucket is reduced by `func`, empty buckets follow `fill` and `start_with_last`, and `align` places the point in its bucket.
-4. **Header value**: the last value, or the live state (`in_header: raw`), or the value just before or after now.
-5. **Display**, the data itself stays as it is:
+1. **Get the data.** By default, the card reads the sensor's recent history from Home Assistant. Instead, a series can use long-term [`statistics`](#statistics-options), only the current state (`ignore_history`), points from your own code ([`data_generator`](#data_generator-option)), or values [computed](#compute-option) from the series above it.
+2. **Clean up values.** `transform` converts each value with your own code, and `fill_raw` decides what a missing value becomes. Points from your own code or from other series skip this step.
+3. **Group by time** (optional). [`group_by`](#group_by-options) combines the points of each period into one, for example the average per hour or the maximum per day. The header's value is taken after this step.
+4. **Prepare for display.** This changes only what is drawn, not the data:
    - `offset` and `time_delta` shift the series in time;
-   - `extend_to` carries the last value to the end of the chart or to now (not for columns);
+   - `extend_to` carries the last value to the end of the chart or to now;
    - `invert` flips the sign;
-   - `in_chart` and `in_brush` decide where the series is drawn;
-   - range bands pair a lower and an upper series, heatmaps make one row per series;
-   - [`downsample`](#large-history-performance) reduces the points drawn for line and area series.
+   - range bands and heatmaps arrange the series in their own shape;
+   - [`downsample`](#large-history-performance) thins out points on long line and area charts.
+5. **Chart.** The series appears in the main chart (`in_chart`), the brush (`in_brush`), or both.
 
 The diagram's source is [`docs/data_processing_chart.mmd`](docs/data_processing_chart.mmd) (Mermaid).
 
