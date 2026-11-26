@@ -343,7 +343,7 @@ export const en: Record<string, string> = {
   'display.panel.colorPalette': 'Color Palette',
   'display.panel.heatmapBands': 'Heatmap Color Bands',
   'display.heatmapBands.helper':
-    'Each band colors the cells from its value up to the next band. The lowest band also covers everything below it. The name is shown in the legend.',
+    'Each band colours the cells from its value up to the next band; the lowest also covers everything below.',
   'display.heatmapBands.add': 'Add band',
   'display.annotations.xaxis': 'X-Axis Annotations',
   'display.annotations.yaxis': 'Y-Axis Annotations',
@@ -471,7 +471,6 @@ export const en: Record<string, string> = {
   'helper.threshold_opacity': '0 (clear) to 1 (solid)',
   'helper.threshold_name': 'Shown in the legend',
   'hint.thresholds': "From each value upwards, the line takes that row's colour. Rows are applied in value order.",
-  'hint.bands': "Cells from each value up to the next row's value take its colour. Rows are applied in value order.",
   'hint.thresholdsExperimental':
     'Adding a threshold turns on the experimental colour-threshold mode for this card. In that mode columns can be thinner and tooltip colours can be off.',
   'yaxis.limit.auto': 'Auto',

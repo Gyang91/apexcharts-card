@@ -97,17 +97,19 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
     this._fire(list);
   }
 
-  // The bands in value order, as the chart's legend shows them
-  private _bar(limits: string[]): TemplateResult {
-    const order = this.thresholds.map((band, i) => ({ band, i })).sort((a, b) => a.band.value - b.band.value);
+  // The bands in value order as a colour strip, with the values where one band ends and the next begins
+  private _bar(): TemplateResult {
+    const sorted = [...this.thresholds].sort((a, b) => a.value - b.value);
+    const unit = this.unit ? ` ${this.unit}` : '';
     return html`<div class="band-bar">
-      ${order.map(
-        ({ band, i }) =>
-          html`<div style="background: ${band.color || 'transparent'}" title=${band.name ?? limits[i]}>
-            <span>${band.name ?? limits[i]}</span>
-          </div>`,
-      )}
-    </div>`;
+        ${sorted.map((band) => html`<div style="background: ${band.color || 'transparent'}"></div>`)}
+      </div>
+      <div class="band-scale">
+        ${sorted
+          .slice(1)
+          .map((band, i) => html`<span style="left: ${((i + 1) * 100) / sorted.length}%">${band.value}</span>`)}
+        <span class="band-unit">${unit}</span>
+      </div>`;
   }
 
   protected render(): TemplateResult {
@@ -115,8 +117,8 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
     const limits = bands ? bandLimits(this.thresholds, this.unit) : [];
     return html`
       <div class="list-editor">
-        <div class="hint">${t(bands ? 'hint.bands' : 'hint.thresholds')}</div>
-        ${bands && this.thresholds.length ? this._bar(limits) : ''}
+        ${bands ? '' : html`<div class="hint">${t('hint.thresholds')}</div>`}
+        ${bands && this.thresholds.length ? this._bar() : ''}
         ${this.thresholds.map(
           (item, i) => html`
             <div class="list-item">

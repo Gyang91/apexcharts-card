@@ -343,7 +343,7 @@ export const fr: Record<string, string> = {
   'display.panel.colorPalette': 'Palette de couleurs',
   'display.panel.heatmapBands': 'Bandes de couleur de la heatmap',
   'display.heatmapBands.helper':
-    'Chaque bande colore les cases à partir de sa valeur jusqu’à la bande suivante. La bande la plus basse couvre aussi tout ce qui est en dessous. Le nom est affiché dans la légende.',
+    'Chaque bande colore les cellules de sa valeur jusqu’à la bande suivante ; la plus basse couvre aussi tout ce qui est en dessous.',
   'display.heatmapBands.add': 'Ajouter une bande',
   'display.annotations.xaxis': 'Annotations de l’axe X',
   'display.annotations.yaxis': 'Annotations de l’axe Y',
@@ -476,8 +476,6 @@ export const fr: Record<string, string> = {
   'helper.threshold_name': 'Affiché dans la légende',
   'hint.thresholds':
     'À partir de chaque valeur, la courbe prend la couleur de la ligne. Les lignes s’appliquent par ordre de valeur.',
-  'hint.bands':
-    'Les cellules entre chaque valeur et la suivante prennent sa couleur. Les lignes s’appliquent par ordre de valeur.',
   'hint.thresholdsExperimental':
     'Ajouter un seuil active le mode expérimental des seuils de couleur pour cette carte. Dans ce mode, les colonnes peuvent être plus fines et les couleurs des info-bulles inexactes.',
   'yaxis.limit.auto': 'Auto',

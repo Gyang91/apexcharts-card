@@ -139,10 +139,33 @@ describe('colour band and threshold rows', () => {
     const { list } = rows([{ value: 10, color: 'red' }], 'name');
     const [name] = await fields(list, 'Name');
     expect((name as AnyEl).helper).toBe('Shown in the legend');
-    expect(list.shadowRoot.querySelector('.hint').textContent).toContain('value order');
+    // bands get no hint of their own: the panel explains them once
+    expect(list.shadowRoot.querySelector('.hint')).toBeNull();
     const colour = list.shadowRoot.querySelector('apexcharts-card-color-input');
     await colour.updateComplete;
     expect(colour.shadowRoot.querySelector('ha-textfield').helper).toContain('#hex');
+  });
+
+  it('draws the bands as a colour strip in value order, following their colours', async () => {
+    const { list } = rows(
+      [
+        { value: 22, color: 'red' },
+        { value: 20, color: 'green' },
+        { value: 24, color: 'blue' },
+      ],
+      'name',
+    );
+    list.unit = '°C';
+    await list.updateComplete;
+    const strip = [...list.shadowRoot.querySelectorAll('.band-bar div')].map((el: AnyEl) => el.style.background);
+    expect(strip).toEqual(['green', 'red', 'blue']);
+    const scale = [...list.shadowRoot.querySelectorAll('.band-scale span')].map((el: Element) =>
+      el.textContent!.trim(),
+    );
+    expect(scale).toEqual(['22', '24', '°C']);
+    list.thresholds = [{ value: 20, color: 'orange' }];
+    await list.updateComplete;
+    expect(list.shadowRoot.querySelector('.band-bar div').style.background).toBe('orange');
   });
 
   it('adds a row above the last value and changes the colour from the picker', async () => {
