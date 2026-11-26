@@ -26,9 +26,9 @@ const graph = () => ({
   lastState: 12,
 });
 
-const cardWithData = (): AnyCard => {
+const cardWithData = (config: Record<string, unknown> = {}): AnyCard => {
   const card = new (customElements.get('apexcharts-card') as CustomElementConstructor)() as AnyCard;
-  card.setConfig({ type: 'custom:apexcharts-card', series: [{ entity: 'sensor.temp' }] });
+  card.setConfig({ type: 'custom:apexcharts-card', series: [{ entity: 'sensor.temp' }], ...config });
   card._hass = mkHass({ 'sensor.temp': mkState('sensor.temp', '12') });
   card._entities = [card._hass.states['sensor.temp']];
   card._graphs = [graph()];
@@ -240,9 +240,7 @@ describe('card lifecycle and diagnostics', () => {
   });
 
   it('persists legend choices across data updates without custom axes and leaves the brush visible', async () => {
-    const card = cardWithData();
-    card.setConfig({
-      type: 'custom:apexcharts-card',
+    const card = cardWithData({
       experimental: { hidden_by_default: true, brush: true },
       series: [{ entity: 'sensor.temp', show: { hidden_by_default: true, in_brush: true } }],
     });
@@ -322,5 +320,32 @@ describe('update_interval timer', () => {
     const card = new (customElements.get('apexcharts-card') as CustomElementConstructor)() as AnyCard;
     card.setConfig({ type: T, update_interval: '1min', series: [{ entity: 'sensor.temp' }] });
     expect(card._intervalTimeout).toBeUndefined();
+  });
+});
+
+describe('a saved config handed to the same card', () => {
+  const config = (title: string) => ({
+    type: 'custom:apexcharts-card',
+    header: { show: true, title },
+    series: [{ entity: 'sensor.a' }],
+  });
+
+  it('starts over only when the config differs, and keeps the card on a rejected one', async () => {
+    await customElements.whenDefined('apexcharts-card');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const card = document.createElement('apexcharts-card') as any;
+    const reset = vi.spyOn(card, '_reset');
+    card.setConfig(config('A'));
+    expect(reset).not.toHaveBeenCalled();
+    card.setConfig(config('A'));
+    expect(reset).not.toHaveBeenCalled();
+    card.setConfig(config('B'));
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(card._config.header.title).toBe('B');
+    expect(() =>
+      card.setConfig({ ...config('C'), series: [{ entity: 'sensor.a', group_by: { duration: 'x' } }] }),
+    ).toThrow();
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(card._config.header.title).toBe('B');
   });
 });

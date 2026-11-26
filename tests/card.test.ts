@@ -168,10 +168,11 @@ describe('apexcharts-card', () => {
       expect(card._apexBrush.updateOptions).toHaveBeenLastCalledWith({ chart: { width: 400 } }, false, true);
     });
 
-    it('hands the height back to ApexCharts once when rows go back to auto', () => {
+    // A changed config rebuilds the card; a layout change keeps the chart and hands the height back
+    it('hands the height back to ApexCharts once when the cell stops fixing it', () => {
       const card = withCharts(cardWith({ grid_options: { rows: 4 } }, 'grid'));
       card._resizeCharts(graph(208));
-      card.setConfig({ type: 'custom:apexcharts-card', series: [{ entity: 'sensor.temp' }] });
+      card.layout = undefined;
       card._resizeCharts(graph(170));
       expect(card._apexChart.updateOptions).toHaveBeenLastCalledWith(
         { chart: { width: 400, height: 'auto' } },

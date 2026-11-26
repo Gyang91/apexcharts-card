@@ -422,6 +422,8 @@ These are starter configurations, not automatic sensor classification. Choose th
 
 Use `chart_type: rangeArea` for one lower/upper envelope. Exactly two numeric source series are required: **lower first, upper second**. They can come from history, statistics, transformed attributes or an integration-fed `data_generator`.
 
+Picking **Range band** in the visual editor for a card with more series keeps the first two as lower and upper bound and sets the others aside; a note above the tabs names them, and the others come back when you pick another chart type while the editor is open.
+
 ```yaml
 type: custom:apexcharts-card
 chart_type: rangeArea
@@ -1616,6 +1618,8 @@ Generates the same result as repeating the configuration in each series:
 | `disable_config_validation` | boolean | `false` | v1.6.0 | If `true`, will disable the config validation. Useful if you have cards adding parameters to this one. Use at your own risk. |
 | `hidden_by_default` | boolean | `false` | v1.6.0 | Will allow you to use the `hidden_by_default` option. See [hidden_by_default](#hidden_by_default-experimental-feature) |
 | `brush` | boolean | `false` | v1.8.0 | Will display a brush which allows you to select a portion of time to display on the main chart. See [brush](#brush-experimental-feature) |
+
+In the visual editor, each switch sits next to the settings it unlocks: **Brush** in the **Display** tab together with its selection span, **Hidden by default** in a series' visibility settings, and **Color Thresholds** in each series. Using one of them turns its experimental flag on for you. Only **Disable config validation** stays in **Advanced** > **Experimental**. The editor shows each of them only for chart types that support it.
 
 ### `color_threshold` experimental feature
 
