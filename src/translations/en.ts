@@ -486,4 +486,7 @@ export const en: Record<string, string> = {
   'yaxis.limit.padding.max.helper': 'Added to the highest value, e.g. 10 for 10 above it',
   'editor.unsupported': "This chart type can't use:",
   'editor.unsupported.remove': 'Remove them',
+  'field.heatmap': 'Heatmap settings',
+  'editor.rangeAreaPair':
+    'A range band needs exactly 2 series in the Series tab: the lower bound first, the upper bound second. It has {count}.',
 };

@@ -1,7 +1,7 @@
 import { LitElement, html, TemplateResult, nothing, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
-import { ChartCardChartType, ChartCardExternalConfig } from '../../types-config';
+import { ChartCardExternalConfig } from '../../types-config';
 import { GENERAL_TOP_SCHEMA, getGeneralBottomSchema, getLayoutSchema } from '../schemas/general';
 import { editorStyles } from '../styles';
 import {
@@ -145,19 +145,11 @@ export class ApexChartsCardEditorGeneral extends LitElement {
     );
   };
 
+  // The editor adapts the rest of the config to the new chart type
   private _chartTypeChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
-    if (!this.config) return;
-    const v = ev.detail.value as ChartCardChartType | undefined;
-    const next: ChartCardExternalConfig = { ...this.config };
-    if (v) next.chart_type = v;
-    else delete next.chart_type;
     this.dispatchEvent(
-      new CustomEvent('config-changed', {
-        detail: { config: next },
-        bubbles: true,
-        composed: true,
-      }),
+      new CustomEvent('chart-type-changed', { detail: { value: ev.detail.value }, bubbles: true, composed: true }),
     );
   };
 

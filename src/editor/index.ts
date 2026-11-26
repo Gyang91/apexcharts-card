@@ -5,7 +5,7 @@ import { ChartCardExternalConfig } from '../types-config';
 import { EDITOR_TABS } from './types';
 import { editorStyles } from './styles';
 import { setEditorLocale, t } from './localize';
-import { removeUnsupported, supports, unsupportedSettings } from './support';
+import { changeChartType, emptyStash, removeUnsupported, supports, unsupportedSettings } from './support';
 
 // Side-effect imports so the custom elements are registered when the editor is loaded.
 import './components/series-editor';
@@ -22,6 +22,7 @@ export class ApexChartsCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @state() private _config?: ChartCardExternalConfig;
   @state() private _activeTab = 'tabs.general';
+  private _stash = emptyStash();
 
   public setConfig(config: ChartCardExternalConfig): void {
     const configDup = JSON.parse(JSON.stringify(config));
@@ -53,6 +54,11 @@ export class ApexChartsCardEditor extends LitElement {
     if (cfg) this._fireConfig(cfg);
   };
 
+  private _onChartTypeChanged = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    if (this._config) this._fireConfig(changeChartType(this._config, ev.detail.value, this._stash));
+  };
+
   static get styles(): CSSResultGroup {
     return editorStyles;
   }
@@ -78,6 +84,13 @@ export class ApexChartsCardEditor extends LitElement {
               >
                 ${t('editor.unsupported.remove')}
               </button>
+            </div>`
+          : ''
+      }
+      ${
+        this._config.chart_type === 'rangeArea' && (this._config.series || []).length !== 2
+          ? html`<div class="unsupported" role="alert">
+              <span>${t('editor.rangeAreaPair', { count: (this._config.series || []).length })}</span>
             </div>`
           : ''
       }
@@ -123,6 +136,7 @@ export class ApexChartsCardEditor extends LitElement {
         .hass=${this.hass}
         .config=${this._config}
         @config-changed=${this._onConfigChanged}
+        @chart-type-changed=${this._onChartTypeChanged}
       ></apexcharts-card-editor-general>
     `;
   }
