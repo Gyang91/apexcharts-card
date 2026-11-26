@@ -118,6 +118,24 @@ export const editorStyles = css`
     background: var(--secondary-background-color);
   }
 
+  .item-controls .move {
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+  }
+  .item-controls .unused {
+    visibility: hidden;
+  }
+  .item-controls .chevron {
+    margin-left: 8px;
+    border-left: 1px solid var(--divider-color);
+    transition: transform 0.2s;
+  }
+  .item-controls .chevron.open {
+    transform: rotate(180deg);
+    border-left: none;
+    border-right: 1px solid var(--divider-color);
+  }
+
   .color-swatch {
     width: 12px;
     height: 12px;
