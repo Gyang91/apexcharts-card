@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.23.8](https://github.com/Gyang91/apexcharts-card/compare/v2.23.7...v2.23.8) (2026-11-26)
+
+
+### Bug Fixes
+
+* **editor:** guard against Home Assistant dropping elements the editor uses ([#99](https://github.com/Gyang91/apexcharts-card/issues/99)) ([62cb7f7](https://github.com/Gyang91/apexcharts-card/commit/62cb7f7d4bbb3770309de9fc58c3299203e90fe7))
+
 ## [2.23.7](https://github.com/Gyang91/apexcharts-card/compare/v2.23.6...v2.23.7) (2026-11-26)
 
 
