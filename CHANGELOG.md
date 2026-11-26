@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.23.4](https://github.com/Gyang91/apexcharts-card/compare/v2.23.3...v2.23.4) (2026-11-26)
+
+
+### Bug Fixes
+
+* **editor:** fields that Home Assistant left blank, and empty Appearance panels ([5b0afef](https://github.com/Gyang91/apexcharts-card/commit/5b0afef0f27f6b41f52784e38a1822b3f36add55))
+
 ## [2.23.3](https://github.com/Gyang91/apexcharts-card/compare/v2.23.2...v2.23.3) (2026-11-26)
 
 
