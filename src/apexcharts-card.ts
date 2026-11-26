@@ -462,7 +462,7 @@ export class ChartsCard extends LitElement {
         headerColors[index] = serie.color || defColors[index % defColors.length];
         applySeriesDefaults(serie, index, newConfig.chart_type);
         if (serie.entity || isComputedSeries(serie)) {
-          const caching = editMode === true ? false : newConfig.cache;
+          const caching = editMode === true && newConfig.cache ? 'read' : newConfig.cache;
           const graphEntry = new GraphEntry(index, graphSpan, caching, serie, newConfig.span);
           if (this._hass) graphEntry.hass = this._hass;
           return graphEntry;
@@ -909,7 +909,17 @@ export class ChartsCard extends LitElement {
         this._loaded = true;
         let chartWidth = graph.clientWidth;
         if (chartWidth < 50) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
+          // Not laid out yet, e.g. in an opening dialog: draw as soon as it has a width
+          await new Promise<void>((resolve) => {
+            const done = () => {
+              observer.disconnect();
+              clearTimeout(timer);
+              resolve();
+            };
+            const observer = new ResizeObserver(() => graph.clientWidth >= 50 && done());
+            const timer = setTimeout(done, 300);
+            observer.observe(graph);
+          });
           await this.updateComplete;
           if (!current()) return;
           chartWidth = graph.clientWidth;
@@ -1211,7 +1221,13 @@ export class ChartsCard extends LitElement {
     const now = new Date();
     const editMode = getLovelace()?.editMode;
 
-    const caching = editMode === true || this._config.navigation?.show ? false : this._config!.cache;
+    // The cache is keyed by the series config: the editor's preview can read it, but its
+    // passing configs would only fill it up
+    const caching = this._config.navigation?.show
+      ? false
+      : editMode === true && this._config.cache
+        ? 'read'
+        : this._config.cache;
     let errorMessage = t('card.warning.refreshFailed');
     try {
       // Reusing GraphEntry while its previous fetch is pending would skip the new refresh.
@@ -1562,7 +1578,7 @@ export class ChartsCard extends LitElement {
   private async _updateHistories(
     start: Date,
     end: Date,
-    caching: boolean,
+    caching: boolean | 'read',
   ): Promise<PromiseSettledResult<boolean | undefined>[]> {
     const series = this._config!.series;
     const update = (index: number) => {

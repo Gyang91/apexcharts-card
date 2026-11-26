@@ -509,6 +509,8 @@ test('editor presets require a click and preserve entity identity through the re
     group_by: { func: 'avg' },
   });
   await page.getByRole('button', { name: 'Apply consumption', exact: true }).click();
+  // changes within 250 ms of the last one go out together, at most 250 ms later
+  await expect.poll(() => page.evaluate(() => window.editorEvents.length)).toBe(2);
   expect(await page.evaluate(() => window.editorEvents.at(-1).series[0])).toMatchObject({
     entity: 'sensor.temp',
     statistics: { type: 'change', period: 'day' },

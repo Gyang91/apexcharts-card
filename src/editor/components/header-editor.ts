@@ -1,3 +1,4 @@
+import { stable } from '../helpers';
 import { LitElement, html, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
@@ -71,8 +72,8 @@ export class ApexChartsCardHeaderEditor extends LitElement {
       <div class="section">
         <ha-form
           .hass=${this.hass}
-          .data=${{ title: h.title || '' }}
-          .schema=${HEADER_TITLE_SCHEMA}
+          .data=${stable({ title: h.title || '' })}
+          .schema=${stable(HEADER_TITLE_SCHEMA)}
           .computeLabel=${computeLabel}
           .computeHelper=${computeHelper}
           @value-changed=${this._formChanged}

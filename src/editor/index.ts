@@ -17,6 +17,8 @@ import './tabs/general-tab';
 import './tabs/display-tab';
 import './tabs/advanced-tab';
 
+const SEND_INTERVAL = 250;
+
 @customElement('apexcharts-card-editor')
 export class ApexChartsCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -25,7 +27,12 @@ export class ApexChartsCardEditor extends LitElement {
   private _stash = emptyStash();
 
   public setConfig(config: ChartCardExternalConfig): void {
-    const configDup = JSON.parse(JSON.stringify(config));
+    const json = JSON.stringify(config);
+    // Our own change coming back, or an older one while a newer waits to be sent:
+    // nothing new to show, and re-rendering every field would only cost time
+    if (this._config && (json === JSON.stringify(this._config) || (this._pending && json === this._sentJson))) return;
+    this._cancelPending();
+    const configDup = JSON.parse(json);
     // Migrate legacy 'entities' key (same as the card's setConfig does)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((configDup as any).entities) {
@@ -37,15 +44,55 @@ export class ApexChartsCardEditor extends LitElement {
     this._config = configDup;
   }
 
+  // Home Assistant rebuilds the preview card for every config it gets: a change goes out at
+  // once, then at most every SEND_INTERVAL ms while typing, and before focus leaves the editor
+  private _pending?: ReturnType<typeof setTimeout>;
+  private _sentJson?: string;
+  private _lastSent = 0;
+
   private _fireConfig(config: ChartCardExternalConfig): void {
     this._config = config;
+    this._cancelPending();
+    const wait = this._lastSent + SEND_INTERVAL - Date.now();
+    if (wait <= 0) this._send();
+    else this._pending = setTimeout(() => this._send(), wait);
+  }
+
+  private _send = (): void => {
+    this._cancelPending();
+    if (!this._config) return;
+    this._lastSent = Date.now();
+    this._sentJson = JSON.stringify(this._config);
     this.dispatchEvent(
       new CustomEvent('config-changed', {
-        detail: { config },
+        detail: { config: this._config },
         bubbles: true,
         composed: true,
       }),
     );
+  };
+
+  private _cancelPending(): void {
+    clearTimeout(this._pending);
+    this._pending = undefined;
+  }
+
+  private _flush = (): void => {
+    if (this._pending) this._send();
+  };
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.addEventListener('focusout', this._flush);
+    // A tap on Save need not move focus (iOS): a press anywhere sends first
+    window.addEventListener('pointerdown', this._flush, true);
+  }
+
+  disconnectedCallback(): void {
+    this._flush();
+    this.removeEventListener('focusout', this._flush);
+    window.removeEventListener('pointerdown', this._flush, true);
+    super.disconnectedCallback();
   }
 
   private _onConfigChanged = (ev: CustomEvent): void => {

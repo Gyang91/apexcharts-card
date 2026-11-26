@@ -1,3 +1,4 @@
+import { stable } from '../helpers';
 import { LitElement, html, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
@@ -222,8 +223,8 @@ export class ApexChartsCardActionEditor extends LitElement {
       return html`
         <ha-form
           .hass=${this.hass}
-          .data=${data}
-          .schema=${this._schema()}
+          .data=${stable(data)}
+          .schema=${stable(this._schema())}
           .computeLabel=${(s: HaFormSchema) => (s.name === 'action' ? this._label : computeLabel(s))}
           .computeHelper=${computeHelper}
           @value-changed=${this._onValueChanged}
@@ -233,8 +234,8 @@ export class ApexChartsCardActionEditor extends LitElement {
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${data}
-        .schema=${this._schema()}
+        .data=${stable(data)}
+        .schema=${stable(this._schema())}
         .computeLabel=${(s: HaFormSchema) => (s.name === 'action' ? this._label : computeLabel(s))}
         .computeHelper=${computeHelper}
         @value-changed=${this._onValueChanged}

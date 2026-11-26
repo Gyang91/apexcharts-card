@@ -1,3 +1,4 @@
+import { stable } from '../helpers';
 import { LitElement, html, TemplateResult, nothing, CSSResultGroup } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
@@ -459,8 +460,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
             : html`
                 <ha-form
                   .hass=${this.hass}
-                  .data=${{ source: this._source(), entity: s.entity || '', compute: s.compute ?? '', id: s.id || '' }}
-                  .schema=${getSeriesSourceSchema(this._source(), !!s.statistics || isExternalStatisticId(s.entity))}
+                  .data=${stable({ source: this._source(), entity: s.entity || '', compute: s.compute ?? '', id: s.id || '' })}
+                  .schema=${stable(getSeriesSourceSchema(this._source(), !!s.statistics || isExternalStatisticId(s.entity)))}
                   .computeLabel=${computeLabel}
                   .computeHelper=${computeHelper}
                   @value-changed=${this._sourceChanged}
@@ -475,8 +476,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
         <ha-form
           .hass=${this.hass}
-          .data=${{ name: this._textName(), type: s.type || '' }}
-          .schema=${filterSchema(getSeriesCoreSchema(), this._applies)}
+          .data=${stable({ name: this._textName(), type: s.type || '' })}
+          .schema=${stable(filterSchema(getSeriesCoreSchema(), this._applies))}
           .computeLabel=${computeLabel}
           .computeHelper=${computeHelper}
           @value-changed=${this._coreChanged}
@@ -491,8 +492,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
             ? html`
                 <ha-form
                   .hass=${this.hass}
-                  .data=${{ yaxis_id: s.yaxis_id || '' }}
-                  .schema=${yaxisIdSchema}
+                  .data=${stable({ yaxis_id: s.yaxis_id || '' })}
+                  .schema=${stable(yaxisIdSchema)}
                   .computeLabel=${computeLabel}
                   .computeHelper=${computeHelper}
                   @value-changed=${this._yaxisIdChanged}
@@ -505,8 +506,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
           <div class="section">
             <ha-form
               .hass=${this.hass}
-              .data=${this._appearanceData()}
-              .schema=${filterSchema(getSeriesAppearanceSchema(), this._applies)}
+              .data=${stable(this._appearanceData())}
+              .schema=${stable(filterSchema(getSeriesAppearanceSchema(), this._applies))}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._appearanceChanged}
@@ -538,8 +539,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
             ></apexcharts-card-bool-grid>
             <ha-form
               .hass=${this.hass}
-              .data=${this._visibilitySelectData()}
-              .schema=${filterSchema(getSeriesVisibilitySelectSchema(), this._applies)}
+              .data=${stable(this._visibilitySelectData())}
+              .schema=${stable(filterSchema(getSeriesVisibilitySelectSchema(), this._applies))}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._visibilitySelectChanged}
@@ -551,8 +552,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
           <div class="section">
             <ha-form
               .hass=${this.hass}
-              .data=${{ smoothing: this._smoothing() }}
-              .schema=${getSmoothingSchema()}
+              .data=${stable({ smoothing: this._smoothing() })}
+              .schema=${stable(getSmoothingSchema())}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._smoothingChanged}
@@ -561,8 +562,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
               this._smoothing() === 'custom'
                 ? html`<ha-form
                       .hass=${this.hass}
-                      .data=${this._groupByData()}
-                      .schema=${getSeriesGroupBySchema()}
+                      .data=${stable(this._groupByData())}
+                      .schema=${stable(getSeriesGroupBySchema())}
                       .computeLabel=${computeLabel}
                       .computeHelper=${computeHelper}
                       @value-changed=${this._groupByChanged}
@@ -585,8 +586,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
                 ? nothing
                 : html`<ha-form
                     .hass=${this.hass}
-                    .data=${this._dataProcessingData()}
-                    .schema=${getSeriesDataProcessingSchema()}
+                    .data=${stable(this._dataProcessingData())}
+                    .schema=${stable(getSeriesDataProcessingSchema())}
                     .computeLabel=${computeLabel}
                     .computeHelper=${computeHelper}
                     @value-changed=${this._dataProcessingChanged}
@@ -598,8 +599,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
         <ha-expansion-panel outlined header=${t('field.advanced')}>
           <ha-form
             .hass=${this.hass}
-            .data=${this._advancedData()}
-            .schema=${this._advancedSchema()}
+            .data=${stable(this._advancedData())}
+            .schema=${stable(this._advancedSchema())}
             .computeLabel=${computeLabel}
             .computeHelper=${computeHelper}
             @value-changed=${this._advancedChanged}
