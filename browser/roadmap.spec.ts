@@ -499,16 +499,17 @@ test('editor presets require a click and preserve entity identity through the re
     window.card.remove();
     document.querySelector('#dashboard').appendChild(window.editor);
   });
-  await expect(page.getByRole('button', { name: 'Apply temperature' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Measurement/ })).toBeVisible();
   expect(await page.evaluate(() => window.editorEvents.length)).toBe(0);
-  await page.getByRole('button', { name: 'Apply power', exact: true }).click();
+  await page.getByRole('button', { name: /^Measurement/ }).click();
+  await expect(page.getByRole('button', { name: /^Measurement/ })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => window.editorEvents.at(-1).series[0])).toMatchObject({
     entity: 'sensor.temp',
     name: 'My sensor',
     type: 'line',
     group_by: { func: 'avg' },
   });
-  await page.getByRole('button', { name: 'Apply consumption', exact: true }).click();
+  await page.getByRole('button', { name: /^Daily consumption/ }).click();
   // changes within 250 ms of the last one go out together, at most 250 ms later
   await expect.poll(() => page.evaluate(() => window.editorEvents.length)).toBe(2);
   expect(await page.evaluate(() => window.editorEvents.at(-1).series[0])).toMatchObject({

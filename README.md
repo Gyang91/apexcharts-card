@@ -100,7 +100,7 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
 
 1. **Install the card**, see [Installation](#installation). On Home Assistant 2026.11 and later, use **Settings** > **Marketplace** > **Add from link** with `Gyang91/apexcharts-card`.
 2. **Reload your browser** after installing or updating, so it loads the new file.
-3. **Add the card**: edit a dashboard, select **Add card**, search for **ApexCharts Card**, and pick a sensor. The visual editor covers most options; the [presets](#visual-editor-starter-presets) in its **General** tab set up a temperature, power or consumption chart for you. Pick the chart type first: the editor then shows only the settings that chart type can use, and offers to remove any that it can't.
+3. **Add the card**: edit a dashboard, select **Add card**, search for **ApexCharts Card**, and pick a sensor. The visual editor covers most options; the [presets](#visual-editor-starter-presets) in its **General** tab set up a measurement, daily consumption or daily pattern chart for you. Pick the chart type first: the editor then shows only the settings that chart type can use, and offers to remove any that it can't.
 4. **Or paste YAML**: select **Show code editor** in the card editor and start from this:
 
    ```yaml
@@ -348,7 +348,7 @@ Everything documented below keeps working as before; this fork adds:
 - **Maintenance**: automatic releases, CI, CodeQL, a daily dependency audit (npm audit and OSV-Scanner) and Dependabot updates.
 - **Adaptive large-history rendering**: opt-in [`downsample`](#large-history-performance) retains spikes/gaps and restores local detail on zoom, brush selection and resize without fetching history again.
 - **Calendar navigation**: optional day/week/month switch with previous/next and plain-language period labels, following the dashboard time zone.
-- **Explicit editor presets**: temperature, power and consumption starters without replacing your entity IDs.
+- **Explicit editor presets**: measurement, daily consumption and daily pattern starters without replacing your entity IDs.
 - **Computed series**: [`compute`](#compute-option) calculates a series from other series of the card (net power, totals, ratios), without a template sensor.
 - **Range-area bands**: a shaded band between two series, such as a min/max or forecast envelope.
 - **Heatmaps**: one row per sensor and one cell per hour, day or longer, with [color bands](#color-bands) and a legend (also in the visual editor), a tooltip naming the time each cell covers (`Tue, Nov 24, 21:00 – 22:00`), time labels that line up with the cells, and enforced cell budgets.
@@ -402,17 +402,17 @@ For energy navigation, choose your **energy counter** and use `statistics: {type
 
 ## Visual-editor starter presets
 
-![Explicit temperature, power and consumption preset buttons with source-data guidance](docs/editor-presets.png)
+![Starter preset buttons in the visual editor](docs/editor-presets.png)
 
-In the visual editor's **General** tab, choose an **Apply** button:
+In the visual editor's **General** tab, pick a **Starter preset**. The preset your card is currently set up as is highlighted with a ✓.
 
 | Preset | Chart / range | Source handling |
 | --- | --- | --- |
-| Temperature | Line, 24 hours | Five-minute `avg` history buckets with null gaps; external statistic IDs use hourly `mean`. |
-| Power | Line, 24 hours | The same lightweight average configuration; values stay in the source unit (for example W). No energy integration or unit conversion. |
-| Consumption | Columns, 7 days | Daily statistics `change`, aligned to the middle of the bucket. Requires an energy counter with HA sum statistics. |
+| Measurement | Line, 24 hours | Five-minute `avg` buckets with null gaps, for temperature, humidity, power and similar. External statistic IDs use hourly `mean`. Values stay in the source unit; no energy integration. |
+| Daily consumption | Columns, 7 days | Daily statistics `change`, aligned to the middle of the bucket. Requires an energy counter with HA sum statistics. |
+| Daily pattern | Heatmap, 24 hours | Hourly `avg`, one row per series. External statistic IDs use hourly `mean`. |
 
-Presets run **only when clicked**. They replace chart type, `graph_span` and series aggregation/statistics, remove heatmap options, and preserve entity IDs, names, units, transforms, actions and other advanced settings. Shared aggregation defaults in `all_series_config` are removed so they cannot silently override the preset. Existing calendar navigation still takes precedence over `graph_span`.
+Presets run **only when clicked**. They set the chart type, `graph_span` and series aggregation/statistics, and keep entity IDs, names, units, transforms, actions and other advanced settings. Shared aggregation defaults in `all_series_config` are removed so they cannot silently override the preset. Settings the new chart type can't use, such as heatmap colour bands, are set aside and come back when you return to that chart type while the editor is open. Existing calendar navigation still takes precedence over `graph_span`.
 
 These are starter configurations, not automatic sensor classification. Choose the correct entities first and review advanced overrides afterward. A consumption preset cannot make a power sensor produce valid energy statistics.
 

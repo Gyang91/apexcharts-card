@@ -2,7 +2,8 @@ import '../src/apexcharts-card';
 import '../src/editor/tabs/general-tab';
 import { navigationRange } from '../src/calendar';
 import { rangeAreaData, heatmapData, assertHeatmapBudget, heatmapXRange } from '../src/visual-data';
-import { applyPreset } from '../src/editor/presets';
+import { activePreset, applyPreset, PRESETS } from '../src/editor/presets';
+import '../src/editor/index';
 import { mkHass, mkState } from './fixtures/hass';
 import { setLocale } from '../src/localize';
 import type { ChartCardExternalConfig } from '../src/types-config';
@@ -335,8 +336,6 @@ describe('bounded visual data', () => {
 describe('explicit editor presets', () => {
   it('keeps entity identity, units, transforms and actions without mutating config', () => {
     const original = config({
-      chart_type: 'heatmap',
-      heatmap: { max_cells: 99 },
       all_series_config: { statistics: { type: 'sum' }, group_by: { func: 'sum' }, color: 'red' },
       series: [
         {
@@ -347,9 +346,8 @@ describe('explicit editor presets', () => {
         },
       ],
     });
-    const next = applyPreset(original, 'power');
+    const next = applyPreset(original, 'measurement');
     expect(next.chart_type).toBeUndefined();
-    expect(next.heatmap).toBeUndefined();
     expect(next.all_series_config?.statistics).toBeUndefined();
     expect(next.all_series_config?.color).toBe('red');
     expect(next.series[0]).toMatchObject({
@@ -360,11 +358,22 @@ describe('explicit editor presets', () => {
       group_by: { func: 'avg', duration: '5min' },
       header_actions: original.series[0].header_actions,
     });
-    expect(original.chart_type).toBe('heatmap');
     expect(original.all_series_config?.statistics?.type).toBe('sum');
   });
 
-  it('keeps consumption change separate from mean power and external statistics mean', () => {
+  it('gives three different setups, each valid, and knows which one a config is', () => {
+    const base = config();
+    const setups = PRESETS.map((preset) => applyPreset(base, preset));
+    expect(new Set(setups.map((setup) => JSON.stringify(setup))).size).toBe(3);
+    for (const [i, setup] of setups.entries()) {
+      expect(() => card(setup)).not.toThrow();
+      expect(activePreset(setup)).toBe(PRESETS[i]);
+    }
+    expect(activePreset(base)).toBeUndefined();
+    expect(setups[2]).toMatchObject({ chart_type: 'heatmap', series: [{ group_by: { func: 'avg', period: 'hour' } }] });
+  });
+
+  it('keeps consumption change separate from mean measurement and external statistics mean', () => {
     const energy = applyPreset(config(), 'consumption');
     expect(energy.series[0]).toMatchObject({
       type: 'column',
@@ -372,24 +381,44 @@ describe('explicit editor presets', () => {
       group_by: { func: 'raw' },
       extend_to: false,
     });
-    const temperature = applyPreset(config({ series: [{ entity: 'import:temp' }] }), 'temperature');
-    expect(temperature.series[0].statistics?.type).toBe('mean');
+    const external = applyPreset(config({ series: [{ entity: 'import:temp' }] }), 'measurement');
+    expect(external.series[0].statistics?.type).toBe('mean');
     expect(() => card(energy)).not.toThrow();
     expect(card({ ...energy, chart_type: 'line' })._config.series[0].type).toBe('column');
   });
 
-  it('only emits a preset after explicit action and preserves config through editor events', () => {
-    const editor = new (customElements.get('apexcharts-card-editor-general') as CustomElementConstructor)() as AnyCard;
-    editor.config = config();
+  it('only acts on a click, and a preset after a heatmap keeps its bands for later', () => {
+    const editor = document.createElement('apexcharts-card-editor') as AnyCard;
+    editor.hass = mkHass();
+    const bands = { color_ranges: [{ value: 20, color: 'green' }] };
+    editor.setConfig(
+      config({
+        chart_type: 'heatmap',
+        heatmap: bands,
+        series: [{ entity: 'sensor.a', group_by: { func: 'avg', period: 'hour' } }],
+      }),
+    );
     const changed = vi.fn();
     editor.addEventListener('config-changed', changed);
     expect(changed).not.toHaveBeenCalled();
-    editor._applyPreset('consumption');
-    expect(changed.mock.calls[0][0].detail.config.series[0].statistics.type).toBe('change');
+    editor._onPresetPicked(new CustomEvent('preset-picked', { detail: { preset: 'measurement' } }));
+    const line = changed.mock.calls[0][0].detail.config;
+    expect(line.heatmap).toBeUndefined();
+    expect(() => card(line)).not.toThrow();
+    editor._send();
+    editor._onPresetPicked(new CustomEvent('preset-picked', { detail: { preset: 'heatmap' } }));
+    editor._send();
+    expect(changed.mock.calls.at(-1)[0].detail.config.heatmap).toEqual(bands);
+  });
+
+  it('turns calendar navigation on without a span', () => {
+    const editor = new (customElements.get('apexcharts-card-editor-general') as CustomElementConstructor)() as AnyCard;
+    const changed = vi.fn();
+    editor.addEventListener('config-changed', changed);
     editor.config = config({ span: { start: 'day' }, navigation: { initial: 'week' } });
     editor._navigationChanged(new CustomEvent('value-changed', { detail: { value: true } }));
-    expect(changed.mock.calls[1][0].detail.config.navigation).toEqual({ show: true, initial: 'week' });
-    expect(changed.mock.calls[1][0].detail.config.span).toBeUndefined();
+    expect(changed.mock.calls[0][0].detail.config.navigation).toEqual({ show: true, initial: 'week' });
+    expect(changed.mock.calls[0][0].detail.config.span).toBeUndefined();
   });
 });
 
