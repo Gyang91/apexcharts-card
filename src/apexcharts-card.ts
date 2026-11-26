@@ -1,5 +1,5 @@
 import { LitElement, html, TemplateResult, PropertyValues, CSSResultGroup } from 'lit';
-import { property, customElement, eventOptions } from 'lit/decorators.js';
+import { property, customElement } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { ClassInfo, classMap } from 'lit/directives/class-map.js';
 import {
@@ -9,9 +9,8 @@ import {
   EntityCachePoints,
   EntityEntryCache,
   StatisticsMetadata,
-  ActionHandlerDetail,
 } from './types';
-import { handleAction, HomeAssistant } from 'custom-card-helpers';
+import { HomeAssistant } from 'custom-card-helpers';
 import localForage from 'localforage';
 import * as pjson from '../package.json';
 import {
@@ -20,7 +19,6 @@ import {
   computeName,
   isComputedSeries,
   seriesState,
-  computeUom,
   decompress,
   formatApexDate,
   getLang,
@@ -31,7 +29,6 @@ import {
   mergeDeep,
   myFormatNumber,
   offsetData,
-  prettyPrintTime,
   parseNumericState,
   truncateFloat,
   validateInterval,
@@ -44,7 +41,6 @@ import { addPeriods, displayTimeZone, navigationLabel, navigationRange, startOfP
 import { computeTimezoneDiffWithLocal, endOf, startOf } from './zone';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { Ripple } from '@material/mwc-ripple';
 import { stylesApex } from './styles';
 import { computeAnnotations } from './annotations';
 import {
@@ -69,11 +65,11 @@ import { HassEntity } from 'home-assistant-js-websocket';
 import { getBrushLayoutConfig, getLayoutConfig } from './apex-layouts';
 import { entityNamesChanged } from './entity-name';
 import GraphEntry from './graphEntry';
-import { ActionsConfig, ChartCardExternalConfig, NavigationPeriod } from './types-config';
-import { DEFAULT_UPDATE_DELAY, NO_VALUE, TIMESERIES_TYPES } from './const';
+import { ChartCardExternalConfig, NavigationPeriod } from './types-config';
+import { DEFAULT_UPDATE_DELAY, TIMESERIES_TYPES } from './const';
 import { DEFAULT_COLORS, DEFAULT_GRAPH_SPAN, HOUR_24 } from './const';
 import parse from 'parse-duration';
-import { actionHandler } from './action-handler-directive';
+import { HeaderContext, renderHeader } from './header';
 import { setLocale, t } from './localize';
 import type { SamplingRange } from './downsample';
 import { hasSampling, sampleSeries, SamplingSeries } from './sampling';
@@ -100,10 +96,6 @@ console.info(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).ApexCharts = ApexCharts;
-
-// Optional `entity` of a tap/hold/double_tap action (ActionConfig does not declare it)
-const actionEntity = (config: ActionsConfig, action: ActionHandlerDetail['action']): string | undefined =>
-  (config[`${action}_action`] as { entity?: string } | undefined)?.entity;
 
 localForage.config({
   name: 'apexchart-card',
@@ -573,7 +565,7 @@ export class ChartsCard extends LitElement {
         <div class=${classMap(wrapperClasses)}>
           ${
             this._config.header?.show && (this._config.header.show_states || !this._config.header.standard_format)
-              ? this._renderHeader()
+              ? renderHeader(this._headerContext())
               : html``
           }
           ${this._renderNavigation()}
@@ -713,168 +705,18 @@ export class ChartsCard extends LitElement {
     this.requestUpdate();
   }
 
-  private _renderHeader(): TemplateResult {
-    const classes: ClassInfo = {
-      floating: this._config?.header?.floating || false,
+  private _headerContext(): HeaderContext {
+    return {
+      host: this,
+      config: this._config!,
+      hass: this._hass,
+      entities: this._entities,
+      states: this._headerState,
+      hasNoEntityState: (index) => this._hasNoEntityState(index),
+      stateStyle: (serie, value) => computeHeaderStateColor(this._config, serie, value, this._headerColors),
+      formatState: (value, index) =>
+        value === null ? value : myFormatNumber(value, this._hass?.locale, this._config?.series[index]),
     };
-    return html`
-      <div id="header" class=${classMap(classes)}>
-        ${!this._config?.header?.standard_format && this._config?.header?.title ? this._renderTitle() : html``}
-        ${this._config?.header?.show_states ? this._renderStates() : html``}
-      </div>
-    `;
-  }
-
-  private _renderTitle(): TemplateResult {
-    const classes =
-      this._config?.header?.disable_actions ||
-      !this._config?.header?.title_actions ||
-      (this._config?.header?.title_actions?.tap_action?.action === 'none' &&
-        (!this._config?.header?.title_actions?.hold_action?.action ||
-          this._config?.header?.title_actions?.hold_action?.action === 'none') &&
-        (!this._config?.header?.title_actions?.double_tap_action?.action ||
-          this._config?.header?.title_actions?.double_tap_action?.action === 'none'))
-        ? 'disabled'
-        : 'actions';
-
-    return html`<div
-      id="header__title"
-      class="${classes}"
-      role=${ifDefined(classes === 'actions' ? 'button' : undefined)}
-      tabindex=${ifDefined(classes === 'actions' ? '0' : undefined)}
-      aria-label=${ifDefined(classes === 'actions' ? this._config?.header?.title : undefined)}
-      @action=${(ev: Event) => {
-        this._handleTitleAction(ev);
-      }}
-      .actionHandler=${actionHandler({
-        hasDoubleClick:
-          this._config?.header?.title_actions?.double_tap_action?.action &&
-          this._config?.header?.title_actions.double_tap_action.action !== 'none',
-        hasHold:
-          this._config?.header?.title_actions?.hold_action?.action &&
-          this._config?.header?.title_actions?.hold_action.action !== 'none',
-      })}
-      @focus="${(ev: Event) => {
-        this.handleRippleFocus(ev, 'title');
-      }}"
-      @blur="${(ev: Event) => {
-        this.handleRippleBlur(ev, 'title');
-      }}"
-      @mousedown="${(ev: Event) => {
-        this.handleRippleActivate(ev, 'title');
-      }}"
-      @mouseup="${(ev: Event) => {
-        this.handleRippleDeactivate(ev, 'title');
-      }}"
-      @touchstart="${(ev: Event) => {
-        this.handleRippleActivate(ev, 'title');
-      }}"
-      @touchend="${(ev: Event) => {
-        this.handleRippleDeactivate(ev, 'title');
-      }}"
-      @touchcancel="${(ev: Event) => {
-        this.handleRippleDeactivate(ev, 'title');
-      }}"
-    >
-      <span>${this._config?.header?.title}</span>
-      <mwc-ripple unbounded id="ripple-title" aria-hidden="true"></mwc-ripple>
-    </div>`;
-  }
-
-  private _renderStates(): TemplateResult {
-    return html`
-      <div id="header__states">
-        ${this._config?.series.map((serie, index) => {
-          if (
-            serie.show.in_header &&
-            (serie.show.null_in_header || this._headerState?.[index] !== null) &&
-            (serie.show.zero_in_header || this._headerState?.[index] !== 0)
-          ) {
-            const stateClasses =
-              this._config?.header?.disable_actions ||
-              // Default tap action is more-info: meaningless without an entity
-              (this._hasNoEntityState(index) && !serie.header_actions) ||
-              (serie.header_actions?.tap_action?.action === 'none' &&
-                (!serie.header_actions?.hold_action?.action || serie.header_actions?.hold_action?.action === 'none') &&
-                (!serie.header_actions?.double_tap_action?.action ||
-                  serie.header_actions?.double_tap_action?.action === 'none'))
-                ? 'disabled'
-                : 'actions';
-            return html`
-              <div
-                id="states__state"
-                class="${stateClasses}"
-                role=${ifDefined(stateClasses === 'actions' ? 'button' : undefined)}
-                tabindex=${ifDefined(stateClasses === 'actions' ? '0' : undefined)}
-                aria-label=${ifDefined(
-                  stateClasses === 'actions'
-                    ? computeName(this._hass, index, this._config?.series, this._entities)
-                    : undefined,
-                )}
-                @action=${(ev: Event) => {
-                  this._handleAction(ev, serie);
-                }}
-                .actionHandler=${actionHandler({
-                  hasDoubleClick:
-                    serie.header_actions?.double_tap_action?.action &&
-                    serie.header_actions.double_tap_action.action !== 'none',
-                  hasHold:
-                    serie.header_actions?.hold_action?.action && serie.header_actions?.hold_action.action !== 'none',
-                })}
-                @focus="${(ev: Event) => {
-                  this.handleRippleFocus(ev, index);
-                }}"
-                @blur="${(ev: Event) => {
-                  this.handleRippleBlur(ev, index);
-                }}"
-                @mousedown="${(ev: Event) => {
-                  this.handleRippleActivate(ev, index);
-                }}"
-                @mouseup="${(ev: Event) => {
-                  this.handleRippleDeactivate(ev, index);
-                }}"
-                @touchstart="${(ev: Event) => {
-                  this.handleRippleActivate(ev, index);
-                }}"
-                @touchend="${(ev: Event) => {
-                  this.handleRippleDeactivate(ev, index);
-                }}"
-                @touchcancel="${(ev: Event) => {
-                  this.handleRippleDeactivate(ev, index);
-                }}"
-              >
-                <div id="state__value">
-                  <span id="state" style="${this._computeHeaderStateColor(serie, this._headerState?.[index])}"
-                    >${
-                      this._headerState?.[index] === 0
-                        ? 0
-                        : serie.show.as_duration
-                          ? prettyPrintTime(this._headerState?.[index], serie.show.as_duration)
-                          : this._computeLastState(this._headerState?.[index], index) || NO_VALUE
-                    }</span
-                  >
-                  ${
-                    !serie.show.as_duration
-                      ? html`<span id="uom">${computeUom(index, this._config?.series, this._entities)}</span>`
-                      : ''
-                  }
-                </div>
-                ${
-                  serie.show.name_in_header
-                    ? html`<div id="state__name">
-                        ${computeName(this._hass, index, this._config?.series, this._entities)}
-                      </div>`
-                    : ''
-                }
-                <mwc-ripple unbounded id="ripple-${index}" aria-hidden="true"></mwc-ripple>
-              </div>
-            `;
-          } else {
-            return html``;
-          }
-        })}
-      </div>
-    `;
   }
 
   private _renderLastUpdated(): TemplateResult {
@@ -1727,15 +1569,6 @@ export class ChartsCard extends LitElement {
     );
   }
 
-  private _computeHeaderStateColor(serie: ChartCardSeriesConfig, value: number | null): string {
-    return computeHeaderStateColor(this._config, serie, value, this._headerColors);
-  }
-
-  private _computeLastState(value: number | null, index: number): string | number | null {
-    if (value === null) return value;
-    return myFormatNumber(value, this._hass?.locale, this._config?.series[index]);
-  }
-
   // Columns grouped in every series: the chart starts and ends at the first and last bucket
   private _findStartAndEndOfChart(start: Date, end: Date, brush: boolean): { start: number; end: number } {
     let offsetStart: number | undefined = 0;
@@ -1795,76 +1628,6 @@ export class ChartsCard extends LitElement {
       start.setTime(start.getTime() + this._offset);
     }
     return { start, end };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _handleAction(ev: any, serieConfig: ChartCardSeriesConfig) {
-    if (ev.detail?.action) {
-      const isExternalStat = isExternalStatisticId(serieConfig.entity);
-      // Without explicit header_actions the default action is more-info,
-      // which cannot open on an external statistic ID.
-      if (isExternalStat && !serieConfig.header_actions) return;
-      const configDup: ActionsConfig = serieConfig.header_actions
-        ? JSON.parse(JSON.stringify(serieConfig.header_actions))
-        : {};
-
-      switch (ev.detail.action) {
-        case 'tap':
-        case 'hold':
-        case 'double_tap':
-          configDup.entity =
-            actionEntity(configDup, ev.detail.action) || (isExternalStat ? undefined : serieConfig.entity);
-
-          handleAction(this, this._hass!, configDup, ev.detail.action);
-          break;
-        default:
-          break;
-      }
-    }
-    return;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _handleTitleAction(ev: any) {
-    if (ev.detail?.action) {
-      const configDup: ActionsConfig = this._config?.header?.title_actions
-        ? JSON.parse(JSON.stringify(this._config?.header?.title_actions))
-        : {};
-
-      switch (ev.detail.action) {
-        case 'tap':
-        case 'hold':
-        case 'double_tap':
-          configDup.entity = actionEntity(configDup, ev.detail.action);
-
-          handleAction(this, this._hass!, configDup, ev.detail.action);
-          break;
-        default:
-          break;
-      }
-    }
-    return;
-  }
-
-  @eventOptions({ passive: true })
-  private handleRippleActivate(evt: Event, index: number | string): void {
-    const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
-    if (r && typeof r.startPress === 'function') r.startPress(evt);
-  }
-
-  private handleRippleDeactivate(_: Event, index: number | string): void {
-    const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
-    if (r && typeof r.endPress === 'function') r.endPress();
-  }
-
-  private handleRippleFocus(_: Event, index: number | string): void {
-    const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
-    if (r && typeof r.startFocus === 'function') r.startFocus();
-  }
-
-  private handleRippleBlur(_: Event, index: number | string): void {
-    const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
-    if (r && typeof r.endFocus === 'function') r.endFocus();
   }
 
   public getCardSize(): number {

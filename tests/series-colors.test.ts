@@ -39,21 +39,21 @@ describe('header state color', () => {
 
   it.each([-5, 0, 5, 10, 15, 20, 25])('line, value %s', async (value) => {
     const c = await card(config());
-    expect(c._computeHeaderStateColor(c._config.series[0], value)).toMatchSnapshot();
+    expect(c._headerContext().stateStyle(c._config.series[0], value)).toMatchSnapshot();
   });
 
   it.each([-5, 5, 15, 25])('column, value %s', async (value) => {
     const c = await card(config('column'));
-    expect(c._computeHeaderStateColor(c._config.series[0], value)).toMatchSnapshot();
+    expect(c._headerContext().stateStyle(c._config.series[0], value)).toMatchSnapshot();
   });
 
   it('falls back to the series color for null, without thresholds, or without colorize_states', async () => {
     const c = await card(config());
-    expect(c._computeHeaderStateColor(c._config.series[0], null)).toBe('color: #123456;');
+    expect(c._headerContext().stateStyle(c._config.series[0], null)).toBe('color: #123456;');
     const plain = await card({ header: { colorize_states: true }, series: [{ entity: 'sensor.a', color: '#123456' }] });
-    expect(plain._computeHeaderStateColor(plain._config.series[0], 5)).toBe('color: #123456;');
+    expect(plain._headerContext().stateStyle(plain._config.series[0], 5)).toBe('color: #123456;');
     const off = await card({ series: [{ entity: 'sensor.a', color: '#123456' }] });
-    expect(off._computeHeaderStateColor(off._config.series[0], 5)).toBe('');
+    expect(off._headerContext().stateStyle(off._config.series[0], 5)).toBe('');
   });
 
   it('uses the series color for thresholds without a color', async () => {
@@ -69,7 +69,7 @@ describe('header state color', () => {
         },
       ],
     });
-    expect([-1, 5, 11].map((v) => c._computeHeaderStateColor(c._config.series[0], v))).toMatchSnapshot();
+    expect([-1, 5, 11].map((v) => c._headerContext().stateStyle(c._config.series[0], v))).toMatchSnapshot();
   });
 });
 

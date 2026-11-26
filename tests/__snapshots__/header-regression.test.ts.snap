@@ -1,0 +1,304 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`header > renders and acts the same: default 1`] = `
+{
+  "events": [
+    "0 tap: 0 navigations",
+    "0 hold: 0 navigations",
+    "0 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 double_tap: 0 navigations",
+    "3 tap: 0 navigations",
+    "3 hold: 0 navigations",
+    "3 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div class="disabled" id="header__title"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div><div id="header__states"><div aria-label="Living" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">21.5</span><span id="uom">°C</span></div><div id="state__name">Living</div><mwc-ripple aria-hidden="true" id="ripple-0" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1,234.5</span><span id="uom">W</span></div><div id="state__name">sensor.b</div><mwc-ripple aria-hidden="true" id="ripple-1" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">N/A</span><span id="uom"></span></div><div id="state__name">import:energy</div><mwc-ripple aria-hidden="true" id="ripple-2" unbounded=""></mwc-ripple></div><div aria-label="Sensor A" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1h 2m 5s</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-3" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">0</span><span id="uom">W</span></div><mwc-ripple aria-hidden="true" id="ripple-4" unbounded=""></mwc-ripple></div></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: disabled 1`] = `
+{
+  "events": [
+    "0 tap: 0 navigations",
+    "0 hold: 0 navigations",
+    "0 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 double_tap: 0 navigations",
+    "3 tap: 0 navigations",
+    "3 hold: 0 navigations",
+    "3 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div class="disabled" id="header__title"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div><div id="header__states"><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">21.5</span><span id="uom">°C</span></div><div id="state__name">Living</div><mwc-ripple aria-hidden="true" id="ripple-0" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">1,234.5</span><span id="uom">W</span></div><div id="state__name">sensor.b</div><mwc-ripple aria-hidden="true" id="ripple-1" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">N/A</span><span id="uom"></span></div><div id="state__name">import:energy</div><mwc-ripple aria-hidden="true" id="ripple-2" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">1h 2m 5s</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-3" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">0</span><span id="uom">W</span></div><mwc-ripple aria-hidden="true" id="ripple-4" unbounded=""></mwc-ripple></div></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: floating 1`] = `
+{
+  "events": [
+    "0 tap: 0 navigations",
+    "0 hold: 0 navigations",
+    "0 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 double_tap: 0 navigations",
+    "3 tap: 0 navigations",
+    "3 hold: 0 navigations",
+    "3 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" floating " id="header"><div class="disabled" id="header__title"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div><div id="header__states"><div aria-label="Living" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">21.5</span><span id="uom">°C</span></div><div id="state__name">Living</div><mwc-ripple aria-hidden="true" id="ripple-0" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1,234.5</span><span id="uom">W</span></div><div id="state__name">sensor.b</div><mwc-ripple aria-hidden="true" id="ripple-1" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">N/A</span><span id="uom"></span></div><div id="state__name">import:energy</div><mwc-ripple aria-hidden="true" id="ripple-2" unbounded=""></mwc-ripple></div><div aria-label="Sensor A" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1h 2m 5s</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-3" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">0</span><span id="uom">W</span></div><mwc-ripple aria-hidden="true" id="ripple-4" unbounded=""></mwc-ripple></div></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: noStates 1`] = `
+{
+  "events": [
+    "0 tap: 0 navigations",
+    "0 hold: 0 navigations",
+    "0 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div class="disabled" id="header__title"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: noTitle 1`] = `
+{
+  "events": [
+    "hass-more-info {"entityId":"sensor.a"}",
+    "0 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "0 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "0 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "1 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "1 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "1 double_tap: 0 navigations",
+    "2 tap: 0 navigations",
+    "2 hold: 0 navigations",
+    "2 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "3 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "3 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "3 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "4 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "4 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "4 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div id="header__states"><div aria-label="Living" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">21.5</span><span id="uom">°C</span></div><div id="state__name">Living</div><mwc-ripple aria-hidden="true" id="ripple-0" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1,234.5</span><span id="uom">W</span></div><div id="state__name">sensor.b</div><mwc-ripple aria-hidden="true" id="ripple-1" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">N/A</span><span id="uom"></span></div><div id="state__name">import:energy</div><mwc-ripple aria-hidden="true" id="ripple-2" unbounded=""></mwc-ripple></div><div aria-label="Sensor A" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1h 2m 5s</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-3" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">0</span><span id="uom">W</span></div><mwc-ripple aria-hidden="true" id="ripple-4" unbounded=""></mwc-ripple></div></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: standardFormat 1`] = `
+{
+  "events": [
+    "hass-more-info {"entityId":"sensor.a"}",
+    "0 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "0 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "0 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "1 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "1 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "1 double_tap: 0 navigations",
+    "2 tap: 0 navigations",
+    "2 hold: 0 navigations",
+    "2 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "3 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "3 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "3 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "4 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "4 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "4 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div id="header__states"><div aria-label="Living" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">21.5</span><span id="uom">°C</span></div><div id="state__name">Living</div><mwc-ripple aria-hidden="true" id="ripple-0" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1,234.5</span><span id="uom">W</span></div><div id="state__name">sensor.b</div><mwc-ripple aria-hidden="true" id="ripple-1" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">N/A</span><span id="uom"></span></div><div id="state__name">import:energy</div><mwc-ripple aria-hidden="true" id="ripple-2" unbounded=""></mwc-ripple></div><div aria-label="Sensor A" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1h 2m 5s</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-3" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">0</span><span id="uom">W</span></div><mwc-ripple aria-hidden="true" id="ripple-4" unbounded=""></mwc-ripple></div></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: stateActions 1`] = `
+{
+  "events": [
+    "0 tap: 0 navigations",
+    "0 hold: 0 navigations",
+    "0 double_tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "1 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 double_tap: 0 navigations",
+    "2 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 double_tap: 0 navigations",
+    "3 tap: 0 navigations",
+    "3 hold: 0 navigations",
+    "3 double_tap: 0 navigations",
+    "4 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 hold: 0 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div class="disabled" id="header__title"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div><div id="header__states"><div aria-label="Sensor A" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">21.5</span><span id="uom">°C</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-0" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">1,234.5</span><span id="uom">W</span></div><div id="state__name">sensor.b</div><mwc-ripple aria-hidden="true" id="ripple-1" unbounded=""></mwc-ripple></div><div aria-label="import:energy" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">N/A</span><span id="uom"></span></div><div id="state__name">import:energy</div><mwc-ripple aria-hidden="true" id="ripple-2" unbounded=""></mwc-ripple></div><div aria-label="Sensor A" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">3,725</span><span id="uom">°C</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-3" unbounded=""></mwc-ripple></div></div></div>",
+  "services": [
+    [
+      "light",
+      "toggle",
+      undefined,
+      undefined,
+    ],
+  ],
+}
+`;
+
+exports[`header > renders and acts the same: titleHoldOnly 1`] = `
+{
+  "events": [
+    "0 tap: 0 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "0 hold: 0 navigations",
+    "0 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div aria-label="Rooms" class="actions" id="header__title" role="button" tabindex="0"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: titleNone 1`] = `
+{
+  "events": [
+    "0 tap: 0 navigations",
+    "0 hold: 0 navigations",
+    "0 double_tap: 0 navigations",
+  ],
+  "html": "<div class=" " id="header"><div class="disabled" id="header__title"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div></div>",
+  "services": [],
+}
+`;
+
+exports[`header > renders and acts the same: titleTap 1`] = `
+{
+  "events": [
+    "0 tap: 1 navigations",
+    "0 hold: 1 navigations",
+    "0 double_tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 hold: 1 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "1 double_tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 hold: 1 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "2 double_tap: 1 navigations",
+    "3 tap: 1 navigations",
+    "3 hold: 1 navigations",
+    "3 double_tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 hold: 1 navigations",
+    "hass-more-info {"entityId":"sensor.a"}",
+    "4 double_tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 tap: 1 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 hold: 1 navigations",
+    "hass-more-info {"entityId":"sensor.b"}",
+    "5 double_tap: 1 navigations",
+  ],
+  "html": "<div class=" " id="header"><div aria-label="Rooms" class="actions" id="header__title" role="button" tabindex="0"><span>Rooms</span><mwc-ripple aria-hidden="true" id="ripple-title" unbounded=""></mwc-ripple></div><div id="header__states"><div aria-label="Living" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">21.5</span><span id="uom">°C</span></div><div id="state__name">Living</div><mwc-ripple aria-hidden="true" id="ripple-0" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1,234.5</span><span id="uom">W</span></div><div id="state__name">sensor.b</div><mwc-ripple aria-hidden="true" id="ripple-1" unbounded=""></mwc-ripple></div><div class="disabled" id="states__state"><div id="state__value"><span id="state" style="">N/A</span><span id="uom"></span></div><div id="state__name">import:energy</div><mwc-ripple aria-hidden="true" id="ripple-2" unbounded=""></mwc-ripple></div><div aria-label="Sensor A" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">1h 2m 5s</span></div><div id="state__name">Sensor A</div><mwc-ripple aria-hidden="true" id="ripple-3" unbounded=""></mwc-ripple></div><div aria-label="sensor.b" class="actions" id="states__state" role="button" tabindex="0"><div id="state__value"><span id="state" style="">0</span><span id="uom">W</span></div><mwc-ripple aria-hidden="true" id="ripple-4" unbounded=""></mwc-ripple></div></div></div>",
+  "services": [],
+}
+`;
