@@ -36,8 +36,7 @@ export function supports(config: ChartCardExternalConfig | undefined, feature: F
   return (SUPPORT[feature] as ChartType[]).includes(config?.chart_type ?? 'line');
 }
 
-// Settings the card rejects on chart types that cannot use them, by where they
-// sit in the config: `paths` at the top, `seriesPaths` in each series.
+// Settings the card rejects on other chart types: `paths` at the top, `seriesPaths` per series
 interface Setting {
   feature: Feature;
   label: string;
@@ -155,8 +154,8 @@ export function emptyStash(): Stash {
   return { series: [] };
 }
 
-// The config for a new chart type: settings it cannot use go to the stash,
-// stashed ones it can use come back, and a heatmap gets the grouping it needs.
+// Settings the new type can't use go to the stash, stashed ones it can use come back,
+// and a heatmap gets the grouping it needs
 export function changeChartType(
   config: ChartCardExternalConfig,
   type: ChartCardExternalConfig['chart_type'],

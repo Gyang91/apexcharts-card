@@ -312,7 +312,6 @@ function getXAxis(config: ChartCardConfig, hass: HomeAssistant | undefined) {
     const period = getCommonPeriod(config);
     return {
       type: 'datetime',
-      // range: getMilli(config.hours_to_show),
       labels: {
         datetimeUTC: false,
         datetimeFormatter: getDateTimeFormatter(hours12),

@@ -16,9 +16,6 @@ import { BoolField } from './bool-grid';
 import { t } from '../localize';
 import './bool-grid';
 
-// Boolean options use bool-grid; other fields use ha-form.
-// A function (not a module-level constant) so option labels re-resolve to the current locale
-// on every render.
 const LIMIT_MODES: YaxisLimitMode[] = ['auto', 'fixed', 'soft', 'padding'];
 
 // Min or max: how the limit is set, then its number, with a hint for that mode
@@ -51,8 +48,6 @@ function limitSchema(key: 'min' | 'max', mode: YaxisLimitMode): HaFormSchema {
   };
 }
 
-// A function (not a module-level constant) so option labels re-resolve to the current locale
-// on every render.
 function getSchema(modes: Record<'min' | 'max', YaxisLimitMode>): HaFormSchema[] {
   return [
     {
@@ -92,10 +87,10 @@ function getSchema(modes: Record<'min' | 'max', YaxisLimitMode>): HaFormSchema[]
 export class ApexChartsCardYAxisItemEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @property({ attribute: false }) public yaxis?: ChartCardYAxisExternal;
-  // Labels (apex_config.yaxis[i].labels) — handled separately from the yaxis core fields.
+  // apex_config.yaxis[i].labels
   @property({ type: Boolean }) public labelsShow = true;
   @property({ type: String }) public labelsFormatterBody = '';
-  // Tick amount (apex_config.yaxis[i].tickAmount) — handled separately
+  // apex_config.yaxis[i].tickAmount
   @property({ type: Number }) public tickAmount?: number;
 
   // A mode picked before its number is typed: nothing to save yet, but the field shows

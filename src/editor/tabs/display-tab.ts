@@ -132,8 +132,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     this._fire({ appearance: data.appearance === 'minimal' ? 'minimal' : undefined });
   };
 
-  // ── apex_config-driven sections ──
-
   private _fireConfig(next: ChartCardExternalConfig): void {
     this.dispatchEvent(
       new CustomEvent('config-changed', {
@@ -154,7 +152,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     this._fireConfig(setApexValues(this.config, patches));
   }
 
-  // Grid
   private _gridSelectChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
     const data = ev.detail.value as { position?: string; borderColor?: string };
@@ -174,8 +171,7 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     };
     const path = pathMap[name];
     if (!path) return;
-    // ApexCharts defaults: grid.show=true, grid.yaxis.lines.show=true, grid.xaxis.lines.show=false.
-    // For fields that default to true, persist only explicit false. For xaxis lines, persist only explicit true.
+    // Persist only what differs from ApexCharts' defaults (grid and y lines shown, x lines hidden)
     if (name === 'xaxis_lines_show') {
       this._setApex(path, value ? true : undefined);
     } else {
@@ -183,7 +179,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     }
   };
 
-  // Legend
   private _legendSelectChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
     const data = ev.detail.value as { position?: string; horizontalAlign?: string };
@@ -200,7 +195,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     this._setApex('legend.show', value ? undefined : false);
   };
 
-  // Tooltip
   private _tooltipChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
     const data = ev.detail.value as { theme?: string; x_format?: string };
@@ -220,14 +214,12 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     });
   };
 
-  // Toolbar
   private _toolbarBoolChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
     const { name, value } = ev.detail as { name: string; value: boolean };
     if (name === 'show') {
-      // apexcharts-card forces chart.toolbar.show=false AND chart.zoom.enabled=false in its defaults.
-      // ApexCharts hides zoom/pan/reset icons when chart.zoom.enabled is false, leaving only the
-      // download menu — so when the user enables the toolbar we also enable zoom (and clear both on off).
+      // The card turns zoom off, and ApexCharts hides the zoom/pan/reset tools without it:
+      // the toolbar switch turns zoom on and off with it.
       this._setApexMany({
         'chart.toolbar.show': value ? true : undefined,
         'chart.zoom.enabled': value ? true : undefined,
@@ -245,7 +237,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     this._setApex(path, value ? undefined : false);
   };
 
-  // Markers
   private _markersChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
     const data = ev.detail.value as { size?: number | string; shape?: string; strokeWidth?: number | string };
@@ -263,7 +254,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     this._setApexMany(patches);
   };
 
-  // Chart background / foreground
   private _chartColorsChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
     const data = ev.detail.value as { background?: string; foreColor?: string };
@@ -273,11 +263,9 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     });
   };
 
-  // Annotations
   private _annotationsChanged = (axis: 'xaxis' | 'yaxis', ev: CustomEvent): void => {
     ev.stopPropagation();
     const value = ev.detail.value as AnnotationItem[] | undefined;
-    // Map UI items to ApexCharts annotation shape
     const mapped = value?.map((it) => {
       const out: Record<string, unknown> = {};
       if (axis === 'xaxis') {
@@ -285,11 +273,9 @@ export class ApexChartsCardEditorDisplay extends LitElement {
           const raw = String(it.value).trim();
           const asNum = Number(raw);
           if (!isNaN(asNum) && /^[\d.eE+-]+$/.test(raw)) {
-            // Already a numeric (ms epoch) value -> keep as-is.
             out.x = asNum;
           } else {
-            // Try to interpret as a date/time string and store as ms epoch
-            // (ApexCharts xaxis annotations on a datetime axis require a numeric x).
+            // A datetime axis needs a numeric x: store a date string as ms since 1970
             const parsed = Date.parse(raw);
             out.x = isNaN(parsed) ? raw : parsed;
           }
@@ -327,9 +313,7 @@ export class ApexChartsCardEditorDisplay extends LitElement {
         ((labelObj?.style as Record<string, unknown> | undefined)?.background as string | undefined);
       const item: AnnotationItem = {};
       if (rawValue !== undefined) {
-        // For xaxis: ms-epoch numbers should be shown as a readable local datetime so the user
-        // can see what they typed. Anything below ~1973 (10^11 ms) is assumed to be a real numeric
-        // category value, not an epoch.
+        // Show ms since 1970 as a local date; values below 10^11 (1973) are plain numbers
         if (axis === 'xaxis' && typeof rawValue === 'number' && rawValue >= 1e11) {
           item.value = msToLocalDateTimeString(rawValue);
         } else {
@@ -361,7 +345,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
       },
     ];
 
-    // Grid
     const gridBoolFields: BoolField[] = getGridBoolFields().map((f) => {
       const pathMap: Record<string, string> = {
         show: 'grid.show',
@@ -369,7 +352,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
         yaxis_lines_show: 'grid.yaxis.lines.show',
       };
       const raw = getApexValue(cfg, pathMap[f.name]);
-      // ApexCharts defaults: grid.show=true, grid.yaxis.lines.show=true, grid.xaxis.lines.show=false.
       const defaultsTrue = f.name !== 'xaxis_lines_show';
       const value = raw === undefined ? defaultsTrue : raw !== false;
       return {
@@ -384,7 +366,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
       borderColor: (getApexValue(cfg, 'grid.borderColor') as string) || '',
     };
 
-    // Legend
     const legendShowFields: BoolField[] = [
       {
         name: 'show',
@@ -397,7 +378,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
       horizontalAlign: (getApexValue(cfg, 'legend.horizontalAlign') as string) || '',
     };
 
-    // Tooltip
     const tooltipData = {
       theme: (getApexValue(cfg, 'tooltip.theme') as string) || '',
       x_format: (getApexValue(cfg, 'tooltip.x.format') as string) || '',
@@ -411,7 +391,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
       },
     ];
 
-    // Toolbar
     const toolbarFields: BoolField[] = getToolbarBoolFields().map((f) => {
       const pathMap: Record<string, string> = {
         show: 'chart.toolbar.show',
@@ -421,7 +400,7 @@ export class ApexChartsCardEditorDisplay extends LitElement {
         tool_reset: 'chart.toolbar.tools.reset',
       };
       const raw = getApexValue(cfg, pathMap[f.name]);
-      // chart.toolbar.show defaults OFF (card forces false); the individual tools default ON when toolbar is shown.
+      // The card hides the toolbar; its tools default to shown
       const defaultValue = f.name === 'show' ? false : true;
       return {
         name: f.name,
@@ -431,20 +410,17 @@ export class ApexChartsCardEditorDisplay extends LitElement {
       };
     });
 
-    // Markers
     const markersData = {
       size: getApexValue(cfg, 'markers.size'),
       shape: (getApexValue(cfg, 'markers.shape') as string) || '',
       strokeWidth: getApexValue(cfg, 'markers.strokeWidth'),
     };
 
-    // Chart background / foreground
     const chartColorsData = {
       background: (getApexValue(cfg, 'chart.background') as string) || '',
       foreColor: (getApexValue(cfg, 'chart.foreColor') as string) || '',
     };
 
-    // Annotations
     const xAnnotations = this._readAnnotations('xaxis');
     const yAnnotations = this._readAnnotations('yaxis');
 

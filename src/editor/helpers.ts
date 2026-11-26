@@ -2,10 +2,7 @@ import { ChartCardExternalConfig } from '../types-config';
 import { HaFormSchema, SEL_FALSE, SEL_TRUE, SEL_UNDEFINED } from './types';
 import { t } from './localize';
 
-// ── Multi-type select conversion ──
-// Selects can only hold strings. For fields whose runtime type is a union of
-// boolean | string | undefined, encode booleans/undefined with sentinels so the
-// round-trip preserves type.
+// Selects hold strings: booleans and undefined go through sentinels to keep their type
 
 export type SelectMixed = boolean | string | number | undefined | null;
 
@@ -22,8 +19,6 @@ export function fromSelectValue(str: string | undefined): boolean | string | und
   if (str === SEL_FALSE) return false;
   return str;
 }
-
-// ── stroke_dash conversion ──
 
 export function parseStrokeDash(val: string | undefined): number | number[] | undefined {
   if (val === undefined || val === null) return undefined;
@@ -46,11 +41,7 @@ export function serializeStrokeDash(val: number | number[] | undefined): string 
   return String(val);
 }
 
-// ── Label & helper text computation ──
-//
-// These maps hold translation KEYS (not display text). computeLabel/computeHelper are called
-// on every ha-form render, so the t() lookup below always reflects the current editor locale —
-// no module-level caching of translated strings.
+// Translation keys, looked up on every render so a locale change applies at once
 
 const LABEL_MAP: Record<string, string> = {
   chart_type: 'field.chart_type',
@@ -196,8 +187,6 @@ export function computeHelper(schema: HaFormSchema): string {
   return key ? t(key) : '';
 }
 
-// ── Duration validation ──
-
 const DURATION_RE =
   /^\d+(\.\d+)?\s*(ms|milliseconds?|s|sec|seconds?|m|min|minutes?|h|hours?|d|days?|w|weeks?)(\s*\d+(\.\d+)?\s*(ms|milliseconds?|s|sec|seconds?|m|min|minutes?|h|hours?|d|days?|w|weeks?))*$/i;
 
@@ -223,8 +212,6 @@ export function isValidYaxisLimit(val: string | undefined): boolean {
   return !isNaN(Number(t));
 }
 
-// ── Default factories ──
-
 export function newSeriesConfig(): { entity: string } {
   return { entity: '' };
 }
@@ -232,8 +219,6 @@ export function newSeriesConfig(): { entity: string } {
 export function newYAxisConfig(): { id: string; show: boolean } {
   return { id: '', show: true };
 }
-
-// ── Immutable updates ──
 
 export function updateConfig(
   config: ChartCardExternalConfig,
@@ -254,7 +239,7 @@ export function updateNestedConfig<K extends keyof ChartCardExternalConfig>(
   };
 }
 
-// Strip keys whose value is undefined/empty-string — keeps the YAML output tidy.
+// Without undefined and empty-string values
 export function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Record<string, unknown> = {};
   for (const k of Object.keys(obj)) {
@@ -266,11 +251,7 @@ export function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T
   return out as Partial<T>;
 }
 
-// ── Live editing ──
-
-// Runs fn once typing pauses, so the preview follows the input without a redraw per key.
-// Pending calls are kept per key (by default one for all), so typing in one field
-// never drops the pending change of another.
+// Runs fn once typing pauses; pending calls are kept per key, so one field never drops another's
 export function debounced<A extends unknown[]>(
   fn: (...args: A) => void,
   keyOf: (...args: A) => string = () => '',
@@ -290,13 +271,10 @@ export function debounced<A extends unknown[]>(
   };
 }
 
-// A complete number as typed: partial input such as "1." or "-" waits for more keys,
-// so the field is not rewritten under the cursor.
+// A complete number: partial input such as "1." or "-" waits, so the field isn't rewritten
 export function typedNumber(text: string): number | undefined {
   return /^-?\d+(\.\d+)?$/.test(text.trim()) ? Number(text) : undefined;
 }
-
-// ── Durations: common values to pick, any other value typed ──
 
 export const SPAN_PRESETS = ['1h', '6h', '12h', '24h', '2d', '7d', '30d'];
 export const INTERVAL_PRESETS = ['30s', '1min', '5min', '15min', '1h'];
@@ -311,8 +289,6 @@ export function durationField(name: string, presets: string[], helper?: string):
     selector: { select: { mode: 'dropdown', custom_value: true, options: presets } },
   };
 }
-
-// ── Y-axis min/max: a mode and a number instead of the ~N / |N| syntax ──
 
 export type YaxisLimitMode = 'auto' | 'fixed' | 'soft' | 'padding';
 
@@ -331,8 +307,6 @@ export function serializeYaxisLimit(mode: YaxisLimitMode, value: number | undefi
   if (mode === 'padding') return `|${value >= 0 ? '+' : ''}${value}|`;
   return value;
 }
-
-// ── Smoothing: common group_by settings by name ──
 
 type GroupBy = NonNullable<ChartCardExternalConfig['series'][number]['group_by']>;
 

@@ -77,12 +77,9 @@ function decompressHistory(entityId: string, rows: HassCompressedState[]): HassH
   });
 }
 
-// Recent statistics, shared by every card on the page: a dashboard rebuilds a
-// card each time it is shown again (tabs, visibility conditions), and long
-// periods are slow to query. Closed periods do not change, so within the TTL
-// only the last cached period (possibly still open) onwards is asked again.
-// After the TTL everything is fetched anew, which also picks up statistics
-// imported later for past periods.
+// Recent statistics, shared by every card on the page, since dashboards rebuild cards and long
+// periods are slow to query. Within the TTL only the last cached period onwards is asked
+// again; after it, everything, which also picks up statistics imported later.
 const STATISTICS_CACHE_TTL_MS = 10 * 60 * 1000;
 const STATISTICS_CACHE_MAX_ENTRIES = 64;
 const STATISTICS_CACHE_MAX_ROWS = 32000;

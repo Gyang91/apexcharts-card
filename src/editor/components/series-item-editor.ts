@@ -43,7 +43,7 @@ import './bool-grid';
 
 type Series = ChartCardSeriesExternalConfig | ChartCardAllSeriesExternalConfig;
 
-// Series fields that only some chart types use (see support.ts)
+// Series fields only some chart types use
 const FIELD_FEATURES: Record<string, Feature> = {
   type: 'series_type',
   curve: 'line_style',
@@ -72,8 +72,6 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
     return editorStyles;
   }
 
-  // ── Core helpers ──
-
   private _fire(updates: Partial<Series>): void {
     const next: Series = { ...(this.series || {}), ...updates };
     // Strip keys whose new value is undefined so the YAML stays clean
@@ -92,8 +90,6 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
   }
 
   private _applies = (name: string): boolean => !FIELD_FEATURES[name] || supports(this.config, FIELD_FEATURES[name]);
-
-  // ── Field handlers ──
 
   private _source(): SeriesSource {
     return isComputedSeries(this.series as ChartCardSeriesExternalConfig | undefined) ? 'compute' : 'entity';
@@ -296,7 +292,6 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
         value: (show[name] as boolean | undefined) ?? defaultValue,
       }),
     );
-    // Conditional experimental booleans
     if (this.config?.experimental?.color_threshold) {
       fields.push({
         name: 'header_color_threshold',
