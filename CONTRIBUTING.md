@@ -28,6 +28,16 @@ npm run check:bundle # after build: raw and gzip size budgets
 A ready-to-use development environment is provided in [`.devcontainer/`](.devcontainer/):
 it starts Home Assistant and serves the card automatically.
 
+### Home Assistant frontend elements
+
+The editor renders some of Home Assistant's own elements (`ha-form`, `ha-icon-button`, `ha-expansion-panel`, …), which HA can remove without notice. A weekly workflow checks that its frontend still provides every one the source uses. To run the check locally against a checkout of [home-assistant/frontend](https://github.com/home-assistant/frontend):
+
+```bash
+node scripts/check-ha-frontend.ts ../frontend
+```
+
+Prefer fields through `ha-form` selectors over HA's input elements: `ha-form` loads whatever input element the installed HA has.
+
 ### Browser and performance regressions
 
 After building the card, install the development-only Chromium binary and run the browser suite:

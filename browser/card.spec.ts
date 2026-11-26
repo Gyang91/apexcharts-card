@@ -242,3 +242,30 @@ test('draws a series computed from another series, with its header value', async
   expect(await page.evaluate(() => window.card._graphs[1].history.at(-1)[1])).toBe(98);
   expect(errors).toEqual([]);
 });
+
+test('redraws with a new config after Save, as Home Assistant hands it to the same card', async ({ page }) => {
+  await mount(page);
+  const firstChart = await page.evaluate(() => {
+    window.firstChart = window.card._apexChart;
+    return window.card._apexChart.w.config.series.length;
+  });
+  expect(firstChart).toBe(1);
+  await page.evaluate(() => {
+    const generated = 'return [[start.getTime(), 1], [end.getTime(), 2]];';
+    window.card.setConfig({
+      type: 'custom:apexcharts-card',
+      update_delay: '0s',
+      header: { show: true, title: 'Saved', show_states: true },
+      apex_config: { chart: { animations: { enabled: false } } },
+      series: [
+        { entity: 'sensor.temp', data_generator: generated },
+        { entity: 'sensor.temp', name: 'Second', data_generator: generated },
+      ],
+    });
+  });
+  await page.waitForFunction(
+    () => window.card._apexChart && window.card._apexChart !== window.firstChart && window.card._dataLoaded,
+  );
+  expect(await page.evaluate(() => window.card._apexChart.w.config.series.length)).toBe(2);
+  await expect(page.locator('apexcharts-card #header__title')).toHaveText('Saved');
+});

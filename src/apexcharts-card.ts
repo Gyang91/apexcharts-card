@@ -138,6 +138,9 @@ export class ChartsCard extends LitElement {
 
   private _entities: (HassEntity | undefined)[] = [];
 
+  // The config last applied, as given: a different one makes the card start over
+  private _configJson?: string;
+
   private _interval?: number;
 
   private _intervalTimeout?: ReturnType<typeof setTimeout>;
@@ -505,6 +508,17 @@ export class ChartsCard extends LitElement {
       this._config = newConfig;
       // A connected card keeps its timer from connectedCallback: follow the new interval
       if (this.isConnected) this._startIntervalTimer();
+      // A dashboard card gets its saved config through setConfig, not as a new card:
+      // start over with it, or the old chart stays until the page reloads
+      const json = JSON.stringify(config);
+      const changed = this._configJson !== undefined && json !== this._configJson;
+      this._configJson = json;
+      if (changed) {
+        this._entities = [];
+        this._headerState = [];
+        if (this._hass) this.hass = this._hass;
+        this._reset();
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       throw new Error(`/// apexcharts-card version ${pjson.version} /// ${e.message}`, { cause: e });
