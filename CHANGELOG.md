@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.23.3](https://github.com/Gyang91/apexcharts-card/compare/v2.23.2...v2.23.3) (2026-11-26)
+
+
+### Bug Fixes
+
+* **editor:** moving and expanding list items no longer look alike ([6cc8518](https://github.com/Gyang91/apexcharts-card/commit/6cc851836f0f645795eb7911330d5c3906b3d650))
+
 ## [2.23.2](https://github.com/Gyang91/apexcharts-card/compare/v2.23.1...v2.23.2) (2026-11-26)
 
 
