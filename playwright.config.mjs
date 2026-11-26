@@ -12,7 +12,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'node scripts/browser-server.mjs',
+    command: 'node scripts/browser-server.ts',
     url: 'http://127.0.0.1:4178',
     reuseExistingServer: false,
   },

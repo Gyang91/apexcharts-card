@@ -1,12 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.ready);
 });
 
-const mount = async (page, extra = {}) => {
-  await page.evaluate((config) => {
+const mount = async (page: Page, extra: Record<string, unknown> = {}) => {
+  await page.evaluate((config: Record<string, unknown>) => {
     window.card = window.makeCard(config);
     document.querySelector('#dashboard').appendChild(window.card);
   }, extra);
@@ -15,7 +15,7 @@ const mount = async (page, extra = {}) => {
 };
 
 test('renders, resizes to a phone, changes theme and reconnects cleanly', async ({ page }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mount(page);
   await page.setViewportSize({ width: 360, height: 740 });
@@ -39,7 +39,7 @@ test('keeps a Sections-style card within a fixed-height cell', async ({ page }) 
   await page.evaluate(() => {
     window.card = window.makeCard({ grid_options: { rows: 4 } });
     window.card.layout = 'grid';
-    const dashboard = document.querySelector('#dashboard');
+    const dashboard = document.querySelector<HTMLElement>('#dashboard');
     dashboard.style.height = '350px';
     dashboard.appendChild(window.card);
   });
@@ -83,7 +83,7 @@ test('explains empty data without treating zero as missing', async ({ page }) =>
 });
 
 test('does not create charts after detaching during asynchronous initialization', async ({ page }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.evaluate(() => {
     window.card = window.makeCard();
@@ -106,7 +106,7 @@ test('does not create charts after detaching during asynchronous initialization'
 });
 
 test('reports chart initialization failures without retry loops', async ({ page }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.evaluate(() => {
     window.card = window.makeCard();
@@ -222,7 +222,7 @@ test('@performance records generated-data render baseline without dropping sampl
 });
 
 test('draws a series computed from another series, with its header value', async ({ page }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mount(page, {
     series: [

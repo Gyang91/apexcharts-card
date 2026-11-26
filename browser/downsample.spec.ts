@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const generatedSeries = {
   entity: 'sensor.temp',
@@ -15,11 +15,11 @@ const generatedSeries = {
   `,
 };
 
-const mount = async (page, extra = {}) => {
+const mount = async (page: Page, extra: Record<string, unknown> = {}) => {
   await page.goto('/');
   await page.waitForFunction(() => window.ready);
   await page.evaluate(
-    (config) => {
+    (config: Record<string, unknown>) => {
       window.card = window.makeCard({
         downsample: true,
         yaxis: [{}],
@@ -47,9 +47,9 @@ test('samples 100000 points, preserving extrema, gaps, full history and header v
       last: sampled.at(-1),
       fullFirst: full[0],
       fullLast: full.at(-1),
-      spikes: sampled.filter(([, value]) => value === 1000 || value === -1000),
-      gaps: sampled.filter(([, value]) => value === null).map(([time]) => time),
-      expectedGaps: full.filter(([, value]) => value === null).map(([time]) => time),
+      spikes: sampled.filter(([, value]: Point) => value === 1000 || value === -1000),
+      gaps: sampled.filter(([, value]: Point) => value === null).map(([time]: Point) => time),
+      expectedGaps: full.filter(([, value]: Point) => value === null).map(([time]: Point) => time),
       header: window.card._headerState[0],
       lastValue: full.at(-1)[1],
       axis: { min: window.card._apexChart.w.config.yaxis[0].min, max: window.card._apexChart.w.config.yaxis[0].max },
@@ -72,7 +72,7 @@ test('restores local zoom detail and adapts to phone width without fetching hist
     window.historyCalls = 0;
     const graph = window.card._graphs[0];
     const update = graph._updateHistory.bind(graph);
-    graph._updateHistory = (...args) => {
+    graph._updateHistory = (...args: unknown[]) => {
       window.historyCalls++;
       return update(...args);
     };
@@ -84,8 +84,9 @@ test('restores local zoom detail and adapts to phone width without fetching hist
     .poll(() =>
       page.evaluate(() => {
         const range = window.zoomRange;
-        return window.card._apexChart.w.config.series[0].data.filter(([time]) => time >= range.min && time <= range.max)
-          .length;
+        return window.card._apexChart.w.config.series[0].data.filter(
+          ([time]: Point) => time >= range.min && time <= range.max,
+        ).length;
       }),
     )
     .toBe(101);
@@ -114,7 +115,7 @@ test('resamples a brush selection independently while retaining full overview ex
         const range = window.card._readChartRange(window.card._apexChart);
         if (!range) return 0;
         const visible = window.card._apexChart.w.config.series[0].data.filter(
-          ([time]) => time >= range.min && time <= range.max,
+          ([time]: Point) => time >= range.min && time <= range.max,
         );
         return visible.length;
       }),
@@ -136,12 +137,12 @@ test('resamples a brush selection independently while retaining full overview ex
     .poll(() =>
       page.evaluate(() => {
         const range = window.card._readChartRange(window.card._apexChart);
-        const full = window.card._graphs[0].history.filter(([time]) => time >= range.min && time <= range.max);
+        const full = window.card._graphs[0].history.filter(([time]: Point) => time >= range.min && time <= range.max);
         const sampled = window.card._apexChart.w.config.series[0].data.filter(
-          ([time]) => time >= range.min && time <= range.max,
+          ([time]: Point) => time >= range.min && time <= range.max,
         );
         const overview = window.card._apexBrush.w.config.series[0].data.filter(
-          ([time]) => time >= range.min && time <= range.max,
+          ([time]: Point) => time >= range.min && time <= range.max,
         );
         return sampled.length > overview.length * 2 && sampled.length <= full.length;
       }),
@@ -184,7 +185,9 @@ for (const initiallyHidden of [false, true]) {
     await expect(legends.nth(1)).not.toHaveClass(/apexcharts-inactive-legend/);
     expect(
       await page.evaluate(() =>
-        window.card._apexBrush.w.config.series.every((series) => !series.hidden && series.data.length > 0),
+        window.card._apexBrush.w.config.series.every(
+          (series: { hidden?: boolean; data: Point[] }) => !series.hidden && series.data.length > 0,
+        ),
       ),
     ).toBe(true);
   });

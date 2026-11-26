@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-const mount = async (page, extra) => {
+const mount = async (page: Page, extra?: Record<string, unknown>) => {
   await page.goto('/');
   await page.waitForFunction(() => window.ready);
-  await page.evaluate((config) => {
+  await page.evaluate((config: Record<string, unknown>) => {
     window.previewConfig = config;
     window.card = window.makeCard(config);
     document.querySelector('#dashboard').appendChild(window.card);
@@ -11,12 +11,12 @@ const mount = async (page, extra) => {
   await page.waitForFunction(() => window.card._dataLoaded && !window.card._updating);
 };
 
-const capture = async (page, name) => {
+const capture = async (page: Page, name: string) => {
   if (!process.env.UPDATE_DOC_IMAGES) return;
   const viewport = page.viewportSize();
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.evaluate(() => {
-    const dashboard = document.querySelector('#dashboard');
+    const dashboard = document.querySelector<HTMLElement>('#dashboard');
     window.originalDashboardStyle = dashboard.getAttribute('style');
     window.originalCardStyle = window.card.getAttribute('style');
     dashboard.style.cssText =
@@ -47,7 +47,7 @@ const capture = async (page, name) => {
   await page.locator('#dashboard').screenshot({ path: `docs/${name}.png` });
   await page.evaluate(() => {
     window.darkPreview.remove();
-    const dashboard = document.querySelector('#dashboard');
+    const dashboard = document.querySelector<HTMLElement>('#dashboard');
     if (window.originalDashboardStyle === null) dashboard.removeAttribute('style');
     else dashboard.setAttribute('style', window.originalDashboardStyle);
     if (window.originalCardStyle === null) window.card.removeAttribute('style');
@@ -57,7 +57,7 @@ const capture = async (page, name) => {
 };
 
 test('calendar controls browse periods, reset current, resize and reconnect', async ({ page }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mount(page, {
     navigation: { show: true },
@@ -128,24 +128,24 @@ test('calendar controls sit above the chart, fit narrow cards and keep a sensibl
   });
   const geometry = () =>
     page.locator('.time-navigation').evaluate((nav) => {
-      const box = (el) => {
+      const box = (el: Element) => {
         const r = el.getBoundingClientRect();
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
       };
-      const root = nav.getRootNode();
+      const root = nav.getRootNode() as ShadowRoot;
       return {
         nav: box(nav),
         graph: box(root.querySelector('#graph-wrapper')),
         step: box(nav.querySelector('.time-navigation-step')),
         periods: box(nav.querySelector('.time-navigation-periods')),
         arrows: Array.from(nav.querySelectorAll('.time-navigation-arrow'), box),
-        periodButtons: Array.from(nav.querySelectorAll('.time-navigation-periods button'), (b) => ({
+        periodButtons: Array.from(nav.querySelectorAll('.time-navigation-periods button'), (b: Element) => ({
           ...box(b),
           overflow: b.scrollWidth > b.clientWidth + 1,
         })),
       };
     });
-  const expectFits = (g) => {
+  const expectFits = (g: Awaited<ReturnType<typeof geometry>>) => {
     expect(g.nav.bottom).toBeLessThanOrEqual(g.graph.top + 1);
     for (const arrow of g.arrows) {
       expect(arrow.width).toBeGreaterThanOrEqual(40);
@@ -161,7 +161,7 @@ test('calendar controls sit above the chart, fit narrow cards and keep a sensibl
 
   for (const width of [200, 260, 320, 440, 520, 700]) {
     await page.evaluate((cardWidth) => {
-      document.querySelector('#dashboard').style.width = `${cardWidth}px`;
+      document.querySelector<HTMLElement>('#dashboard').style.width = `${cardWidth}px`;
     }, width);
     const g = await geometry();
     expectFits(g);
@@ -173,7 +173,7 @@ test('calendar controls sit above the chart, fit narrow cards and keep a sensibl
   }
 
   await page.evaluate(() => {
-    document.querySelector('#dashboard').style.width = '320px';
+    document.querySelector<HTMLElement>('#dashboard').style.width = '320px';
     window.card.style.fontSize = '18px';
     window.card.hass = {
       ...window.card._hass,
@@ -186,7 +186,7 @@ test('calendar controls sit above the chart, fit narrow cards and keep a sensibl
   expectFits(await geometry());
 
   await page.evaluate(() => {
-    document.querySelector('#dashboard').style.width = '700px';
+    document.querySelector<HTMLElement>('#dashboard').style.width = '700px';
     window.card.style.fontSize = '';
     window.card.hass = {
       ...window.card._hass,
@@ -215,13 +215,13 @@ test('navigation.position bottom puts the controls under the chart', async ({ pa
     .locator('.time-navigation')
     .evaluate((el) => [
       el.getBoundingClientRect().top,
-      el.getRootNode().querySelector('#graph-wrapper').getBoundingClientRect().bottom,
+      (el.getRootNode() as ShadowRoot).querySelector('#graph-wrapper').getBoundingClientRect().bottom,
     ]);
   expect(nav).toBeGreaterThanOrEqual(graph - 1);
 });
 
 test('renders integration-supplied range bounds with both headers and missing intervals', async ({ page }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mount(page, {
     chart_type: 'rangeArea',
@@ -259,7 +259,7 @@ test('renders integration-supplied range bounds with both headers and missing in
 });
 
 test('renders bounded aggregated heatmaps and reports over-budget data without truncation', async ({ page }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await mount(page, {
     chart_type: 'heatmap',
@@ -299,12 +299,12 @@ test('renders bounded aggregated heatmaps and reports over-budget data without t
   }));
   expect(data.error).toBeUndefined();
   expect(data.series).toHaveLength(2);
-  expect(data.series.flatMap((row) => row.data).length).toBeLessThanOrEqual(100);
-  expect(data.series[0].data.some((point) => point.y === 0)).toBe(true);
-  expect(data.series[0].data.every((point) => point.y !== null)).toBe(true);
+  expect(data.series.flatMap((row: { data: unknown[] }) => row.data).length).toBeLessThanOrEqual(100);
+  expect(data.series[0].data.some((point: XY) => point.y === 0)).toBe(true);
+  expect(data.series[0].data.every((point: XY) => point.y !== null)).toBe(true);
   const missing = await page.evaluate(() => {
-    const time = window.card._graphs[0].history.find(([, value]) => value === null)?.[0];
-    return { time, painted: window.card._apexChart.w.config.series[0].data.some((point) => point.x === time) };
+    const time = window.card._graphs[0].history.find(([, value]: Point) => value === null)?.[0];
+    return { time, painted: window.card._apexChart.w.config.series[0].data.some((point: XY) => point.x === time) };
   });
   expect(missing.time).toBeDefined();
   expect(missing.painted).toBe(false);
@@ -342,7 +342,7 @@ for (const group_by of [
     const measure = () =>
       page.evaluate((hourBuckets) => {
         const root = window.card.shadowRoot;
-        const box = (el) => el.getBoundingClientRect();
+        const box = (el: Element) => el.getBoundingClientRect();
         const cells = [...root.querySelector('.apexcharts-heatmap-series').querySelectorAll('rect')].map(box);
         const left = cells[0].left;
         const width = (cells.at(-1).right - left) / cells.length;
@@ -420,7 +420,7 @@ test('heatmap tooltip shows the time range of the hovered cell', async ({ page }
     const first = new Date(window.card._getSpanDates().start);
     if (first.getMinutes() || first.getSeconds() || first.getMilliseconds())
       first.setHours(first.getHours() + 1, 0, 0, 0);
-    const pad = (n) => String(n).padStart(2, '0');
+    const pad = (n: number) => String(n).padStart(2, '0');
     return [first.getHours(), (first.getHours() + 1) % 24].map((h) => pad(h) + ':00');
   });
   await expect
@@ -459,7 +459,7 @@ test('heatmap colour bands colour each cell by its value and list the bands in t
   const result = await page.evaluate(() => {
     const root = window.card.shadowRoot;
     const cells = [...root.querySelector('.apexcharts-heatmap-series').querySelectorAll('rect')];
-    const values = window.card._apexChart.w.config.series[0].data.map((point) => point.y);
+    const values = window.card._apexChart.w.config.series[0].data.map((point: XY) => point.y);
     return {
       // colours come back resolved (rgb): compare them as the browser normalises them
       cells: cells.map((cell, i) => {
@@ -492,7 +492,9 @@ test('editor presets require a click and preserve entity identity through the re
       series: [{ entity: 'sensor.temp', name: 'My sensor' }],
     });
     window.editorEvents = [];
-    window.editor.addEventListener('config-changed', (event) => window.editorEvents.push(event.detail.config));
+    window.editor.addEventListener('config-changed', (event: CustomEvent) =>
+      window.editorEvents.push(event.detail.config),
+    );
     window.card.remove();
     document.querySelector('#dashboard').appendChild(window.editor);
   });
@@ -530,7 +532,7 @@ test('calendar buttons work with touch and long-term statistics without extra po
           { entity: 'sensor.temp', type: 'column', statistics: { type: 'mean', period: 'day', align: 'start' } },
         ],
       });
-      window.card._hass.callWS = async (message) => {
+      window.card._hass.callWS = async (message: { type: string; start_time?: string }) => {
         window.requests.push(message);
         const start = Date.parse(message.start_time);
         return { 'sensor.temp': [{ start, end: start + 86400000, mean: 12 }] };
@@ -544,7 +546,7 @@ test('calendar buttons work with touch and long-term statistics without extra po
     expect(await page.evaluate(() => window.requests.length)).toBe(calls + 1);
     expect(
       await page.evaluate(() =>
-        window.requests.every((message) => message.type === 'recorder/statistics_during_period'),
+        window.requests.every((message: { type: string }) => message.type === 'recorder/statistics_during_period'),
       ),
     ).toBe(true);
     expect(await page.evaluate(() => window.card._loadError)).toBeUndefined();
