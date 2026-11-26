@@ -16,9 +16,8 @@ function getPath(root: unknown, path: string): unknown {
   return cur;
 }
 
-// Sets root.<path> = value. When value is `undefined`, '' or null, removes the
-// leaf and prunes any empty objects up the chain so the YAML stays tidy.
-// Returns false, for the caller to drop `root`, on a prototype-polluting path.
+// Sets root.<path>; an empty value removes the leaf and the objects it leaves empty.
+// False on a prototype-polluting path.
 function setPath(root: AnyRec, path: string, value: unknown): boolean {
   const segs = path.split('.');
   const leaf = segs[segs.length - 1];
@@ -44,7 +43,6 @@ function setPath(root: AnyRec, path: string, value: unknown): boolean {
     cur[leaf] = value;
   }
 
-  // Prune empty parent objects bottom-up
   for (let i = parents.length - 1; i > 0; i--) {
     const node = parents[i];
     if (Object.keys(node).length === 0) {
@@ -84,9 +82,8 @@ export function setApexValues(
   return next;
 }
 
-// Read/write to config.yaxis[index].apex_config.<path>.
-// (apexcharts-card overwrites the top-level apex_config.yaxis with its own generated array,
-//  but merges each yaxis entry's per-axis `apex_config` field into the generated entry.)
+// config.yaxis[index].apex_config.<path>: the card replaces apex_config.yaxis with its own
+// axes but merges each axis' own apex_config into them
 export function getApexYaxisValue(config: ChartCardExternalConfig | undefined, index: number, path: string): unknown {
   const yaxis = config?.yaxis?.[index];
   if (!yaxis) return undefined;
@@ -98,7 +95,6 @@ export function getApexYaxisValue(config: ChartCardExternalConfig | undefined, i
 export function setApexYaxisValue(
   config: ChartCardExternalConfig,
   index: number,
-  // axisCount kept for API parity; unused now since we mutate the yaxis array directly
   _axisCount: number,
   path: string,
   value: unknown,
@@ -119,7 +115,6 @@ export function setApexYaxisValue(
   return { ...config, yaxis: yaxisList };
 }
 
-// EVAL wrappers/unwrappers for formatter strings.
 const EVAL_PREFIX = 'EVAL:function(value) {';
 const EVAL_SUFFIX = '}';
 

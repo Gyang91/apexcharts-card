@@ -233,9 +233,8 @@ export class ChartsCard extends LitElement {
 
   disconnectedCallback() {
     this._stopIntervalTimer();
-    // ApexCharts adds a window resize listener that only destroy() removes, so a chart left
-    // alive here keeps the whole card in memory after HA discards it (dashboard save or
-    // navigation). connectedCallback rebuilds it, and the resize observer, via _initialLoad().
+    // Only destroy() removes ApexCharts' window resize listener: a live chart would keep the
+    // card in memory after HA discards it. connectedCallback rebuilds it via _initialLoad().
     this._destroyCharts();
     super.disconnectedCallback();
   }
@@ -308,9 +307,7 @@ export class ChartsCard extends LitElement {
       // A computed series has no entity: it follows the series it is computed from
       if (isComputedSeries(serie)) return;
       if (isExternalStatisticId(serie.entity)) {
-        // No state object exists for external statistic IDs: keep a stable
-        // synthetic entity (enriched with recorder metadata once fetched) so
-        // the card doesn't warn and name/unit resolution keeps working.
+        // External statistic IDs have no state: a stable synthetic one keeps names and units resolving
         if (!this._entities[index]) {
           this._entities[index] = this._buildExternalStatisticEntity(serie.entity);
         }
@@ -456,7 +453,6 @@ export class ChartsCard extends LitElement {
         headerColors[index] = serie.color || defColors[index % defColors.length];
         applySeriesDefaults(serie, index, newConfig.chart_type);
         if (serie.entity || isComputedSeries(serie)) {
-          // disable caching for editor
           const caching = editMode === true ? false : newConfig.cache;
           const graphEntry = new GraphEntry(index, graphSpan, caching, serie, newConfig.span);
           if (this._hass) graphEntry.hass = this._hass;
@@ -491,7 +487,6 @@ export class ChartsCard extends LitElement {
         });
       }
 
-      // Everything is valid: switch the card to the new config
       this._interval = interval;
       this._graphSpan = graphSpan;
       this._offset = offset;
@@ -513,8 +508,6 @@ export class ChartsCard extends LitElement {
     } catch (e: any) {
       throw new Error(`/// apexcharts-card version ${pjson.version} /// ${e.message}`, { cause: e });
     }
-    // Full reset only happens in editor mode
-    // this._reset();
   }
 
   static get styles(): CSSResultGroup {
@@ -675,8 +668,7 @@ export class ChartsCard extends LitElement {
     </nav>`;
   }
 
-  // Changes the period at once (the label updates immediately). While data loads, the
-  // reload for the new period waits for that load to end (see _updateData).
+  // The label changes at once; during a load, the reload waits for that load to end.
   private async _navigate(period: NavigationPeriod, direction?: number): Promise<void> {
     if (!this._config?.navigation?.show || !this._apexChart) return;
     const timeZone = displayTimeZone(this._hass);
@@ -1007,11 +999,9 @@ export class ChartsCard extends LitElement {
     };
   }
 
-  // color_threshold stops span each series' min..max. ApexCharts sizes a vertical
-  // gradient to each path's own bounding box, so a line split by null values gave
-  // the same value different colors in each piece (RomRider#1111). After every
-  // draw, span each threshold gradient over the series' min..max in plot
-  // coordinates instead: the same as before for a line without gaps.
+  // ApexCharts sizes a gradient to each path's own box, so a line split by nulls would colour
+  // the same value differently per piece: span each threshold gradient over the series'
+  // min..max in plot coordinates instead.
   private _configureThresholdGradients(layout: ApexOptions, brush: boolean): void {
     if (!this._thresholdGradientSeries(brush).length) return;
     layout.chart ??= {};
@@ -1134,8 +1124,7 @@ export class ChartsCard extends LitElement {
   }
 
   // A sections cell only has a fixed height when rows is a number. 'auto' rows size to the
-  // content, where filling would freeze the chart at its first height, so section_mode (which
-  // the editor used to recommend for every sections card) only opts in outside sections.
+  // content, where filling would freeze the chart at its first height.
   private _fillsHeight(): boolean {
     if (this.layout === 'grid') return typeof this._config?.grid_options?.rows === 'number';
     return this._config?.section_mode === true;
@@ -1335,13 +1324,11 @@ export class ChartsCard extends LitElement {
       const inHeader = this._config?.series[index].show.in_header;
       if (inHeader && inHeader !== 'raw') {
         if (inHeader === 'after_now' || inHeader === 'before_now') {
-          // before_now / after_now
           this._headerState[index] = graph.nowValue(
             now.getTime() + (this._seriesOffset[index] ? this._seriesOffset[index] : 0),
             inHeader === 'before_now',
           );
         } else {
-          // not raw
           this._headerState[index] = graph.lastState;
         }
       } else if (inHeader === 'raw' && this._hasNoEntityState(index)) {
@@ -1539,8 +1526,8 @@ export class ChartsCard extends LitElement {
     return brushSelection;
   }
 
-  // Loads every series. Computed series come last, in config order: each one
-  // reads the series above it and every non-computed series.
+  // Computed series load last, in config order: each reads the series above it and every
+  // non-computed series.
   private async _updateHistories(
     start: Date,
     end: Date,
@@ -1702,10 +1689,7 @@ export class ChartsCard extends LitElement {
     return myFormatNumber(value, this._hass?.locale, this._config?.series[index]);
   }
 
-  /*
-    Makes the chart start and end at the first / last timestamp of the data when everything displayed is a
-    column and group_by is enabled for every serie
-  */
+  // Columns grouped in every series: the chart starts and ends at the first and last bucket
   private _findStartAndEndOfChart(start: Date, end: Date, brush: boolean): { start: number; end: number } {
     let offsetStart: number | undefined = 0;
     let offsetEnd: number | undefined = 0;
@@ -1753,7 +1737,6 @@ export class ChartsCard extends LitElement {
     let start = new Date(end.getTime() - this._graphSpan + 1);
     const timeZone = displayTimeZone(this._hass);
     if (this._config?.span?.start) {
-      // Just Span
       start = new Date(startOf(end.getTime(), this._config.span.start, timeZone));
       end = new Date(start.getTime() + this._graphSpan);
     } else if (this._config?.span?.end) {
@@ -1816,7 +1799,6 @@ export class ChartsCard extends LitElement {
     return;
   }
 
-  // backward compatibility
   @eventOptions({ passive: true })
   private handleRippleActivate(evt: Event, index: number | string): void {
     const r = this.shadowRoot?.getElementById(`ripple-${index}`) as Ripple;
@@ -1843,10 +1825,8 @@ export class ChartsCard extends LitElement {
   }
 
   public getGridOptions(): { columns: number | 'full'; rows: number | 'auto'; min_columns: number; min_rows: number } {
-    // Charts are content-driven: HA only fixes the card height when `rows` is a
-    // number (fit-rows), which would truncate legends/extra series. `rows: 'auto'`
-    // lets the section grid size the card from its content; user-set grid_options
-    // from the resize handle still win over these defaults.
+    // `rows: 'auto'` sizes the card from its content; a fixed number of rows would cut off
+    // legends. grid_options set with the resize handle still win.
     return {
       columns: 12,
       rows: 'auto',

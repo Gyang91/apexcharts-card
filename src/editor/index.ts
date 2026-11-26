@@ -7,7 +7,7 @@ import { editorStyles } from './styles';
 import { setEditorLocale, t } from './localize';
 import { changeChartType, emptyStash, removeUnsupported, supports, unsupportedSettings } from './support';
 
-// Side-effect imports so the custom elements are registered when the editor is loaded.
+// Registers the custom elements
 import './components/series-editor';
 import './components/header-editor';
 import './components/yaxis-editor';

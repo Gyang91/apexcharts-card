@@ -5,9 +5,7 @@ import { BUCKET_PRESETS, durationField, OFFSET_PRESETS, SMOOTHING_PRESETS } from
 // Schemas below are exposed as functions (not module-level constants) so that option labels
 // re-resolve to the current editor locale on every render.
 
-// Entity field: switches to the statistic picker (ha-statistic-picker) when
-// statistics mode is active, so external statistic IDs (source:object_id)
-// can be selected too.
+// The statistic picker in statistics mode, so external statistic IDs can be picked
 export function getSeriesEntitySchema(statisticsMode: boolean): HaFormSchema[] {
   return [{ name: 'entity', selector: statisticsMode ? { statistic: {} } : { entity: {} } }];
 }
@@ -37,7 +35,6 @@ export function getSeriesSourceSchema(source: SeriesSource, statisticsMode: bool
   ];
 }
 
-// ── Core fields rendered above the expandables (entity is handled separately). ──
 export function getSeriesCoreSchema(): HaFormSchema[] {
   return [
     { name: 'name', selector: { text: {} } },
@@ -139,7 +136,6 @@ export function getSeriesGroupBySchema(): HaFormSchema[] {
   ];
 }
 
-// ── Data processing ── (group_by rendered separately as a custom panel)
 export function getSeriesDataProcessingSchema(): HaFormSchema[] {
   return [
     {
@@ -221,7 +217,6 @@ export function getSeriesDataProcessingSchema(): HaFormSchema[] {
   ];
 }
 
-// ── Appearance ──
 export function getSeriesAppearanceSchema(): HaFormSchema[] {
   return [
     {
@@ -360,7 +355,6 @@ export const SERIES_VISIBILITY_BOOL_FIELDS: { name: string; defaultValue: boolea
   { name: 'zero_in_header', defaultValue: true },
 ];
 
-// ── Advanced ──
 export function getSeriesAdvancedBaseSchema(): HaFormSchema[] {
   return [
     {

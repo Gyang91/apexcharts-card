@@ -7,8 +7,6 @@ import { HaFormSchema } from '../types';
 import { computeHelper, computeLabel } from '../helpers';
 import { t } from '../localize';
 
-// Functions (not module-level constants) so option labels re-resolve to the current locale
-// on every render.
 function getActionOptions(): { value: string; label: string }[] {
   return [
     { value: 'default', label: t('common.default') },
@@ -145,8 +143,7 @@ export class ApexChartsCardActionEditor extends LitElement {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const merged: any = { ...prev };
 
-      // If the action type changed, drop keys that belonged to the old type
-      // (so a stale `service` doesn't linger on a `navigate` action).
+      // A new action type drops the old type's keys, e.g. `service` on a `navigate` action
       if (prevType && prevType !== actionType) {
         const TYPE_KEYS: Record<string, string[]> = {
           'call-service': ['service'],
@@ -160,7 +157,6 @@ export class ApexChartsCardActionEditor extends LitElement {
 
       merged.action = actionType;
 
-      // Overwrite only the keys that belong to the chosen action type.
       if (actionType === 'call-service') {
         merged.service = data.service || '';
       } else if (actionType === 'navigate') {
@@ -175,7 +171,6 @@ export class ApexChartsCardActionEditor extends LitElement {
         }
       }
 
-      // Haptic: empty string clears it, otherwise set.
       if (data.haptic === '' || data.haptic === undefined) {
         delete merged.haptic;
       } else {
@@ -224,7 +219,6 @@ export class ApexChartsCardActionEditor extends LitElement {
     if (!this.hass) return html``;
     const data = this._formData();
     if (data.action === 'default') {
-      // Use a single dropdown form when no action is configured.
       return html`
         <ha-form
           .hass=${this.hass}

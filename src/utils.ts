@@ -84,9 +84,8 @@ export function mergeDeep(target: any, source: any): any {
   return mergeDeepWith(target, source, 'concat');
 }
 
-// External long-term statistics use a `source:object_id` ID (e.g.
-// `veolia:1235075_daily_consumption`) instead of an `entity_id`: they have no
-// state object in `hass.states` and no recorder history, only LTS data.
+// External statistics use a `source:object_id` ID (e.g. `veolia:1235075_daily_consumption`):
+// no state object and no recorder history, only long-term statistics.
 export function isExternalStatisticId(entityId: string | undefined): entityId is string {
   return !!entityId && /^[a-z0-9_]+:[a-z0-9_]+$/.test(entityId);
 }

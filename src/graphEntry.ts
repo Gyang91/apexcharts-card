@@ -79,8 +79,6 @@ export default class GraphEntry {
 
   private _cache: boolean;
 
-  // private _hoursToShow: number;
-
   private _graphSpan: number;
 
   private _useCompress = false;
@@ -102,12 +100,10 @@ export default class GraphEntry {
 
   private _md5Config: string;
 
-  // External statistic IDs (source:object_id) have no state object in
-  // hass.states: everything relying on _entityState must be bypassed.
+  // External statistic IDs (source:object_id) have no state object: bypass _entityState
   private _isExternalStat: boolean;
 
-  // Set when span padding is applied: the header/legend must keep showing the
-  // last REAL value, not the trailing null padding points.
+  // With span padding, the header keeps the last real value, not the trailing null padding
   private _lastRealState: number | null | undefined = undefined;
 
   // Recent history of the previous refresh, extended incrementally
@@ -150,7 +146,7 @@ export default class GraphEntry {
     this._func = aggregateFuncMap[config.group_by.func];
     this._realEnd = new Date();
     this._realStart = new Date();
-    // Valid because tested during init;
+    // Valid: checked when the config was set
 
     this._groupByDurationMs = parse(this._config.group_by.duration)!;
     this._groupByOffsetMs =
@@ -305,7 +301,6 @@ export default class GraphEntry {
       return false;
     this._updating = true;
     // Always release the lock: a failed fetch must not freeze this series
-    // until the page is reloaded.
     try {
       return await this._computeHistory(start, end, inputs);
     } finally {
@@ -329,8 +324,7 @@ export default class GraphEntry {
     const startHistory = new Date(boundaries ? boundaries[0] : start);
     this._lastRealState = undefined;
 
-    // ignore_history is never set for statistics series (hence never for
-    // external statistic IDs), so _entityState is always defined here.
+    // ignore_history is never set for statistics series, so _entityState is defined here
     if (this._config.ignore_history && this._entityState) {
       let currentState: null | number | string;
       if (this._config.attribute) {
@@ -370,10 +364,10 @@ export default class GraphEntry {
           skipInitialState = true;
         }
         if (currDataIndex > 4) {
-          // >4 so that the graph has some more history
+          // Keep 4 earlier points so the graph starts with some history
           history.data = history.data.slice(currDataIndex === 0 ? 0 : currDataIndex - 4);
         } else if (currDataIndex === -1) {
-          // there was no state which could be used in current graph so clearing
+          // No state usable in the current graph
           history.data = [];
         }
       } else {
@@ -455,12 +449,8 @@ export default class GraphEntry {
             ];
           });
 
-          // Column widths in ApexCharts derive from the smallest gap between
-          // consecutive points: a single (or irregular) statistics bucket makes
-          // the column span (almost) the whole graph. Since the bucket interval
-          // is known by construction, pad the whole [start, end] span with
-          // empty ([ts, null]) buckets so the spacing is always regular.
-          // group_by (non-raw) series are already padded by _dataBucketer.
+          // ApexCharts sizes columns from the smallest gap between points: pad the span with
+          // empty buckets so one bucket does not span the whole graph. group_by is padded already.
           if (this._config.type === 'column' && this._config.group_by.func === 'raw') {
             this._lastRealState = newStateHistory.length ? newStateHistory[newStateHistory.length - 1][1] : null;
             newStateHistory = this._padStatisticsSpan(newStateHistory, newHistory, start, end);
@@ -475,10 +465,7 @@ export default class GraphEntry {
         });
         if (newHistory && newHistory.length > 0) {
           updateGraphHistory = true;
-          /*
-          hack because HA doesn't return anything if skipInitialState is false
-          when retrieving for attributes so we retrieve it and we remove it.
-          */
+          // HA returns nothing for attributes without the initial state: fetch it, then drop it
           if (this._needsFullHistoryRows && skipInitialState) {
             newHistory.shift();
           }
@@ -560,9 +547,8 @@ export default class GraphEntry {
     return true;
   }
 
-  // Display timestamp of a statistics bucket according to `statistics.align`.
-  // Recorder API buckets carry epoch-ms start/end (internal gap fillers store
-  // them as numeric strings, hence the Number() at the call sites).
+  // Display timestamp of a statistics bucket according to `statistics.align`. Gap fillers
+  // store start/end as numeric strings, hence Number() at the call sites.
   private _statDisplayDate(startMs: number, endMs: number): number {
     const align = this._config.statistics?.align || 'middle';
     if (align === 'start') return startMs;
@@ -570,12 +556,8 @@ export default class GraphEntry {
     return startMs + (endMs - startMs) / 2;
   }
 
-  // Pad the whole [start, end] span with [ts, null] points at every statistics
-  // bucket boundary that carries no data, so ApexCharts always sees a constant
-  // interval between points (correct column width even with a single bucket).
-  // Boundaries are anchored on the real API bucket timestamps and extended with
-  // calendar arithmetic (src/calendar.ts), which follows local DST transitions for
-  // day/week/month periods instead of assuming fixed-length periods.
+  // [ts, null] at every empty statistics bucket of [start, end], so ApexCharts sees a constant
+  // interval. Extended from the real buckets with calendar arithmetic, which follows DST.
   private _padStatisticsSpan(
     points: EntityCachePoints,
     stats: StatisticValue[],
@@ -700,9 +682,8 @@ export default class GraphEntry {
       const index = findBucketIndex(buckets, entry[0]);
       if (index !== -1) buckets[index].data.push(entry);
     });
-    // Last point before the first bucket: the value the entity held when the
-    // range starts. Cached history keeps such points, but they fall outside
-    // every bucket, so seed `fill: last` and `start_with_last` from it.
+    // The last point before the first bucket is the value held when the range starts: it
+    // seeds `fill: last` and `start_with_last`.
     const firstIndexAfterStart = buckets.length
       ? history.data.findIndex((entry) => entry[0] > buckets[0].timestamp)
       : -1;
@@ -733,12 +714,10 @@ export default class GraphEntry {
         }
       }
     });
-    // Drop the first bucket when it starts before the range (partial), and the
-    // closing boundary. A rolling window starts 1 ms after a bucket boundary
-    // (graph_span + 1 ms), so a bucket starting there is complete and kept.
+    // Drop a first bucket that starts before the range (partial) and the closing boundary. A
+    // rolling window starts 1 ms after a boundary, so a bucket starting there is complete.
     if (buckets[0]?.timestamp < start.getTime() - 1) buckets.shift();
     buckets.pop();
-    // Remove nulls at the end
     while (
       buckets.length > 0 &&
       (buckets[buckets.length - 1].data.length === 0 ||

@@ -1,8 +1,6 @@
 import { LitElement } from 'lit';
 import { HomeAssistant } from 'custom-card-helpers';
 
-// ── ha-form schema types ──
-
 export interface HaFormSchema {
   name: string;
   required?: boolean;
@@ -23,9 +21,7 @@ export interface EditorTab {
   icon: string;
 }
 
-// `label` holds a translation KEY here (not display text) — EDITOR_TABS is a module-level
-// constant evaluated before the editor locale is known. Resolve the actual text with
-// `t(tab.label)` at the point of use (see index.ts).
+// `label` is a translation key: resolve it with t() when rendering
 export const EDITOR_TABS: EditorTab[] = [
   { label: 'tabs.general', icon: 'mdi:cog' },
   { label: 'tabs.series', icon: 'mdi:chart-line' },
@@ -38,8 +34,6 @@ export const EDITOR_TABS: EditorTab[] = [
 export const SEL_TRUE = '_true';
 export const SEL_FALSE = '_false';
 export const SEL_UNDEFINED = '_undefined';
-
-// ── HA component type declarations ──
 
 declare global {
   interface HTMLElementTagNameMap {
