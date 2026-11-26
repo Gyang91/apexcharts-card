@@ -637,11 +637,28 @@ In the UI:
 
 ## Data processing steps
 
-This diagram shows how your data goes through all the steps allowed by this card:
+Each series goes through these steps, in this order:
 
-![data_processing_steps](docs/data_processing_chart.png)
+![How a series' data is processed: source, transform, fill_raw, group_by, header value, offsets, extend_to, invert, chart shape, downsample](docs/data_processing_chart.png)
 
-A [computed series](#compute-option) comes after these steps: it starts from the processed data of the series it reads, then goes through its own `group_by` and the display steps.
+1. **Source**, one per series:
+   - recent history from Home Assistant (the default);
+   - [`statistics`](#statistics-options): long-term statistics, with empty periods padded;
+   - `ignore_history`: the current state only;
+   - [`data_generator`](#data_generator-option): its points are used as returned;
+   - a [computed series](#compute-option): built from the processed data of the series above it, with their offsets applied.
+2. **`transform`, then `fill_raw`**: for history, statistics and `ignore_history`. Not for `data_generator` or computed series.
+3. **[`group_by`](#group_by-options)**, unless `func` is `raw`: points go into buckets (calendar `period`, or `duration` with its `offset`), each bucket is reduced by `func`, empty buckets follow `fill` and `start_with_last`, and `align` places the point in its bucket.
+4. **Header value**: the last value, or the live state (`in_header: raw`), or the value just before or after now.
+5. **Display**, the data itself stays as it is:
+   - `offset` and `time_delta` shift the series in time;
+   - `extend_to` carries the last value to the end of the chart or to now (not for columns);
+   - `invert` flips the sign;
+   - `in_chart` and `in_brush` decide where the series is drawn;
+   - range bands pair a lower and an upper series, heatmaps make one row per series;
+   - [`downsample`](#large-history-performance) reduces the points drawn for line and area series.
+
+The diagram's source is [`docs/data_processing_chart.mmd`](docs/data_processing_chart.mmd) (Mermaid).
 
 ## Using the card
 

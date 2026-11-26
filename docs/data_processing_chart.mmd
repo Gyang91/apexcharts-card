@@ -1,0 +1,39 @@
+%% Source of docs/data_processing_chart.png: how one series' data is processed.
+%% Render with mermaid (e.g. https://mermaid.live) and replace the PNG after a change.
+%% Colours follow the original diagram: sources yellow, steps green, chart blue.
+flowchart TD
+  start([START]) --> src{Source}
+  src --> hist(Home Assistant<br/>history)
+  src --> stats("<code>statistics</code><br/>empty periods padded")
+  src --> now("<code>ignore_history</code><br/>current state only")
+  src --> gen("<code>data_generator</code>")
+  src --> comp("<code>compute</code><br/>from the series above")
+  hist --> tr("<code>transform</code>")
+  stats --> tr
+  now --> tr
+  tr --> fr("<code>fill_raw</code>")
+  fr --> gb{"<code>group_by</code>?"}
+  gen --> gb
+  comp --> gb
+  gb -->|yes| fd("<code>period</code> / <code>duration</code><br/>+ <code>offset</code>")
+  fd --> fn("<code>func</code>")
+  fn --> gf("<code>fill</code> /<br/><code>start_with_last</code>")
+  gf --> al("<code>align</code>")
+  gb -->|no| hv
+  al --> hv(header value<br/><code>in_header</code>)
+  hv --> sh("<code>offset</code> /<br/><code>time_delta</code>")
+  sh --> ext("<code>extend_to</code>")
+  ext --> inv("<code>invert</code>")
+  inv --> sp("<code>in_chart</code> /<br/><code>in_brush</code>")
+  sp --> shape(range band /<br/>heatmap shape)
+  shape --> ds("<code>downsample</code>")
+  ds --> chart(Display<br/>Chart)
+
+  classDef source fill:#fff2cc,stroke:#d6b656,color:#000
+  classDef step fill:#d5e8d4,stroke:#82b366,color:#000
+  classDef output fill:#dae8fc,stroke:#6c8ebf,color:#000
+  classDef plain fill:#fff,stroke:#fff,color:#000
+  class hist,stats,now,gen,comp source
+  class tr,fr,gb,fd,fn,gf,al,hv,sh,ext,inv,sp,shape,ds,src step
+  class chart output
+  class start source
