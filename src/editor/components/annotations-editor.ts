@@ -2,6 +2,7 @@ import { LitElement, html, TemplateResult, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { computeColor } from '../../utils';
 import { t } from '../localize';
+import { formField } from './form-field';
 
 const ICON_DELETE = 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
 const ICON_ADD = 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z';
@@ -95,23 +96,24 @@ export class ApexChartsCardAnnotationsEditor extends LitElement {
           (item, i) => html`
             <div class="annotation-row">
               <div class="annotation-field">
-                <ha-textfield
-                  class="annotation-input"
-                  label=${t('field.value')}
-                  placeholder=${valuePlaceholder}
-                  .value=${item.value === undefined ? '' : String(item.value)}
-                  @change=${(ev: Event) => this._update(i, { value: (ev.target as HTMLInputElement).value })}
-                ></ha-textfield>
+                ${formField({
+                  name: 'value',
+                  value: item.value === undefined ? '' : String(item.value),
+                  selector: { text: {} },
+                  label: `${t('field.value')} (${valuePlaceholder})`,
+                  onChange: (value) => this._update(i, { value: String(value ?? '') }),
+                })}
                 <div class="annotation-helper">${valueHelper}</div>
               </div>
               <div class="annotation-field">
-                <ha-textfield
-                  class="annotation-input"
-                  label=${t('field.label')}
-                  placeholder=${t('annotations.label.placeholder')}
-                  .value=${item.label || ''}
-                  @change=${(ev: Event) => this._update(i, { label: (ev.target as HTMLInputElement).value })}
-                ></ha-textfield>
+                ${formField({
+                  name: 'label',
+                  value: item.label || '',
+                  selector: { text: {} },
+                  label: t('field.label'),
+                  helper: t('annotations.label.placeholder'),
+                  onChange: (value) => this._update(i, { label: String(value ?? '') }),
+                })}
               </div>
               <div class="annotation-field">
                 <div class="annotation-color-row">
@@ -125,13 +127,14 @@ export class ApexChartsCardAnnotationsEditor extends LitElement {
                       @input=${(ev: Event) => this._update(i, { color: (ev.target as HTMLInputElement).value })}
                     />
                   </label>
-                  <ha-textfield
-                    class="annotation-input"
-                    label=${t('field.color')}
-                    placeholder="#ff0000, red, var(--my-color)"
-                    .value=${item.color || ''}
-                    @change=${(ev: Event) => this._update(i, { color: (ev.target as HTMLInputElement).value })}
-                  ></ha-textfield>
+                  ${formField({
+                    name: 'color',
+                    value: item.color || '',
+                    selector: { text: {} },
+                    label: t('field.color'),
+                    helper: t('helper.color'),
+                    onChange: (value) => this._update(i, { color: String(value ?? '') }),
+                  })}
                   <ha-icon-button
                     .path=${ICON_DELETE}
                     .label=${t('annotations.remove')}

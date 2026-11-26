@@ -19,6 +19,9 @@ import type { ChartCardExternalConfig } from '../src/types-config';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRec = Record<string, any>;
 
+const labelled = (list: AnyRec, label: string) =>
+  [...list.shadowRoot.querySelectorAll('ha-form')].filter((form: AnyRec) => form.schema?.[0]?.label === label).length;
+
 const BANDS = [
   { value: 22, color: '#d8b13a', name: 'warm' },
   { value: 20, color: '#5fa772', name: 'comfort' },
@@ -130,7 +133,7 @@ describe('heatmap bands in the visual editor', () => {
     expect(list.third).toBe('name');
     expect(list.thresholds).toEqual(BANDS);
     await list.updateComplete;
-    expect(list.shadowRoot.querySelectorAll('ha-textfield[label="Name"]').length).toBe(3);
+    expect(labelled(list, t('field.name'))).toBe(3);
 
     const line = display({ type: 'custom:apexcharts-card', series: [{ entity: 'sensor.a' }] });
     await line.updateComplete;
@@ -154,8 +157,8 @@ describe('heatmap bands in the visual editor', () => {
     list.thresholds = [{ value: 1, color: 'red', opacity: 0.5 }];
     document.body.appendChild(list as unknown as Node);
     await list.updateComplete;
-    expect(list.shadowRoot.querySelectorAll('ha-textfield[label="Opacity"]').length).toBe(1);
-    expect(list.shadowRoot.querySelectorAll('ha-textfield[label="Name"]').length).toBe(0);
+    expect(labelled(list, t('field.opacity'))).toBe(1);
+    expect(labelled(list, t('field.name'))).toBe(0);
     expect(list.shadowRoot.querySelector('.add-button').textContent).toContain('Add Threshold');
   });
 });
@@ -238,7 +241,7 @@ describe('heatmap bands panel', () => {
     const ranges = [...list.shadowRoot.querySelectorAll('.band-range')].map((el: Element) => el.textContent);
     expect(ranges).toEqual(['22 – 23 °C', '< 22 °C', '≥ 23 °C']);
     expect(list.shadowRoot.querySelectorAll('.band-bar div').length).toBe(3);
-    expect(list.shadowRoot.querySelector('ha-textfield').getAttribute('label')).toBe(`${t('field.value')} (°C)`);
+    expect(list.shadowRoot.querySelector('ha-form').schema[0].label).toBe(`${t('field.value')} (°C)`);
   });
 
   it('suggests bands from the recorded min and max', async () => {
