@@ -123,6 +123,18 @@ describe('getLayoutConfig', () => {
     expect(mixed.tooltip.x?.show).not.toBe(true);
   });
 
+  it('ignores prototype keys in apex_config, also with EVAL functions', () => {
+    const apex_config = JSON.parse(
+      '{"__proto__": {"polluted": "EVAL:() => 1", "evil": true}, "constructor": {"prototype": {"evil": true}}, "chart": {"height": 200}}',
+    );
+    const config = internalConfig({ apex_config });
+    const layout = getLayoutConfig(config, mkHass(), []) as AnyRec;
+    expect(({} as AnyRec).polluted).toBeUndefined();
+    expect(({} as AnyRec).evil).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(layout, 'constructor')).toBe(false);
+    expect(layout.chart.height).toBe(200);
+  });
+
   it('keeps time labels when series use different periods or none', () => {
     const config = internalConfig({
       series: [

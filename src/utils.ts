@@ -38,9 +38,6 @@ export function log(message: unknown): void {
 
 const isObject = (obj: unknown): boolean => !!obj && typeof obj === 'object';
 
-// Keys that would reach Object.prototype through user-supplied YAML/JSON
-const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
 // How two arrays under the same key are combined:
 // 'concat' appends the source items, 'byIndex' merges item by item in place.
 type ArrayMerge = 'concat' | 'byIndex';
@@ -59,7 +56,9 @@ function mergeDeepWith(target: any, source: any, arrays: ArrayMerge): any {
   }
 
   Object.keys(source).forEach((key) => {
-    if (UNSAFE_KEYS.has(key)) return;
+    // Keys that would reach Object.prototype through user-supplied YAML/JSON.
+    // Compared inline: CodeQL recognises this form as a prototype-pollution guard.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
     const targetValue = target[key];
     const sourceValue = source[key];
 
