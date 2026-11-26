@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.23.0](https://github.com/Gyang91/apexcharts-card/compare/v2.22.0...v2.23.0) (2026-11-26)
+
+
+### Features
+
+* **heatmap:** colour bands show their range and unit, and can be suggested from data ([9fd4a63](https://github.com/Gyang91/apexcharts-card/commit/9fd4a63bad6d10b22e96bce6d33fa29bd0de980d))
+
 ## [2.22.0](https://github.com/Gyang91/apexcharts-card/compare/v2.21.2...v2.22.0) (2026-11-26)
 
 
