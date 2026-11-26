@@ -1,0 +1,46 @@
+name: HA frontend check
+
+# Home Assistant can drop an element the editor renders (it removed ha-textfield, and those
+# fields went blank). Each week, and when our source changes, check that its frontend still
+# provides every element and form selector we use. A scheduled failure opens an issue.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  pull_request:
+    branches: [main]
+    paths: ['src/**', 'scripts/check-ha-frontend.ts']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: HA frontend provides what we use
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26.12.1'
+      - name: Fetch the HA frontend components
+        run: |
+          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/home-assistant/frontend.git "$RUNNER_TEMP/frontend"
+          git -C "$RUNNER_TEMP/frontend" sparse-checkout set src/components src/panels/lovelace/components
+      - name: Check
+        id: check
+        shell: bash # -o pipefail: the check's failure, not tee's success
+        run: node scripts/check-ha-frontend.ts "$RUNNER_TEMP/frontend" | tee "$RUNNER_TEMP/report.txt"
+      - name: Open an issue
+        if: failure() && steps.check.outcome == 'failure' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="HA frontend no longer provides something the card uses"
+          if [ -z "$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')" ]; then
+            gh issue create --title "$title" --body-file "$RUNNER_TEMP/report.txt"
+          fi

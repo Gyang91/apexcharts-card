@@ -341,42 +341,6 @@ export const editorStyles = css`
     }
   }
 
-  /* Boolean grid (custom switch rows with left-aligned switch + label) */
-  .bool-grid {
-    display: grid;
-    gap: 8px 16px;
-    margin: 4px 0;
-  }
-  .bool-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-  .bool-row-text {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    flex: 1;
-  }
-  .bool-row-label {
-    color: var(--primary-text-color);
-    font-size: 0.95em;
-    line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .bool-row-helper {
-    color: var(--secondary-text-color);
-    font-size: 0.78em;
-    line-height: 1.2;
-    margin-top: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   /* Inline grid */
   .grid-2 {
     display: grid;
