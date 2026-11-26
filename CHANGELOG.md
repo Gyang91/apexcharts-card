@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.23.9](https://github.com/Gyang91/apexcharts-card/compare/v2.23.8...v2.23.9) (2026-11-26)
+
+
+### Bug Fixes
+
+* a saved config redraws the dashboard card without a page reload ([bf73ec2](https://github.com/Gyang91/apexcharts-card/commit/bf73ec275275d73029ad2cc7a4ed54a6a7cfd587))
+
 ## [2.23.8](https://github.com/Gyang91/apexcharts-card/compare/v2.23.7...v2.23.8) (2026-11-26)
 
 
