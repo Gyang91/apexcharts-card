@@ -1,5 +1,5 @@
 import { LitElement, html, TemplateResult, nothing, CSSResultGroup } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { editorStyles } from '../styles';
 import {
@@ -7,7 +7,7 @@ import {
   ChartCardExternalConfig,
   ChartCardSeriesExternalConfig,
 } from '../../types-config';
-import { computeColor, isComputedSeries, isExternalStatisticId } from '../../utils';
+import { isComputedSeries, isExternalStatisticId } from '../../utils';
 import { COMPUTE_EXCLUDED_OPTIONS } from '../../const';
 import { HaFormSchema } from '../types';
 import {
@@ -16,6 +16,8 @@ import {
   fromSelectValue,
   parseStrokeDash,
   serializeStrokeDash,
+  SMOOTHING_PRESETS,
+  smoothingOf,
   toSelectValue,
 } from '../helpers';
 import {
@@ -26,16 +28,21 @@ import {
   getSeriesSourceSchema,
   SeriesSource,
   getSeriesGroupBySchema,
+  getSmoothingSchema,
   getSeriesVisibilitySelectSchema,
   SERIES_VISIBILITY_BOOL_FIELDS,
 } from '../schemas/series';
 import { BoolField } from './bool-grid';
 import { t } from '../localize';
 import './color-threshold-editor';
+import './color-input';
 import './actions-editor';
 import './bool-grid';
 
 type Series = ChartCardSeriesExternalConfig | ChartCardAllSeriesExternalConfig;
+
+// Chart types colour thresholds work with (README, color_threshold experimental feature)
+const THRESHOLD_CHART_TYPES = ['line', 'radialBar', 'pie', 'donut'];
 
 // Body a new computed series starts with: valid, and shows where the values are
 const COMPUTE_STARTER = 'return null; // e.g. return values.import - values.export;';
@@ -68,18 +75,6 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
         composed: true,
       }),
     );
-  }
-
-  private _swatch(): string {
-    const s = this.series;
-    if (s?.color) {
-      try {
-        return computeColor(s.color);
-      } catch {
-        return 'transparent';
-      }
-    }
-    return 'transparent';
   }
 
   // ── Field handlers ──
@@ -126,22 +121,10 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
     this._fire(updates);
   };
 
-  private _colorChanged = (ev: Event): void => {
-    const value = (ev.target as HTMLInputElement).value;
-    this._fire({ color: value || undefined } as Partial<Series>);
+  private _colorChanged = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    this._fire({ color: ev.detail.value } as Partial<Series>);
   };
-
-  private _swatchHex(): string {
-    const s = this.series;
-    if (s?.color) {
-      try {
-        return computeColor(s.color);
-      } catch {
-        return '#000000';
-      }
-    }
-    return '#000000';
-  }
 
   private _dataProcessingData(): Record<string, unknown> {
     const s = this.series || {};
@@ -162,6 +145,26 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
       align: g.align || '',
     };
   }
+
+  // Custom stays open once picked, even when its values happen to match a preset
+  @state() private _customSmoothing = false;
+
+  private _smoothing(): string {
+    const preset = smoothingOf(this.series?.group_by);
+    return this._customSmoothing ? 'custom' : preset;
+  }
+
+  private _smoothingChanged = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    const picked = (ev.detail.value as { smoothing?: string }).smoothing;
+    this._customSmoothing = picked === 'custom';
+    if (!picked || picked === 'custom') return;
+    const g: NonNullable<Series['group_by']> = { ...(this.series?.group_by || {}) };
+    delete g.func;
+    delete g.duration;
+    if (picked !== 'none') Object.assign(g, SMOOTHING_PRESETS[picked]);
+    this._fire({ group_by: Object.keys(g).length > 0 ? g : undefined } as Partial<Series>);
+  };
 
   private _groupByChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
@@ -431,7 +434,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
   protected render(): TemplateResult {
     if (!this.hass || !this.series) return html``;
     const s = this.series as ChartCardSeriesExternalConfig;
-    const showColorThreshold = !this.isAllSeriesConfig && this.config?.experimental?.color_threshold;
+    const showColorThreshold =
+      !this.isAllSeriesConfig && THRESHOLD_CHART_TYPES.includes(this.config?.chart_type ?? 'line');
     const showHeaderActions = !this.isAllSeriesConfig;
     const yaxisIdSchema = this._yaxisIdSchema();
 
@@ -483,19 +487,10 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
         <ha-expansion-panel outlined header=${t('series.panel.appearance')}>
           <div class="section">
-            <div class="color-field">
-              <span class="color-field-label">${t('field.color')}</span>
-              <label class="color-preview" title=${t('common.pickColor')}>
-                <span style="display:block;width:100%;height:100%;background: ${this._swatch()};"></span>
-                <input type="color" .value=${this._swatchHex()} @input=${this._colorChanged} />
-              </label>
-              <ha-textfield
-                label=${t('field.color')}
-                .value=${s.color || ''}
-                placeholder=${t('series.color.placeholder')}
-                @change=${this._colorChanged}
-              ></ha-textfield>
-            </div>
+            <apexcharts-card-color-input
+              .value=${s.color}
+              @value-changed=${this._colorChanged}
+            ></apexcharts-card-color-input>
             <ha-form
               .hass=${this.hass}
               .data=${this._appearanceData()}
@@ -538,29 +533,37 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
         <ha-expansion-panel outlined header=${t('series.panel.dataProcessing')}>
           <div class="section">
-            <ha-expansion-panel outlined header=${t('field.group_by')}>
-              <div class="section">
-                <ha-form
-                  .hass=${this.hass}
-                  .data=${this._groupByData()}
-                  .schema=${getSeriesGroupBySchema()}
-                  .computeLabel=${computeLabel}
-                  .computeHelper=${computeHelper}
-                  @value-changed=${this._groupByChanged}
-                ></ha-form>
-                <apexcharts-card-bool-grid
-                  .fields=${[
-                    {
-                      name: 'start_with_last',
-                      label: computeLabel({ name: 'start_with_last' } as HaFormSchema),
-                      value: !!this.series?.group_by?.start_with_last,
-                    },
-                  ]}
-                  .columns=${1}
-                  @value-changed=${this._groupByStartWithLastChanged}
-                ></apexcharts-card-bool-grid>
-              </div>
-            </ha-expansion-panel>
+            <ha-form
+              .hass=${this.hass}
+              .data=${{ smoothing: this._smoothing() }}
+              .schema=${getSmoothingSchema()}
+              .computeLabel=${computeLabel}
+              .computeHelper=${computeHelper}
+              @value-changed=${this._smoothingChanged}
+            ></ha-form>
+            ${
+              this._smoothing() === 'custom'
+                ? html`<ha-form
+                      .hass=${this.hass}
+                      .data=${this._groupByData()}
+                      .schema=${getSeriesGroupBySchema()}
+                      .computeLabel=${computeLabel}
+                      .computeHelper=${computeHelper}
+                      @value-changed=${this._groupByChanged}
+                    ></ha-form>
+                    <apexcharts-card-bool-grid
+                      .fields=${[
+                        {
+                          name: 'start_with_last',
+                          label: computeLabel({ name: 'start_with_last' } as HaFormSchema),
+                          value: !!this.series?.group_by?.start_with_last,
+                        },
+                      ]}
+                      .columns=${1}
+                      @value-changed=${this._groupByStartWithLastChanged}
+                    ></apexcharts-card-bool-grid>`
+                : nothing
+            }
             ${
               this._source() === 'compute'
                 ? nothing
@@ -591,6 +594,11 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
           showColorThreshold
             ? html`
                 <ha-expansion-panel outlined header=${t('series.panel.colorThresholds')}>
+                  ${
+                    this.config?.experimental?.color_threshold
+                      ? nothing
+                      : html`<div class="hint">${t('hint.thresholdsExperimental')}</div>`
+                  }
                   <apexcharts-card-color-threshold-editor
                     .thresholds=${s.color_threshold || []}
                     @value-changed=${this._thresholdsChanged}

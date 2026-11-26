@@ -1,12 +1,8 @@
 import { HaFormSchema, SEL_FALSE, SEL_TRUE, SEL_UNDEFINED } from '../types';
 import { t } from '../localize';
+import { durationField, INTERVAL_PRESETS, OFFSET_PRESETS, SPAN_PRESETS } from '../helpers';
 
-export const GENERAL_TOP_SCHEMA: HaFormSchema[] = [
-  {
-    name: 'graph_span',
-    selector: { text: {} },
-  },
-];
+export const GENERAL_TOP_SCHEMA: HaFormSchema[] = [durationField('graph_span', SPAN_PRESETS)];
 
 // Layout select, rendered side-by-side with the `stacked` bool-grid switch.
 // A function (not a module-level constant) so option labels re-resolve to the current locale
@@ -34,8 +30,8 @@ export function getGeneralBottomSchema(): HaFormSchema[] {
       type: 'grid',
       name: '',
       schema: [
-        { name: 'update_interval', selector: { text: {} } },
-        { name: 'update_delay', selector: { text: {} } },
+        durationField('update_interval', INTERVAL_PRESETS),
+        durationField('update_delay', ['500ms', '1500ms', '3s', '5s']),
       ],
     },
     {
@@ -94,11 +90,7 @@ export function getGeneralBottomSchema(): HaFormSchema[] {
             },
           },
         },
-        {
-          name: 'offset',
-          helper: t('general.span.offset.helper'),
-          selector: { text: {} },
-        },
+        durationField('offset', OFFSET_PRESETS, t('general.span.offset.helper')),
       ],
     },
   ];

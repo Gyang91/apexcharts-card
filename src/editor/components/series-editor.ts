@@ -139,6 +139,11 @@ export class ApexChartsCardSeriesEditor extends LitElement {
     }
     const series = [...(this.config.series || [])];
     series[index] = updatedSeries;
+    // Thresholds only take effect with the experimental switch: turn it on with the first one
+    if (updatedSeries.color_threshold?.length && !this.config.experimental?.color_threshold) {
+      this._fire({ series, experimental: { ...this.config.experimental, color_threshold: true } });
+      return;
+    }
     this._fire({ series });
   }
 

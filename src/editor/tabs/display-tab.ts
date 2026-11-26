@@ -22,6 +22,7 @@ import { t } from '../localize';
 import '../components/header-editor';
 import '../components/color-list-editor';
 import '../components/color-threshold-editor';
+import '../components/color-input';
 import '../components/bool-grid';
 import '../components/annotations-editor';
 
@@ -65,7 +66,10 @@ export class ApexChartsCardEditorDisplay extends LitElement {
 
   private _nowChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
-    const data = ev.detail.value as { color?: string; label?: string };
+    this._setNow(ev.detail.value);
+  };
+
+  private _setNow(data: { color?: string; label?: string }): void {
     const existing = this.config?.now || {};
     const next: NonNullable<ChartCardExternalConfig['now']> = { ...existing };
     if ('color' in data) {
@@ -77,7 +81,7 @@ export class ApexChartsCardEditorDisplay extends LitElement {
       else delete next.label;
     }
     this._fire({ now: Object.keys(next).length > 0 ? next : undefined });
-  };
+  }
 
   private _nowShowChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
@@ -460,9 +464,16 @@ export class ApexChartsCardEditorDisplay extends LitElement {
               .columns=${1}
               @value-changed=${this._nowShowChanged}
             ></apexcharts-card-bool-grid>
+            <apexcharts-card-color-input
+              .value=${cfg.now?.color}
+              @value-changed=${(ev: CustomEvent) => {
+                ev.stopPropagation();
+                this._setNow({ color: ev.detail.value });
+              }}
+            ></apexcharts-card-color-input>
             <ha-form
               .hass=${this.hass}
-              .data=${{ color: cfg.now?.color || '', label: cfg.now?.label || '' }}
+              .data=${{ label: cfg.now?.label || '' }}
               .schema=${NOW_SCHEMA}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}

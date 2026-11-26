@@ -1619,6 +1619,8 @@ Generates the same result as repeating the configuration in each series:
 
 `color_threshold` is an experimental feature for now since enabling it will break some other default features.
 
+In the visual editor, each series has a **Color Thresholds** panel. Adding the first threshold there turns `experimental.color_threshold` on for you.
+
 If enabled, it might:
 * display the wrong series color in the tooltip in some cases (series with data points not aligned mostly)
 * display thin columns instead of the standard size

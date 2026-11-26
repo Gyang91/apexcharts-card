@@ -134,6 +134,7 @@ const LABEL_MAP: Record<string, string> = {
   start: 'field.start',
   end: 'field.end',
   group_by: 'field.group_by',
+  smoothing: 'field.smoothing',
   statistics: 'field.statistics',
   value: 'field.value',
   tap_action: 'field.tap_action',
@@ -171,6 +172,7 @@ const HELPER_MAP: Record<string, string> = {
   offset: 'helper.offset',
   time_delta: 'helper.time_delta',
   duration: 'helper.duration',
+  smoothing: 'helper.smoothing',
   transform: 'helper.transform',
   data_generator: 'helper.data_generator',
   compute: 'helper.compute',
@@ -217,7 +219,7 @@ export function isValidYaxisLimit(val: string | undefined): boolean {
   const t = String(val).trim();
   if (t === '' || t === 'auto') return true;
   if (/^~-?\d+(\.\d+)?$/.test(t)) return true;
-  if (/^\|-?\d+(\.\d+)?\|$/.test(t)) return true;
+  if (/^\|[+-]?\d+(\.\d+)?\|$/.test(t)) return true;
   return !isNaN(Number(t));
 }
 
@@ -262,4 +264,92 @@ export function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T
     out[k] = v;
   }
   return out as Partial<T>;
+}
+
+// ── Live editing ──
+
+// Runs fn once typing pauses, so the preview follows the input without a redraw per key.
+// Pending calls are kept per key (by default one for all), so typing in one field
+// never drops the pending change of another.
+export function debounced<A extends unknown[]>(
+  fn: (...args: A) => void,
+  keyOf: (...args: A) => string = () => '',
+  wait = 350,
+): (...args: A) => void {
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  return (...args: A) => {
+    const key = keyOf(...args);
+    clearTimeout(timers.get(key));
+    timers.set(
+      key,
+      setTimeout(() => {
+        timers.delete(key);
+        fn(...args);
+      }, wait),
+    );
+  };
+}
+
+// A complete number as typed: partial input such as "1." or "-" waits for more keys,
+// so the field is not rewritten under the cursor.
+export function typedNumber(text: string): number | undefined {
+  return /^-?\d+(\.\d+)?$/.test(text.trim()) ? Number(text) : undefined;
+}
+
+// ── Durations: common values to pick, any other value typed ──
+
+export const SPAN_PRESETS = ['1h', '6h', '12h', '24h', '2d', '7d', '30d'];
+export const INTERVAL_PRESETS = ['30s', '1min', '5min', '15min', '1h'];
+export const BUCKET_PRESETS = ['5min', '15min', '30min', '1h', '6h', '1d'];
+export const OFFSET_PRESETS = ['-1h', '-1d', '-7d', '+1h', '+1d'];
+
+// A dropdown of presets that also takes a typed value; the helper says the format.
+export function durationField(name: string, presets: string[], helper?: string): HaFormSchema {
+  return {
+    name,
+    ...(helper ? { helper } : {}),
+    selector: { select: { mode: 'dropdown', custom_value: true, options: presets } },
+  };
+}
+
+// ── Y-axis min/max: a mode and a number instead of the ~N / |N| syntax ──
+
+export type YaxisLimitMode = 'auto' | 'fixed' | 'soft' | 'padding';
+
+export function parseYaxisLimit(limit: string | number | undefined): { mode: YaxisLimitMode; value?: number } {
+  if (limit === undefined || limit === null || limit === '' || limit === 'auto') return { mode: 'auto' };
+  if (typeof limit === 'number') return { mode: 'fixed', value: limit };
+  const text = limit.trim();
+  if (text.startsWith('~')) return { mode: 'soft', value: Number(text.slice(1)) };
+  if (text.startsWith('|')) return { mode: 'padding', value: Number(text.slice(1, -1)) };
+  return { mode: 'fixed', value: Number(text) };
+}
+
+export function serializeYaxisLimit(mode: YaxisLimitMode, value: number | undefined): string | number | undefined {
+  if (mode === 'auto' || value === undefined || isNaN(value)) return undefined;
+  if (mode === 'soft') return `~${value}`;
+  if (mode === 'padding') return `|${value >= 0 ? '+' : ''}${value}|`;
+  return value;
+}
+
+// ── Smoothing: common group_by settings by name ──
+
+type GroupBy = NonNullable<ChartCardExternalConfig['series'][number]['group_by']>;
+
+export const SMOOTHING_PRESETS: Record<string, Pick<GroupBy, 'func' | 'duration'>> = {
+  avg_5min: { func: 'avg', duration: '5min' },
+  avg_15min: { func: 'avg', duration: '15min' },
+  avg_1h: { func: 'avg', duration: '1h' },
+  avg_1d: { func: 'avg', duration: '1d' },
+  max_1d: { func: 'max', duration: '1d' },
+  min_1d: { func: 'min', duration: '1d' },
+};
+
+// The preset a group_by matches: 'none' without grouping, 'custom' for anything else.
+export function smoothingOf(groupBy: GroupBy | undefined): string {
+  if (!groupBy?.func || groupBy.func === 'raw') return groupBy?.duration ? 'custom' : 'none';
+  const found = Object.entries(SMOOTHING_PRESETS).find(
+    ([, preset]) => preset.func === groupBy.func && preset.duration === groupBy.duration,
+  );
+  return found ? found[0] : 'custom';
 }

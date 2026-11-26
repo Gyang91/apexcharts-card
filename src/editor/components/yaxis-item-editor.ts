@@ -1,10 +1,17 @@
 import { LitElement, html, TemplateResult, nothing, CSSResultGroup } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { ChartCardYAxisExternal } from '../../types-config';
 import { HaFormSchema } from '../types';
 import { editorStyles } from '../styles';
-import { computeHelper, computeLabel, isValidYaxisLimit } from '../helpers';
+import {
+  computeHelper,
+  computeLabel,
+  isValidYaxisLimit,
+  parseYaxisLimit,
+  serializeYaxisLimit,
+  YaxisLimitMode,
+} from '../helpers';
 import { BoolField } from './bool-grid';
 import { t } from '../localize';
 import './bool-grid';
@@ -12,7 +19,41 @@ import './bool-grid';
 // Boolean options use bool-grid; other fields use ha-form.
 // A function (not a module-level constant) so option labels re-resolve to the current locale
 // on every render.
-function getSchema(): HaFormSchema[] {
+const LIMIT_MODES: YaxisLimitMode[] = ['auto', 'fixed', 'soft', 'padding'];
+
+// Min or max: how the limit is set, then its number, with a hint for that mode
+function limitSchema(key: 'min' | 'max', mode: YaxisLimitMode): HaFormSchema {
+  return {
+    type: 'grid',
+    name: '',
+    schema: [
+      {
+        name: `${key}_mode`,
+        label: t(`field.${key}`),
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: LIMIT_MODES.map((value) => ({ value, label: t(`yaxis.limit.${value}`) })),
+          },
+        },
+      },
+      ...(mode === 'auto'
+        ? []
+        : [
+            {
+              name: key,
+              label: t('field.value'),
+              helper: t(`yaxis.limit.${mode}.${key}.helper`),
+              selector: { number: { mode: 'box', step: 'any' } },
+            },
+          ]),
+    ],
+  };
+}
+
+// A function (not a module-level constant) so option labels re-resolve to the current locale
+// on every render.
+function getSchema(modes: Record<'min' | 'max', YaxisLimitMode>): HaFormSchema[] {
   return [
     {
       type: 'grid',
@@ -33,14 +74,8 @@ function getSchema(): HaFormSchema[] {
         },
       ],
     },
-    {
-      type: 'grid',
-      name: '',
-      schema: [
-        { name: 'min', selector: { text: {} } },
-        { name: 'max', selector: { text: {} } },
-      ],
-    },
+    limitSchema('min', modes.min),
+    limitSchema('max', modes.max),
     {
       type: 'grid',
       name: '',
@@ -63,17 +98,30 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
   // Tick amount (apex_config.yaxis[i].tickAmount) — handled separately
   @property({ type: Number }) public tickAmount?: number;
 
+  // A mode picked before its number is typed: nothing to save yet, but the field shows
+  @state() private _pickedModes: Partial<Record<'min' | 'max', YaxisLimitMode>> = {};
+
   static get styles(): CSSResultGroup {
     return editorStyles;
   }
 
+  private _limit(key: 'min' | 'max'): { mode: YaxisLimitMode; value?: number } {
+    const saved = parseYaxisLimit(this.yaxis?.[key]);
+    const picked = this._pickedModes[key];
+    return picked && saved.value === undefined ? { mode: picked } : saved;
+  }
+
   private _formData(): Record<string, unknown> {
     const y = this.yaxis || {};
+    const min = this._limit('min');
+    const max = this._limit('max');
     return {
       id: y.id || '',
       axis: y.opposite ? 'right' : 'left',
-      min: y.min === undefined ? '' : String(y.min),
-      max: y.max === undefined ? '' : String(y.max),
+      min_mode: min.mode,
+      min: min.value,
+      max_mode: max.mode,
+      max: max.value,
       decimals: y.decimals,
       align_to: y.align_to,
       log_base: y.log_base ?? y.apex_config?.logBase,
@@ -153,27 +201,17 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
       if (data.axis === 'right') next.opposite = true;
       else delete next.opposite;
     }
-    if ('min' in data) {
-      const raw = (data.min as string | undefined) ?? '';
-      const v = typeof raw === 'string' ? raw.trim() : String(raw);
-      if (v === '' || data.min === undefined || data.min === null) {
-        delete next.min;
-      } else if (!isNaN(Number(v)) && !v.startsWith('~') && !v.startsWith('|')) {
-        next.min = Number(v);
-      } else {
-        next.min = v;
-      }
-    }
-    if ('max' in data) {
-      const raw = (data.max as string | undefined) ?? '';
-      const v = typeof raw === 'string' ? raw.trim() : String(raw);
-      if (v === '' || data.max === undefined || data.max === null) {
-        delete next.max;
-      } else if (!isNaN(Number(v)) && !v.startsWith('~') && !v.startsWith('|')) {
-        next.max = Number(v);
-      } else {
-        next.max = v;
-      }
+    for (const key of ['min', 'max'] as const) {
+      const before = this._limit(key);
+      const mode = (data[`${key}_mode`] as YaxisLimitMode | undefined) ?? before.mode;
+      const raw = data[key];
+      const value = mode === 'auto' || raw === undefined || raw === '' ? undefined : Number(raw);
+      // Untouched limits stay as written, e.g. max: auto next to tick_step
+      if (mode === before.mode && Object.is(value, before.value)) continue;
+      this._pickedModes = { ...this._pickedModes, [key]: mode };
+      const limit = serializeYaxisLimit(mode, value);
+      if (limit === undefined) delete next[key];
+      else next[key] = limit;
     }
     if ('decimals' in data) {
       if (data.decimals === undefined || data.decimals === '') delete next.decimals;
@@ -251,7 +289,7 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
         <ha-form
           .hass=${this.hass}
           .data=${this._formData()}
-          .schema=${getSchema()}
+          .schema=${getSchema({ min: this._limit('min').mode, max: this._limit('max').mode })}
           .computeLabel=${computeLabel}
           .computeHelper=${computeHelper}
           @value-changed=${this._onChange}
@@ -270,7 +308,7 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
             step="1"
             placeholder=${t('common.auto')}
             .value=${this.tickAmount === undefined ? '' : String(this.tickAmount)}
-            @change=${this._tickAmountChanged}
+            @input=${this._tickAmountChanged}
           ></ha-textfield>
           <div class="tick-amount-helper">
             ${t('yaxis.tickAmount.helperPrefix')}
