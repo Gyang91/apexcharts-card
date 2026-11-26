@@ -489,4 +489,5 @@ export const en: Record<string, string> = {
   'field.heatmap': 'Heatmap settings',
   'editor.rangeAreaPair':
     'A range band needs exactly 2 series in the Series tab: the lower bound first, the upper bound second. It has {count}.',
+  'helper.brush': 'A small overview chart under the main one: drag in it to choose the time shown above.',
 };

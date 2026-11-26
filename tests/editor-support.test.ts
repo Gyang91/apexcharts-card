@@ -261,4 +261,36 @@ describe('editor follows the chart type', () => {
     const advanced = await mount('apexcharts-card-editor-advanced', chart('heatmap'));
     expect(boolFields(advanced)).toEqual(['section_mode', 'disable_config_validation', 'cache']);
   });
+
+  it('puts the brush switch with its settings in the Display tab', async () => {
+    const panels = (el: AnyEl) =>
+      [...el.shadowRoot.querySelectorAll('ha-expansion-panel')].map((panel: AnyEl) => panel.getAttribute('header'));
+    const line = await mount('apexcharts-card-editor-display', chart('line'));
+    expect(panels(line)).toContain(t('advanced.panel.brush'));
+    expect(boolFields(line)).toContain('brush');
+    expect(formFields(line)).not.toContain('selection_span');
+
+    const changed = vi.fn();
+    line.addEventListener('config-changed', changed);
+    line._brushSwitched(new CustomEvent('value-changed', { detail: { name: 'brush', value: true } }));
+    expect(changed.mock.calls[0][0].detail.config.experimental).toEqual({ brush: true });
+
+    const on = await mount('apexcharts-card-editor-display', chart('line', { experimental: { brush: true } }));
+    expect(formFields(on)).toContain('selection_span');
+    const heatmap = await mount('apexcharts-card-editor-display', chart('heatmap'));
+    expect(panels(heatmap)).not.toContain(t('advanced.panel.brush'));
+  });
+
+  it('shows hidden by default on the series and turns its switch on with first use', async () => {
+    const item = await mount('apexcharts-card-series-item-editor', chart('line'), { series: { entity: 'sensor.a' } });
+    expect(boolFields(item)).toContain('hidden_by_default');
+    expect(item.shadowRoot.querySelector('.section > apexcharts-card-color-input')).not.toBeNull();
+
+    const editor = await mount('apexcharts-card-series-editor', chart('line'));
+    const changed = vi.fn();
+    editor.addEventListener('config-changed', changed);
+    const serie = { entity: 'sensor.a', show: { hidden_by_default: true } };
+    editor._seriesChanged(0, new CustomEvent('series-changed', { detail: { series: serie } }));
+    expect(changed.mock.calls[0][0].detail.config.experimental).toEqual({ hidden_by_default: true });
+  });
 });
