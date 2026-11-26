@@ -13,6 +13,30 @@ export const editorStyles = css`
     cursor: pointer;
     font: inherit;
   }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .preset-grid button {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    text-align: left;
+  }
+  .preset-grid button small {
+    color: var(--secondary-text-color);
+  }
+  .preset-grid button.active {
+    border-color: var(--primary-color);
+    box-shadow: inset 0 0 0 1px var(--primary-color);
+  }
+  .preset-grid .check {
+    margin-right: 4px;
+    color: var(--primary-color);
+  }
   .preset-actions p,
   .hint {
     color: var(--secondary-text-color);

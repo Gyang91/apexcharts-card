@@ -10,12 +10,10 @@ export const fr: Record<string, string> = {
   'field.navigation': 'Navigation calendrier',
   'helper.navigation':
     'Commandes jour/semaine/mois et précédent/suivant. Remplace span ; fuseau du tableau de bord et semaines ISO.',
-  'preset.title': 'Appliquer un préréglage',
+  'preset.title': 'Préréglage de départ',
   'preset.helper':
-    'Remplace explicitement type, période et agrégation. Conserve entités, unités, transformations et réglages avancés. La consommation exige un compteur énergie avec statistiques sum, pas une puissance instantanée.',
-  'preset.temperature': 'Appliquer température',
-  'preset.power': 'Appliquer puissance',
-  'preset.consumption': 'Appliquer consommation',
+    'Définit le type de graphique, la durée et le regroupement. Vos entités, noms, unités et actions restent.',
+  'preset.consumption': 'Consommation par jour',
   'general.chartType.rangeArea': 'Bande de valeurs',
   'general.chartType.heatmap': 'Carte de chaleur',
   'error.visual.options':
@@ -505,4 +503,9 @@ export const fr: Record<string, string> = {
   'editor.openSeries': 'Ouvrir Séries',
   'editor.rangeAreaUses': 'La bande va de {lower} (borne basse) à {upper} (borne haute).',
   'editor.rangeAreaAside': '{count} autres séries sont mises de côté et reviennent si vous choisissez un autre type.',
+  'preset.measurement': 'Mesure',
+  'preset.measurement.desc': 'Ligne · 24 h · moyenne sur 5 min. Température, humidité, puissance.',
+  'preset.consumption.desc': 'Colonnes · 7 jours · variation par jour. Compteurs d’énergie avec statistiques.',
+  'preset.heatmap': 'Profil journalier',
+  'preset.heatmap.desc': 'Heatmap · 24 h · moyenne par heure.',
 };

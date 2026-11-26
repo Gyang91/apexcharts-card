@@ -18,7 +18,7 @@ import '../components/bool-grid';
 import { BoolField } from '../components/bool-grid';
 import { HaFormSchema } from '../types';
 import { t } from '../localize';
-import { applyPreset, EditorPreset } from '../presets';
+import { activePreset, EditorPreset, PRESETS } from '../presets';
 import { Feature, supports } from '../support';
 
 interface FormData {
@@ -154,15 +154,9 @@ export class ApexChartsCardEditorGeneral extends LitElement {
     );
   };
 
+  // The editor switches the chart type first, so a preset can be undone by picking another
   private _applyPreset(preset: EditorPreset): void {
-    if (!this.config) return;
-    this.dispatchEvent(
-      new CustomEvent('config-changed', {
-        detail: { config: applyPreset(this.config, preset) },
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    this.dispatchEvent(new CustomEvent('preset-picked', { detail: { preset }, bubbles: true, composed: true }));
   }
 
   private _navigationChanged = (ev: CustomEvent): void => {
@@ -182,6 +176,7 @@ export class ApexChartsCardEditorGeneral extends LitElement {
   protected render(): TemplateResult {
     if (!this.config || !this.hass) return html``;
     const data = this._formData();
+    const active = activePreset(this.config);
     // Only the switches this chart type uses (see support.ts)
     const stackedFields: BoolField[] = [
       {
@@ -210,11 +205,23 @@ export class ApexChartsCardEditorGeneral extends LitElement {
         <div class="preset-actions">
           <strong>${t('preset.title')}</strong>
           <p>${t('preset.helper')}</p>
-          ${(['temperature', 'power', 'consumption'] as const).map(
-            (preset) => html`
-              <button type="button" @click=${() => this._applyPreset(preset)}>${t(`preset.${preset}`)}</button>
-            `,
-          )}
+          <div class="preset-grid" role="group" aria-label=${t('preset.title')}>
+            ${PRESETS.map(
+              (preset) => html`
+                <button
+                  type="button"
+                  class=${preset === active ? 'active' : ''}
+                  aria-pressed=${preset === active}
+                  @click=${() => this._applyPreset(preset)}
+                >
+                  <span>
+                    ${preset === active ? html`<span class="check" aria-hidden="true">✓</span>` : ''}${t(`preset.${preset}`)}
+                  </span>
+                  <small>${t(`preset.${preset}.desc`)}</small>
+                </button>
+              `,
+            )}
+          </div>
         </div>
         ${
           supports(this.config, 'navigation')

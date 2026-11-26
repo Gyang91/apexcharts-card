@@ -9,12 +9,9 @@ export const en: Record<string, string> = {
   'field.navigation': 'Calendar navigation',
   'helper.navigation':
     'Day/week/month and previous/next controls. Replaces span settings; uses dashboard timezone and ISO weeks.',
-  'preset.title': 'Apply a starter preset',
-  'preset.helper':
-    'Explicitly replaces chart type, time span and series aggregation. Keeps your entities, units, transforms and advanced settings. Consumption requires an energy counter with HA sum statistics; never use it for instantaneous power.',
-  'preset.temperature': 'Apply temperature',
-  'preset.power': 'Apply power',
-  'preset.consumption': 'Apply consumption',
+  'preset.title': 'Starter preset',
+  'preset.helper': 'Sets the chart type, time span and grouping. Your entities, names, units and actions stay.',
+  'preset.consumption': 'Daily consumption',
   'general.chartType.rangeArea': 'Range band',
   'general.chartType.heatmap': 'Heatmap',
   'error.visual.options':
@@ -499,4 +496,9 @@ export const en: Record<string, string> = {
   'editor.openSeries': 'Open Series',
   'editor.rangeAreaUses': 'The band runs from {lower} (lower bound) to {upper} (upper bound).',
   'editor.rangeAreaAside': '{count} other series are set aside and come back when you pick another chart type.',
+  'preset.measurement': 'Measurement',
+  'preset.measurement.desc': 'Line · 24 h · 5-min average. Temperature, humidity, power.',
+  'preset.consumption.desc': 'Columns · 7 days · change per day. Energy meters with statistics.',
+  'preset.heatmap': 'Daily pattern',
+  'preset.heatmap.desc': 'Heatmap · 24 h · average per hour.',
 };

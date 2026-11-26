@@ -5,6 +5,7 @@ import { ChartCardExternalConfig } from '../types-config';
 import { EDITOR_TABS } from './types';
 import { editorStyles } from './styles';
 import { setEditorLocale, t } from './localize';
+import { applyPreset, EditorPreset, presetChartType } from './presets';
 import { changeChartType, emptyStash, removeUnsupported, supports, unsupportedSettings } from './support';
 
 // Registers the custom elements
@@ -106,6 +107,14 @@ export class ApexChartsCardEditor extends LitElement {
     if (this._config) this._fireConfig(changeChartType(this._config, ev.detail.value, this._stash));
   };
 
+  private _onPresetPicked = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    if (!this._config) return;
+    const preset = ev.detail.preset as EditorPreset;
+    const switched = changeChartType(this._config, presetChartType(preset), this._stash);
+    this._fireConfig(applyPreset(switched, preset));
+  };
+
   static get styles(): CSSResultGroup {
     return editorStyles;
   }
@@ -200,6 +209,7 @@ export class ApexChartsCardEditor extends LitElement {
         .config=${this._config}
         @config-changed=${this._onConfigChanged}
         @chart-type-changed=${this._onChartTypeChanged}
+        @preset-picked=${this._onPresetPicked}
       ></apexcharts-card-editor-general>
     `;
   }
