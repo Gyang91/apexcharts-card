@@ -497,4 +497,11 @@ export const fr: Record<string, string> = {
     'Une bande de plage demande exactement 2 séries dans l’onglet Séries : la borne basse puis la borne haute. Elle en a {count}.',
   'helper.brush':
     'Un petit graphique d’ensemble sous le principal : faites-y glisser pour choisir la période affichée au-dessus.',
+  'display.heatmapBands.mixedUnits':
+    'Les séries utilisent des unités différentes : une seule échelle de couleurs ne peut convenir à toutes. Donnez-leur la même unité, ou une heatmap par unité.',
+  'display.heatmapBands.suggest': 'Proposer des bandes d’après les données',
+  'display.heatmapBands.suggesting': 'Lecture des données…',
+  'display.heatmapBands.suggestHelper':
+    'Lit les valeurs les plus basses et les plus hautes sur la période et remplace les bandes par des limites arrondies, du froid au chaud.',
+  'display.heatmapBands.noData': 'Aucune donnée numérique trouvée pour ces séries sur la période.',
 };

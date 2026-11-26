@@ -29,7 +29,7 @@ import { layoutMinimal } from './layouts/minimal';
 import { getLocales, getDefaultLocale } from './locales';
 import { t } from './localize';
 import GraphEntry from './graphEntry';
-import { heatmapColorScale } from './visual-data';
+import { heatmapColorScale, sharedUnit } from './visual-data';
 
 // Follow the Home Assistant theme: axis labels and legend in the secondary
 // text color and the theme font, grid and axis lines in the divider color.
@@ -148,7 +148,17 @@ export function getLayoutConfig(
             radius: 2,
             enableShades: false,
             distributed: false,
-            colorScale: { ranges: heatmapColorScale(bands, computeColor) },
+            colorScale: {
+              ranges: heatmapColorScale(
+                bands,
+                computeColor,
+                sharedUnit(
+                  config.series_in_graph.map((serie, index) =>
+                    computeUom(index, config.series_in_graph, undefined, seriesState(hass, serie)),
+                  ),
+                ).unit,
+              ),
+            },
           },
         };
         // Legend entries are the bands, not the series: show each band's name

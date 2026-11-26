@@ -490,4 +490,11 @@ export const en: Record<string, string> = {
   'editor.rangeAreaPair':
     'A range band needs exactly 2 series in the Series tab: the lower bound first, the upper bound second. It has {count}.',
   'helper.brush': 'A small overview chart under the main one: drag in it to choose the time shown above.',
+  'display.heatmapBands.mixedUnits':
+    'The series use different units, so one colour scale cannot fit them all: give them the same unit, or use one heatmap per unit.',
+  'display.heatmapBands.suggest': 'Suggest bands from data',
+  'display.heatmapBands.suggesting': 'Reading the data…',
+  'display.heatmapBands.suggestHelper':
+    'Reads the lowest and highest values over the time span and replaces the bands with round limits from cool to warm.',
+  'display.heatmapBands.noData': 'No numeric data found for these series over the time span.',
 };

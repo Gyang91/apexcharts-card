@@ -5,6 +5,7 @@ import { editorStyles } from '../styles';
 import { t } from '../localize';
 import { debounced, typedNumber } from '../helpers';
 import './color-input';
+import { bandLimits } from '../../visual-data';
 
 const ICON_DELETE =
   'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
@@ -21,6 +22,9 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
   @property({ attribute: false }) public third: 'opacity' | 'name' = 'opacity';
 
   @property({ attribute: false }) public addLabel?: string;
+
+  // Bands only: the unit the series share, shown with the value and each band's range
+  @property({ attribute: false }) public unit?: string;
 
   static get styles(): CSSResultGroup {
     return editorStyles;
@@ -73,7 +77,7 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
     return html`<ha-textfield
       type=${isNumber ? 'number' : 'text'}
       step="any"
-      label=${t(`field.${key}`)}
+      label=${key === 'value' && this.unit ? `${t('field.value')} (${this.unit})` : t(`field.${key}`)}
       .value=${current === undefined ? '' : String(current)}
       .helper=${t(`helper.threshold_${key}`)}
       helperPersistent
@@ -93,14 +97,31 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
     this._fire(list);
   }
 
+  // The bands in value order, as the chart's legend shows them
+  private _bar(limits: string[]): TemplateResult {
+    const order = this.thresholds.map((band, i) => ({ band, i })).sort((a, b) => a.band.value - b.band.value);
+    return html`<div class="band-bar">
+      ${order.map(
+        ({ band, i }) =>
+          html`<div style="background: ${band.color || 'transparent'}" title=${band.name ?? limits[i]}>
+            <span>${band.name ?? limits[i]}</span>
+          </div>`,
+      )}
+    </div>`;
+  }
+
   protected render(): TemplateResult {
+    const bands = this.third === 'name';
+    const limits = bands ? bandLimits(this.thresholds, this.unit) : [];
     return html`
       <div class="list-editor">
-        <div class="hint">${t(this.third === 'name' ? 'hint.bands' : 'hint.thresholds')}</div>
+        <div class="hint">${t(bands ? 'hint.bands' : 'hint.thresholds')}</div>
+        ${bands && this.thresholds.length ? this._bar(limits) : ''}
         ${this.thresholds.map(
           (item, i) => html`
             <div class="list-item">
               <div class="list-item-body" style="padding-top: 12px;">
+                ${bands ? html`<div class="band-range">${limits[i]}</div>` : ''}
                 <div class="grid-2">${this._field(item, i, 'value')} ${this._field(item, i, this.third)}</div>
                 <apexcharts-card-color-input
                   .value=${item.color}

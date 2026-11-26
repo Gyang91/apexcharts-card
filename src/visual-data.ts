@@ -104,21 +104,63 @@ export function heatmapTimeLabel(ts: number, now: number, lang: string, hours12:
   return word.charAt(0).toLocaleUpperCase(lang) + word.slice(1);
 }
 
+// The range each band covers, in the bands' own order: "< 20 °C", "20 – 22 °C", "≥ 23 °C"
+export function bandLimits(bands: { value: number }[], unit?: string): string[] {
+  const order = bands.map((band, index) => ({ value: band.value, index })).sort((a, b) => a.value - b.value);
+  const u = unit ? ` ${unit}` : '';
+  const labels: string[] = [];
+  order.forEach(({ value, index }, i) => {
+    const next = order[i + 1]?.value;
+    labels[index] =
+      i === 0 && next !== undefined
+        ? `< ${next}${u}`
+        : next !== undefined
+          ? `${value} – ${next}${u}`
+          : `≥ ${value}${u}`;
+  });
+  return labels;
+}
+
+// The unit every series shares; mixed when they differ
+export function sharedUnit(units: (string | undefined)[]): { unit?: string; mixed: boolean } {
+  const found = [...new Set(units.filter((unit): unit is string => !!unit))];
+  return { unit: found.length === 1 ? found[0] : undefined, mixed: found.length > 1 };
+}
+
+const SUGGESTED_COLORS = ['#3a85d6', '#5f9ac2', '#5f9e6e', '#c9a03e', '#d8742f', '#d85a30'];
+
+// Bands with round limits across [min, max], cool to warm: about 4 to 6 of them
+export function suggestBands(min: number, max: number): ChartCardHeatmapColorRange[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [];
+  if (max <= min) max = min + 1;
+  const rough = (max - min) / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(rough));
+  const step = [1, 2, 2.5, 5, 10].map((factor) => factor * magnitude).find((size) => size >= rough)!;
+  const first = Math.floor(min / step) * step;
+  const count = Math.min(SUGGESTED_COLORS.length, Math.max(3, Math.ceil((max - first) / step)));
+  return Array.from({ length: count }, (_, i) => ({
+    value: Number((first + i * step).toPrecision(12)),
+    color: SUGGESTED_COLORS[Math.round((i * (SUGGESTED_COLORS.length - 1)) / (count - 1))],
+  }));
+}
+
 /**
  * ApexCharts colour-scale ranges for `heatmap.color_ranges`: each band runs
  * from its value up to just below the next band's, the lowest one from -∞ and
  * the highest to +∞, so every value gets a band. Bands without a name are
- * named after their limits ("< 20", "20 – 22", "≥ 23") for the legend.
+ * named after their limits for the legend.
  */
 export function heatmapColorScale(
   bands: ChartCardHeatmapColorRange[],
   color: (value: string) => string = (value) => value,
+  unit?: string,
 ): { from: number; to: number; color: string; name: string }[] {
-  const sorted = [...bands].sort((a, b) => a.value - b.value);
-  return sorted.map((band, i) => {
-    const next = sorted[i + 1];
-    const name =
-      band.name ?? (i === 0 && next ? `< ${next.value}` : next ? `${band.value} – ${next.value}` : `≥ ${band.value}`);
+  const limits = bandLimits(bands, unit);
+  const sorted = bands
+    .map((band, index) => ({ band, name: band.name ?? limits[index] }))
+    .sort((a, b) => a.band.value - b.band.value);
+  return sorted.map(({ band, name }, i) => {
+    const next = sorted[i + 1]?.band;
     return {
       from: i === 0 ? -Number.MAX_VALUE : band.value,
       // ApexCharts' ranges include both ends: stop just below the next band
