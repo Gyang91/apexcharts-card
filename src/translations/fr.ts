@@ -492,4 +492,7 @@ export const fr: Record<string, string> = {
   'yaxis.limit.padding.max.helper': 'Ajouté à la valeur la plus haute, ex. : 10 pour 10 au-dessus',
   'editor.unsupported': 'Ce type de graphique ne peut pas utiliser :',
   'editor.unsupported.remove': 'Les supprimer',
+  'field.heatmap': 'Réglages de la heatmap',
+  'editor.rangeAreaPair':
+    'Une bande de plage demande exactement 2 séries dans l’onglet Séries : la borne basse puis la borne haute. Elle en a {count}.',
 };

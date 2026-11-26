@@ -2,7 +2,7 @@
 // the ones the card would reject
 import '../src/apexcharts-card';
 import '../src/editor/index';
-import { removeUnsupported, supports, unsupportedSettings } from '../src/editor/support';
+import { changeChartType, emptyStash, removeUnsupported, supports, unsupportedSettings } from '../src/editor/support';
 import { mkHass } from './fixtures/hass';
 import { t } from '../src/editor/localize';
 import type { ChartCardExternalConfig } from '../src/types-config';
@@ -85,6 +85,68 @@ describe('what each chart type supports', () => {
   });
 });
 
+describe('changing the chart type', () => {
+  beforeAll(() => customElements.whenDefined('apexcharts-card'));
+
+  const TYPES = [undefined, 'line', 'scatter', 'rangeArea', 'heatmap', 'pie', 'donut', 'radialBar'] as const;
+  const loaded = chart(undefined, {
+    stacked: true,
+    yaxis: [{ id: 'a', min: 0 }],
+    navigation: { show: true },
+    experimental: { brush: true, hidden_by_default: true, color_threshold: true },
+    heatmap: { max_cells: 100, color_ranges: [{ value: 20, color: 'green' }] },
+  });
+  Object.assign(loaded.series[0], { yaxis_id: 'a', invert: true, show: { extremas: true, in_chart: false } });
+  loaded.series[1].color_threshold = [{ value: 1, color: 'red' }];
+  delete loaded.series[0].group_by;
+
+  it.each(TYPES)('gives a config the card accepts when switching to %s', (type) => {
+    const config = changeChartType(loaded, type, emptyStash());
+    expect(setConfig(config)).not.toThrow();
+  });
+
+  it('moves heatmap settings out when leaving a heatmap, and back on return', () => {
+    const stash = emptyStash();
+    const heatmap = chart('heatmap', { heatmap: { color_ranges: [{ value: 20, color: 'green' }] } });
+    const line = changeChartType(heatmap, 'line', stash);
+    expect(line).not.toHaveProperty('heatmap');
+    expect(setConfig(line)).not.toThrow();
+    expect(changeChartType(line, 'heatmap', stash).heatmap).toEqual(heatmap.heatmap);
+  });
+
+  it('keeps y-axes and series settings through a round trip to a heatmap', () => {
+    const stash = emptyStash();
+    const config = chart('line', { yaxis: [{ id: 'a' }] });
+    config.series[0].yaxis_id = 'a';
+    config.series[1].show = { extremas: true, in_legend: false };
+    const heatmap = changeChartType(config, 'heatmap', stash);
+    expect(heatmap).not.toHaveProperty('yaxis');
+    expect(heatmap.series[0]).not.toHaveProperty('yaxis_id');
+    expect(heatmap.series[1].show).toEqual({ in_legend: false });
+    expect(changeChartType(heatmap, 'line', stash)).toEqual(config);
+  });
+
+  it('does not put a setting back on a series that now reads another entity', () => {
+    const stash = emptyStash();
+    const config = chart('line');
+    config.series[0].invert = true;
+    const heatmap = changeChartType(config, 'heatmap', stash);
+    heatmap.series[0].entity = 'sensor.other';
+    expect(changeChartType(heatmap, 'line', stash).series[0]).not.toHaveProperty('invert');
+  });
+
+  it('groups ungrouped series per hour for a heatmap, keeping a set duration', () => {
+    const config = chart('line');
+    config.series[0].group_by = { func: 'raw', duration: '30min' };
+    delete config.series[1].group_by;
+    const heatmap = changeChartType(config, 'heatmap', emptyStash());
+    expect(heatmap.series.map((serie) => serie.group_by)).toEqual([
+      { func: 'avg', duration: '30min' },
+      { func: 'avg', period: 'hour' },
+    ]);
+  });
+});
+
 describe('editor follows the chart type', () => {
   const mount = async (tag: string, config: ChartCardExternalConfig, props: AnyEl = {}) => {
     const el = document.createElement(tag) as unknown as AnyEl;
@@ -106,6 +168,27 @@ describe('editor follows the chart type', () => {
     );
 
   afterEach(() => document.body.replaceChildren());
+
+  it('adapts the config when the chart type is picked', async () => {
+    const editor = await mount('apexcharts-card-editor', chart('heatmap', { heatmap: { max_cells: 50 } }));
+    const changed = vi.fn();
+    editor.addEventListener('config-changed', changed);
+    const general = editor.shadowRoot.querySelector('apexcharts-card-editor-general');
+    await general.updateComplete;
+    general.shadowRoot
+      .querySelector('apexcharts-card-chart-type-picker')
+      .dispatchEvent(new CustomEvent('value-changed', { detail: { value: 'line' } }));
+    expect(changed.mock.calls[0][0].detail.config).toEqual({ ...chart('line') });
+  });
+
+  it('says a range band needs two series', async () => {
+    const config = chart('rangeArea');
+    config.series.pop();
+    const editor = await mount('apexcharts-card-editor', config);
+    expect(editor.shadowRoot.querySelector('.unsupported').textContent).toContain(
+      t('editor.rangeAreaPair', { count: 1 }),
+    );
+  });
 
   it('hides the Y-Axis tab and offers to remove the axes a heatmap cannot use', async () => {
     const editor = await mount('apexcharts-card-editor', chart('heatmap', { yaxis: [{ min: 0 }] }));
