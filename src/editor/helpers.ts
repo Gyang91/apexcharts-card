@@ -353,3 +353,12 @@ export function smoothingOf(groupBy: GroupBy | undefined): string {
   );
   return found ? found[0] : 'custom';
 }
+
+// The schema without the fields `keep` rejects; grids left empty go too.
+export function filterSchema(schema: HaFormSchema[], keep: (name: string) => boolean): HaFormSchema[] {
+  return schema.flatMap((field) => {
+    if (!field.schema || field.type === 'expandable') return keep(field.name) ? [field] : [];
+    const inner = filterSchema(field.schema, keep);
+    return inner.length ? [{ ...field, schema: inner }] : [];
+  });
+}

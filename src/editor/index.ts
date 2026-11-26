@@ -5,6 +5,7 @@ import { ChartCardExternalConfig } from '../types-config';
 import { EDITOR_TABS } from './types';
 import { editorStyles } from './styles';
 import { setEditorLocale, t } from './localize';
+import { removeUnsupported, supports, unsupportedSettings } from './support';
 
 // Side-effect imports so the custom elements are registered when the editor is loaded.
 import './components/series-editor';
@@ -20,7 +21,7 @@ import './tabs/advanced-tab';
 export class ApexChartsCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @state() private _config?: ChartCardExternalConfig;
-  @state() private _activeTab = 0;
+  @state() private _activeTab = 'tabs.general';
 
   public setConfig(config: ChartCardExternalConfig): void {
     const configDup = JSON.parse(JSON.stringify(config));
@@ -61,16 +62,34 @@ export class ApexChartsCardEditor extends LitElement {
     setEditorLocale((this.hass as any)?.locale?.language || this.hass?.language);
     if (!this._config || !this.hass) return html``;
 
+    // The Y-Axis tab only where the chart has a y axis; elsewhere it falls back to General
+    const tabs = EDITOR_TABS.filter((tab) => tab.label !== 'tabs.yaxis' || supports(this._config, 'yaxis'));
+    const active = tabs.some((tab) => tab.label === this._activeTab) ? this._activeTab : 'tabs.general';
+    const unsupported = unsupportedSettings(this._config);
+
     return html`
+      ${
+        unsupported.length
+          ? html`<div class="unsupported" role="alert">
+              <span>${t('editor.unsupported')} ${unsupported.map((key) => t(key)).join(', ')}</span>
+              <button
+                type="button"
+                @click=${() => this._fireConfig(removeUnsupported(this._config as ChartCardExternalConfig))}
+              >
+                ${t('editor.unsupported.remove')}
+              </button>
+            </div>`
+          : ''
+      }
       <div class="tab-bar" role="tablist">
-        ${EDITOR_TABS.map(
-          (tab, index) => html`
+        ${tabs.map(
+          (tab) => html`
             <button
-              class="tab ${index === this._activeTab ? 'active' : ''}"
+              class="tab ${tab.label === active ? 'active' : ''}"
               role="tab"
-              aria-selected=${index === this._activeTab}
+              aria-selected=${tab.label === active}
               @click=${() => {
-                this._activeTab = index;
+                this._activeTab = tab.label;
               }}
             >
               <ha-icon icon=${tab.icon}></ha-icon>
@@ -79,24 +98,22 @@ export class ApexChartsCardEditor extends LitElement {
           `,
         )}
       </div>
-      <div class="tab-content">${this._renderTab()}</div>
+      <div class="tab-content">${this._renderTab(active)}</div>
     `;
   }
 
-  private _renderTab(): TemplateResult {
-    switch (this._activeTab) {
-      case 0:
-        return this._renderGeneralTab();
-      case 1:
+  private _renderTab(active: string): TemplateResult {
+    switch (active) {
+      case 'tabs.series':
         return this._renderSeriesTab();
-      case 2:
+      case 'tabs.display':
         return this._renderDisplayTab();
-      case 3:
+      case 'tabs.yaxis':
         return this._renderYAxisTab();
-      case 4:
+      case 'tabs.advanced':
         return this._renderAdvancedTab();
       default:
-        return html``;
+        return this._renderGeneralTab();
     }
   }
 

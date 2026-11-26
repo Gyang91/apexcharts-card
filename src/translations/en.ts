@@ -484,4 +484,6 @@ export const en: Record<string, string> = {
   'yaxis.limit.soft.max.helper': 'Ends here or higher if the data goes higher, e.g. 30',
   'yaxis.limit.padding.min.helper': 'Added to the lowest value, e.g. -5 for 5 below it',
   'yaxis.limit.padding.max.helper': 'Added to the highest value, e.g. 10 for 10 above it',
+  'editor.unsupported': "This chart type can't use:",
+  'editor.unsupported.remove': 'Remove them',
 };

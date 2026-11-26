@@ -13,6 +13,7 @@ import { HaFormSchema } from '../types';
 import {
   computeHelper,
   computeLabel,
+  filterSchema,
   fromSelectValue,
   parseStrokeDash,
   serializeStrokeDash,
@@ -34,6 +35,7 @@ import {
 } from '../schemas/series';
 import { BoolField } from './bool-grid';
 import { t } from '../localize';
+import { Feature, supports } from '../support';
 import './color-threshold-editor';
 import './color-input';
 import './actions-editor';
@@ -41,8 +43,20 @@ import './bool-grid';
 
 type Series = ChartCardSeriesExternalConfig | ChartCardAllSeriesExternalConfig;
 
-// Chart types colour thresholds work with (README, color_threshold experimental feature)
-const THRESHOLD_CHART_TYPES = ['line', 'radialBar', 'pie', 'donut'];
+// Series fields that only some chart types use (see support.ts)
+const FIELD_FEATURES: Record<string, Feature> = {
+  type: 'series_type',
+  curve: 'line_style',
+  stroke_width: 'line_style',
+  stroke_dash: 'line_style',
+  opacity: 'opacity',
+  extend_to: 'extend_to',
+  invert: 'invert',
+  in_chart: 'in_chart',
+  extremas: 'extremas',
+  datalabels: 'datalabels',
+  yaxis_id: 'yaxis',
+};
 
 // Body a new computed series starts with: valid, and shows where the values are
 const COMPUTE_STARTER = 'return null; // e.g. return values.import - values.export;';
@@ -76,6 +90,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
       }),
     );
   }
+
+  private _applies = (name: string): boolean => !FIELD_FEATURES[name] || supports(this.config, FIELD_FEATURES[name]);
 
   // ── Field handlers ──
 
@@ -273,11 +289,13 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
   private _visibilityBoolFields(): BoolField[] {
     const show = (this.series?.show || {}) as Record<string, unknown>;
-    const fields: BoolField[] = SERIES_VISIBILITY_BOOL_FIELDS.map(({ name, defaultValue }) => ({
-      name,
-      label: computeLabel({ name } as HaFormSchema),
-      value: (show[name] as boolean | undefined) ?? defaultValue,
-    }));
+    const fields: BoolField[] = SERIES_VISIBILITY_BOOL_FIELDS.filter(({ name }) => this._applies(name)).map(
+      ({ name, defaultValue }) => ({
+        name,
+        label: computeLabel({ name } as HaFormSchema),
+        value: (show[name] as boolean | undefined) ?? defaultValue,
+      }),
+    );
     // Conditional experimental booleans
     if (this.config?.experimental?.color_threshold) {
       fields.push({
@@ -434,10 +452,9 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
   protected render(): TemplateResult {
     if (!this.hass || !this.series) return html``;
     const s = this.series as ChartCardSeriesExternalConfig;
-    const showColorThreshold =
-      !this.isAllSeriesConfig && THRESHOLD_CHART_TYPES.includes(this.config?.chart_type ?? 'line');
+    const showColorThreshold = !this.isAllSeriesConfig && supports(this.config, 'color_threshold');
     const showHeaderActions = !this.isAllSeriesConfig;
-    const yaxisIdSchema = this._yaxisIdSchema();
+    const yaxisIdSchema = filterSchema(this._yaxisIdSchema(), this._applies);
 
     return html`
       <div class="section">
@@ -464,7 +481,7 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
         <ha-form
           .hass=${this.hass}
           .data=${{ name: this._textName(), type: s.type || '' }}
-          .schema=${getSeriesCoreSchema()}
+          .schema=${filterSchema(getSeriesCoreSchema(), this._applies)}
           .computeLabel=${computeLabel}
           .computeHelper=${computeHelper}
           @value-changed=${this._coreChanged}
@@ -494,22 +511,26 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
             <ha-form
               .hass=${this.hass}
               .data=${this._appearanceData()}
-              .schema=${getSeriesAppearanceSchema()}
+              .schema=${filterSchema(getSeriesAppearanceSchema(), this._applies)}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._appearanceChanged}
             ></ha-form>
-            <apexcharts-card-bool-grid
-              .fields=${[
-                {
-                  name: 'invert',
-                  label: computeLabel({ name: 'invert' } as HaFormSchema),
-                  value: s.invert ?? false,
-                },
-              ]}
-              .columns=${1}
-              @value-changed=${this._invertChanged}
-            ></apexcharts-card-bool-grid>
+            ${
+              this._applies('invert')
+                ? html`<apexcharts-card-bool-grid
+                    .fields=${[
+                      {
+                        name: 'invert',
+                        label: computeLabel({ name: 'invert' } as HaFormSchema),
+                        value: s.invert ?? false,
+                      },
+                    ]}
+                    .columns=${1}
+                    @value-changed=${this._invertChanged}
+                  ></apexcharts-card-bool-grid>`
+                : nothing
+            }
           </div>
         </ha-expansion-panel>
 
@@ -523,7 +544,7 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
             <ha-form
               .hass=${this.hass}
               .data=${this._visibilitySelectData()}
-              .schema=${getSeriesVisibilitySelectSchema()}
+              .schema=${filterSchema(getSeriesVisibilitySelectSchema(), this._applies)}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._visibilitySelectChanged}

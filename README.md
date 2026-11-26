@@ -100,7 +100,7 @@ It is also inspired by the great [`mini-graph-card`](https://github.com/kalkih/m
 
 1. **Install the card**, see [Installation](#installation). On Home Assistant 2026.11 and later, use **Settings** > **Marketplace** > **Add from link** with `Gyang91/apexcharts-card`.
 2. **Reload your browser** after installing or updating, so it loads the new file.
-3. **Add the card**: edit a dashboard, select **Add card**, search for **ApexCharts Card**, and pick a sensor. The visual editor covers most options; the [presets](#visual-editor-starter-presets) in its **General** tab set up a temperature, power or consumption chart for you.
+3. **Add the card**: edit a dashboard, select **Add card**, search for **ApexCharts Card**, and pick a sensor. The visual editor covers most options; the [presets](#visual-editor-starter-presets) in its **General** tab set up a temperature, power or consumption chart for you. Pick the chart type first: the editor then shows only the settings that chart type can use, and offers to remove any that it can't.
 4. **Or paste YAML**: select **Show code editor** in the card editor and start from this:
 
    ```yaml
