@@ -135,6 +135,23 @@ describe('changing the chart type', () => {
     expect(changeChartType(heatmap, 'line', stash).series[0]).not.toHaveProperty('invert');
   });
 
+  it('keeps the first two series for a range band, and brings the others back after', () => {
+    const stash = emptyStash();
+    const six = chart('line');
+    six.series = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ entity: `sensor.${id}`, name: id }));
+    const band = changeChartType(six, 'rangeArea', stash);
+    expect(band.series.map((serie) => serie.name)).toEqual(['a', 'b']);
+    expect(setConfig(band)).not.toThrow();
+    expect(changeChartType(band, 'line', stash).series.map((serie) => serie.name)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+      'f',
+    ]);
+  });
+
   it('groups ungrouped series per hour for a heatmap, keeping a set duration', () => {
     const config = chart('line');
     config.series[0].group_by = { func: 'raw', duration: '30min' };
@@ -181,6 +198,22 @@ describe('editor follows the chart type', () => {
     expect(changed.mock.calls[0][0].detail.config).toEqual({ ...chart('line') });
   });
 
+  it('names the two series a range band uses and how many are set aside', async () => {
+    const config = chart('line');
+    config.series = ['Low', 'High', 'Other'].map((name) => ({ entity: 'sensor.a', name }));
+    const editor = await mount('apexcharts-card-editor', config);
+    const general = editor.shadowRoot.querySelector('apexcharts-card-editor-general');
+    await general.updateComplete;
+    general.shadowRoot
+      .querySelector('apexcharts-card-chart-type-picker')
+      .dispatchEvent(new CustomEvent('value-changed', { detail: { value: 'rangeArea' } }));
+    editor.setConfig(editor._config);
+    await editor.updateComplete;
+    const note = editor.shadowRoot.querySelector('.range-note').textContent;
+    expect(note).toContain(t('editor.rangeAreaUses', { lower: 'Low', upper: 'High' }));
+    expect(note).toContain(t('editor.rangeAreaAside', { count: 1 }));
+  });
+
   it('says a range band needs two series', async () => {
     const config = chart('rangeArea');
     config.series.pop();
@@ -188,6 +221,9 @@ describe('editor follows the chart type', () => {
     expect(editor.shadowRoot.querySelector('.unsupported').textContent).toContain(
       t('editor.rangeAreaPair', { count: 1 }),
     );
+    editor.shadowRoot.querySelector('.unsupported button').click();
+    await editor.updateComplete;
+    expect(editor.shadowRoot.querySelector('.tab.active').textContent).toContain(t('tabs.series'));
   });
 
   it('hides the Y-Axis tab and offers to remove the axes a heatmap cannot use', async () => {

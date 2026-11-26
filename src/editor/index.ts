@@ -134,13 +134,7 @@ export class ApexChartsCardEditor extends LitElement {
             </div>`
           : ''
       }
-      ${
-        this._config.chart_type === 'rangeArea' && (this._config.series || []).length !== 2
-          ? html`<div class="unsupported" role="alert">
-              <span>${t('editor.rangeAreaPair', { count: (this._config.series || []).length })}</span>
-            </div>`
-          : ''
-      }
+      ${this._renderRangeNote()}
       <div class="tab-bar" role="tablist">
         ${tabs.map(
           (tab) => html`
@@ -160,6 +154,28 @@ export class ApexChartsCardEditor extends LitElement {
       </div>
       <div class="tab-content">${this._renderTab(active)}</div>
     `;
+  }
+
+  // A range band needs a lower and an upper series: say which it uses, or what is missing
+  private _renderRangeNote(): TemplateResult | string {
+    const cfg = this._config!;
+    if (cfg.chart_type !== 'rangeArea') return '';
+    const series = cfg.series || [];
+    const name = (index: number) => {
+      const serie = series[index];
+      return (typeof serie?.name === 'string' && serie.name) || serie?.entity || serie?.id || '';
+    };
+    if (series.length < 2) {
+      return html`<div class="unsupported" role="alert">
+        <span>${t('editor.rangeAreaPair', { count: series.length })}</span>
+        <button type="button" @click=${() => (this._activeTab = 'tabs.series')}>${t('editor.openSeries')}</button>
+      </div>`;
+    }
+    const aside = this._stash.extraSeries?.length ?? 0;
+    return html`<div class="hint range-note">
+      ${t('editor.rangeAreaUses', { lower: name(0), upper: name(1) })}
+      ${aside ? t('editor.rangeAreaAside', { count: aside }) : ''}
+    </div>`;
   }
 
   private _renderTab(active: string): TemplateResult {

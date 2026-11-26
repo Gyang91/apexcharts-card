@@ -487,7 +487,7 @@ export const en: Record<string, string> = {
   'editor.unsupported.remove': 'Remove them',
   'field.heatmap': 'Heatmap settings',
   'editor.rangeAreaPair':
-    'A range band needs exactly 2 series in the Series tab: the lower bound first, the upper bound second. It has {count}.',
+    'A range band shows the area between two series, the lower bound first. It has {count}: add one in the Series tab.',
   'helper.brush': 'A small overview chart under the main one: drag in it to choose the time shown above.',
   'display.heatmapBands.mixedUnits':
     'The series use different units, so one colour scale cannot fit them all: give them the same unit, or use one heatmap per unit.',
@@ -496,4 +496,7 @@ export const en: Record<string, string> = {
   'display.heatmapBands.suggestHelper':
     'Reads the lowest and highest values over the time span and replaces the bands with round limits from cool to warm.',
   'display.heatmapBands.noData': 'No numeric data found for these series over the time span.',
+  'editor.openSeries': 'Open Series',
+  'editor.rangeAreaUses': 'The band runs from {lower} (lower bound) to {upper} (upper bound).',
+  'editor.rangeAreaAside': '{count} other series are set aside and come back when you pick another chart type.',
 };

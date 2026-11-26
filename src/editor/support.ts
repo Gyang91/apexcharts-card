@@ -148,7 +148,7 @@ export function removeUnsupported(config: ChartCardExternalConfig): ChartCardExt
 }
 
 // Settings set aside while the editor is open, for when the chart type comes back
-export type Stash = Obj & { series: Series };
+export type Stash = Obj & { series: Series; extraSeries?: Series };
 
 export function emptyStash(): Stash {
   return { series: [] };
@@ -165,6 +165,16 @@ export function changeChartType(
   if (type) next.chart_type = type;
   else delete next.chart_type;
   const nextObj = next as unknown as Obj;
+
+  // A range band reads exactly two series: keep the first two, and the others until the type changes
+  const series = (next.series ?? []) as unknown as Series;
+  if (next.chart_type === 'rangeArea' && series.length > 2) {
+    stash.extraSeries = series.slice(2);
+    next.series = series.slice(0, 2) as unknown as ChartCardExternalConfig['series'];
+  } else if (next.chart_type !== 'rangeArea' && stash.extraSeries) {
+    next.series = [...series, ...stash.extraSeries] as unknown as ChartCardExternalConfig['series'];
+    delete stash.extraSeries;
+  }
 
   const back = SETTINGS.filter((setting) => supports(next, setting.feature) && !used(next, setting));
   // Series are matched by position, and only while they still read the same entity

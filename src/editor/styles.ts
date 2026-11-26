@@ -438,6 +438,9 @@ export const editorStyles = css`
     background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.15);
     color: var(--primary-text-color);
   }
+  .range-note {
+    margin-bottom: 12px;
+  }
   .unsupported span {
     flex: 1;
   }
