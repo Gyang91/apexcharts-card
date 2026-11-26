@@ -425,8 +425,8 @@ export const editorStyles = css`
   }
   .band-bar {
     display: flex;
-    height: 12px;
-    border-radius: 6px;
+    height: 20px;
+    border-radius: 8px;
     overflow: hidden;
   }
   .band-bar div {
