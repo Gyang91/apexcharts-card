@@ -4,8 +4,16 @@ import '../src/apexcharts-card';
 import '../src/editor/tabs/display-tab';
 import '../src/editor/components/color-threshold-editor';
 import { getLayoutConfig } from '../src/apex-layouts';
-import { heatmapColorScale, heatmapTickAmount, heatmapTimeLabel } from '../src/visual-data';
-import { mkHass } from './fixtures/hass';
+import {
+  bandLimits,
+  heatmapColorScale,
+  heatmapTickAmount,
+  heatmapTimeLabel,
+  sharedUnit,
+  suggestBands,
+} from '../src/visual-data';
+import { t } from '../src/editor/localize';
+import { mkHass, mkState } from './fixtures/hass';
 import type { ChartCardExternalConfig } from '../src/types-config';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,5 +177,85 @@ describe('heatmap time labels', () => {
     expect(heatmapTimeLabel(new Date(2026, 10, 25).getTime(), now, 'en', false)).toBe('Yesterday');
     expect(heatmapTimeLabel(new Date(2026, 10, 23).getTime(), now, 'en', false)).toBe('Mon');
     expect(heatmapTimeLabel(new Date(2026, 10, 26).getTime(), now, 'fr', false)).toBe('Aujourd’hui');
+  });
+});
+
+describe('band ranges, units and suggestions', () => {
+  it('names the range of each band in its own order, with the unit', () => {
+    expect(bandLimits([{ value: 22 }, { value: 20 }, { value: 24 }], '°C')).toEqual([
+      '22 – 24 °C',
+      '< 22 °C',
+      '≥ 24 °C',
+    ]);
+    expect(bandLimits([{ value: 5 }])).toEqual(['≥ 5']);
+  });
+
+  it('finds the unit the series share, or reports them mixed', () => {
+    expect(sharedUnit(['°C', undefined, '°C'])).toEqual({ unit: '°C', mixed: false });
+    expect(sharedUnit(['°C', '%'])).toEqual({ unit: undefined, mixed: true });
+    expect(sharedUnit([undefined])).toEqual({ unit: undefined, mixed: false });
+  });
+
+  it('suggests round limits across the data, cool to warm, for any unit', () => {
+    const temperature = suggestBands(18.3, 24.6);
+    expect(temperature.map((band) => band.value)).toEqual([18, 20, 22, 24]);
+    expect(temperature[0].color).toBe('#3a85d6');
+    expect(temperature.at(-1)!.color).toBe('#d85a30');
+    expect(suggestBands(120, 2350).map((band) => band.value)).toEqual([0, 1000, 2000]);
+    expect(suggestBands(0.2, 0.9).map((band) => band.value)).toEqual([0.2, 0.4, 0.6, 0.8]);
+    expect(suggestBands(NaN, 3)).toEqual([]);
+  });
+
+  it('puts the unit in the legend names of unnamed bands', () => {
+    const config = heatmap({ heatmap: { color_ranges: [{ value: 20, color: 'green' }] } });
+    config.series[0].unit = '°C';
+    const layout = getLayoutConfig(internalConfig(config), mkHass(), []) as AnyRec;
+    expect(layout.plotOptions.heatmap.colorScale.ranges[0].name).toBe('≥ 20 °C');
+  });
+});
+
+describe('heatmap bands panel', () => {
+  afterEach(() => document.body.replaceChildren());
+
+  const mount = async (config: ChartCardExternalConfig, hass = mkHass()) => {
+    const tab = document.createElement('apexcharts-card-editor-display') as unknown as AnyRec;
+    tab.hass = hass;
+    tab.config = config;
+    document.body.appendChild(tab as unknown as Node);
+    await tab.updateComplete;
+    return tab;
+  };
+
+  it('comes first, with the unit from the sensors and the range of each band', async () => {
+    const hass = mkHass({ 'sensor.a': mkState('sensor.a', '21', { unit_of_measurement: '°C' }) });
+    const tab = await mount(heatmap({ heatmap: { color_ranges: BANDS } }), hass);
+    expect(tab.shadowRoot.querySelector('.section > ha-expansion-panel').getAttribute('header')).toBe(
+      t('display.panel.heatmapBands'),
+    );
+    const list = tab.shadowRoot.querySelector('apexcharts-card-color-threshold-editor');
+    expect(list.unit).toBe('°C');
+    await list.updateComplete;
+    const ranges = [...list.shadowRoot.querySelectorAll('.band-range')].map((el: Element) => el.textContent);
+    expect(ranges).toEqual(['22 – 23 °C', '< 22 °C', '≥ 23 °C']);
+    expect(list.shadowRoot.querySelectorAll('.band-bar div').length).toBe(3);
+    expect(list.shadowRoot.querySelector('ha-textfield').getAttribute('label')).toBe(`${t('field.value')} (°C)`);
+  });
+
+  it('suggests bands from the recorded min and max', async () => {
+    const hass = mkHass();
+    (hass as AnyRec).callWS = async () => ({
+      'sensor.a': [
+        { start: Date.now() - 7200000, end: Date.now() - 3600000, min: 18.3, max: 21, mean: 20 },
+        { start: Date.now() - 3600000, end: Date.now(), min: 20, max: 24.6, mean: 22 },
+      ],
+    });
+    const tab = await mount(heatmap({ heatmap: { max_cells: 100 } }), hass);
+    const changed = vi.fn();
+    tab.addEventListener('config-changed', changed);
+    await tab._suggestBands();
+    expect(changed.mock.calls[0][0].detail.config.heatmap).toEqual({
+      max_cells: 100,
+      color_ranges: suggestBands(18.3, 24.6),
+    });
   });
 });

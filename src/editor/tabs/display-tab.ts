@@ -1,5 +1,6 @@
 import { LitElement, html, nothing, TemplateResult, CSSResultGroup } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
+import parse from 'parse-duration';
 import { HomeAssistant } from 'custom-card-helpers';
 import { ChartCardExternalConfig, ChartCardHeaderExternalConfig, ChartCardHeatmapColorRange } from '../../types-config';
 import { computeHelper, computeLabel } from '../helpers';
@@ -20,6 +21,8 @@ import { AnnotationItem } from '../components/annotations-editor';
 import { getApexValue, setApexValue, setApexValues } from '../apex-config-utils';
 import { t } from '../localize';
 import { supports } from '../support';
+import { sharedUnit, suggestBands } from '../../visual-data';
+import { fetchStatistics } from '../../recorder';
 import { BRUSH_SCHEMA } from '../schemas/advanced';
 import '../components/header-editor';
 import '../components/color-list-editor';
@@ -134,13 +137,56 @@ export class ApexChartsCardEditorDisplay extends LitElement {
   };
 
   // Heatmap colour bands, keeping the other heatmap options
+  // The unit the series share: their own, all_series_config's, else the entity's
+  private _bandUnit(): { unit?: string; mixed: boolean } {
+    const cfg = this.config!;
+    return sharedUnit(
+      (cfg.series || []).map(
+        (serie) =>
+          serie.unit ??
+          cfg.all_series_config?.unit ??
+          this.hass?.states[serie.entity ?? '']?.attributes?.unit_of_measurement,
+      ),
+    );
+  }
+
+  @state() private _suggesting = false;
+  @state() private _suggestNote?: string;
+
+  // Bands across the min and max the series' statistics recorded over the chart's span,
+  // else their current states
+  private _suggestBands = async (): Promise<void> => {
+    const cfg = this.config!;
+    const ids = (cfg.series || []).map((serie) => serie.entity).filter((id): id is string => !!id);
+    const end = new Date();
+    const start = new Date(end.getTime() - (parse(cfg.graph_span ?? '24h') ?? 86400000));
+    this._suggesting = true;
+    try {
+      const rows = await Promise.all(
+        ids.map((id) => fetchStatistics(this.hass, id, start, end, 'hour').catch(() => undefined)),
+      );
+      const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+      let values = rows.flatMap((list) => (list ?? []).flatMap((row) => [row.min ?? row.mean, row.max ?? row.mean]));
+      if (!values.some(isNumber)) values = ids.map((id) => Number(this.hass?.states[id]?.state));
+      const found = values.filter(isNumber);
+      const bands = found.length ? suggestBands(Math.min(...found), Math.max(...found)) : [];
+      this._suggestNote = bands.length ? undefined : t('display.heatmapBands.noData');
+      if (bands.length) this._setBands(bands);
+    } finally {
+      this._suggesting = false;
+    }
+  };
+
   private _heatmapBandsChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
-    const bands = ev.detail.value as ChartCardHeatmapColorRange[];
+    this._setBands(ev.detail.value as ChartCardHeatmapColorRange[]);
+  };
+
+  private _setBands(bands: ChartCardHeatmapColorRange[]): void {
     const heatmap = { ...this.config?.heatmap, color_ranges: bands.length ? bands : undefined };
     if (!heatmap.color_ranges) delete heatmap.color_ranges;
     this._fire({ heatmap: Object.keys(heatmap).length ? heatmap : undefined });
-  };
+  }
 
   private _appearanceChanged = (ev: CustomEvent): void => {
     ev.stopPropagation();
@@ -441,8 +487,28 @@ export class ApexChartsCardEditorDisplay extends LitElement {
     const xAnnotations = this._readAnnotations('xaxis');
     const yAnnotations = this._readAnnotations('yaxis');
 
+    const unit = this._bandUnit();
     return html`
       <div class="section">
+        ${
+          cfg.chart_type === 'heatmap'
+            ? html`<ha-expansion-panel outlined header=${t('display.panel.heatmapBands')} expanded>
+                <p class="hint">${t('display.heatmapBands.helper')}</p>
+                ${unit.mixed ? html`<p class="hint">${t('display.heatmapBands.mixedUnits')}</p>` : nothing}
+                <apexcharts-card-color-threshold-editor
+                  .thresholds=${cfg.heatmap?.color_ranges || []}
+                  .third=${'name'}
+                  .unit=${unit.unit}
+                  .addLabel=${t('display.heatmapBands.add')}
+                  @value-changed=${this._heatmapBandsChanged}
+                ></apexcharts-card-color-threshold-editor>
+                <button class="add-button" type="button" ?disabled=${this._suggesting} @click=${this._suggestBands}>
+                  ${t(this._suggesting ? 'display.heatmapBands.suggesting' : 'display.heatmapBands.suggest')}
+                </button>
+                <p class="hint">${this._suggestNote ?? t('display.heatmapBands.suggestHelper')}</p>
+              </ha-expansion-panel>`
+            : nothing
+        }
         <ha-expansion-panel outlined header=${t('display.panel.header')} expanded>
           <apexcharts-card-header-editor
             .hass=${this.hass}
@@ -620,19 +686,6 @@ export class ApexChartsCardEditorDisplay extends LitElement {
                 </div>
               </ha-expansion-panel>`
             : nothing
-        }
-        ${
-          cfg.chart_type === 'heatmap'
-            ? html`<ha-expansion-panel outlined header=${t('display.panel.heatmapBands')} expanded>
-                <p class="hint">${t('display.heatmapBands.helper')}</p>
-                <apexcharts-card-color-threshold-editor
-                  .thresholds=${cfg.heatmap?.color_ranges || []}
-                  .third=${'name'}
-                  .addLabel=${t('display.heatmapBands.add')}
-                  @value-changed=${this._heatmapBandsChanged}
-                ></apexcharts-card-color-threshold-editor>
-              </ha-expansion-panel>`
-            : ''
         }
         ${
           supports(cfg, 'brush')

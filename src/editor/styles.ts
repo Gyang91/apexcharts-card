@@ -423,6 +423,34 @@ export const editorStyles = css`
   .unsupported span {
     flex: 1;
   }
+  .band-bar {
+    display: flex;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--divider-color);
+  }
+  .band-bar div {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 4px;
+    text-align: center;
+  }
+  .band-bar span {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 0.8em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .band-range {
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
   .validation-error {
     color: var(--error-color);
     font-size: 0.85em;

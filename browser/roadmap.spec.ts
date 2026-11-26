@@ -479,7 +479,8 @@ test('heatmap colour bands colour each cell by its value and list the bands in t
   }
   expect(result.cells.some((cell) => cell.value < 20)).toBe(true);
   expect(result.cells.some((cell) => cell.value >= 22)).toBe(true);
-  expect(result.legend).toEqual(['Comfort', '≥ 22']);
+  // unnamed bands carry the sensor's unit
+  expect(result.legend).toEqual(['Comfort', '≥ 22 °C']);
 });
 
 test('editor presets require a click and preserve entity identity through the real editor', async ({ page }) => {

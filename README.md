@@ -513,7 +513,8 @@ heatmap:
 ```
 
 - Each band colors the cells from its `value` up to the next band's value. The lowest band also covers everything below it, and the highest everything above, so every cell gets a color with no gaps between bands.
-- `name` is shown in the legend, which appears with the bands. Without a name, the band is named after its limits, such as `< 18`, `18 – 21` or `≥ 21`.
+- `name` is shown in the legend, which appears with the bands. Without a name, the band is named after its limits and the series' unit, such as `< 18 °C`, `18 – 21 °C` or `≥ 21 °C`. The unit is left out when the series use different units.
+- In the editor, the panel comes first on the Display tab for heatmaps. Each band shows the range it covers with the unit, and a colour bar shows the bands in order. **Suggest bands from data** reads the lowest and highest values of the time span from Home Assistant's statistics and replaces the bands with round limits from cool to warm, for any unit: for example 18 / 20 / 22 / 24 °C, or 0 / 1000 / 2000 W.
 - `color` accepts any CSS color, including theme variables like `var(--state-climate-cool-color)`.
 - If you already set `apex_config.plotOptions.heatmap.colorScale.ranges` yourself, that keeps working; use either that or `color_ranges`, not both.
 
