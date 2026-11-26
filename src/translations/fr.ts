@@ -492,7 +492,7 @@ export const fr: Record<string, string> = {
   'editor.unsupported.remove': 'Les supprimer',
   'field.heatmap': 'Réglages de la heatmap',
   'editor.rangeAreaPair':
-    'Une bande de plage demande exactement 2 séries dans l’onglet Séries : la borne basse puis la borne haute. Elle en a {count}.',
+    'Une bande de plage montre la zone entre deux séries, la borne basse d’abord. Elle en a {count} : ajoutez-en une dans l’onglet Séries.',
   'helper.brush':
     'Un petit graphique d’ensemble sous le principal : faites-y glisser pour choisir la période affichée au-dessus.',
   'display.heatmapBands.mixedUnits':
@@ -502,4 +502,7 @@ export const fr: Record<string, string> = {
   'display.heatmapBands.suggestHelper':
     'Lit les valeurs les plus basses et les plus hautes sur la période et remplace les bandes par des limites arrondies, du froid au chaud.',
   'display.heatmapBands.noData': 'Aucune donnée numérique trouvée pour ces séries sur la période.',
+  'editor.openSeries': 'Ouvrir Séries',
+  'editor.rangeAreaUses': 'La bande va de {lower} (borne basse) à {upper} (borne haute).',
+  'editor.rangeAreaAside': '{count} autres séries sont mises de côté et reviennent si vous choisissez un autre type.',
 };
