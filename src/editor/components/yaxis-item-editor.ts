@@ -8,6 +8,7 @@ import { editorStyles } from '../styles';
 import {
   computeHelper,
   computeLabel,
+  debounced,
   isValidYaxisLimit,
   parseYaxisLimit,
   serializeYaxisLimit,
@@ -15,6 +16,7 @@ import {
 } from '../helpers';
 import { BoolField } from './bool-grid';
 import { t } from '../localize';
+import { formField } from './form-field';
 import './bool-grid';
 
 const LIMIT_MODES: YaxisLimitMode[] = ['auto', 'fixed', 'soft', 'padding'];
@@ -161,21 +163,18 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
     this._fireLabels(value === false ? false : undefined, this.labelsFormatterBody);
   };
 
-  private _labelsFormatterChanged = (ev: Event): void => {
-    const body = (ev.target as HTMLInputElement | HTMLTextAreaElement).value;
-    this._fireLabels(this.labelsShow === false ? false : undefined, body);
-  };
+  // A function body is invalid while typed: wait for a pause before the preview runs it
+  private _labelsFormatterChanged = debounced(
+    (body: string): void => {
+      this._fireLabels(this.labelsShow === false ? false : undefined, body);
+    },
+    undefined,
+    800,
+  );
 
-  private _tickAmountChanged = (ev: Event): void => {
-    const raw = (ev.target as HTMLInputElement).value;
-    const trimmed = raw.trim();
-    let value: number | undefined;
-    if (trimmed === '') {
-      value = undefined;
-    } else {
-      const n = Number(trimmed);
-      value = isNaN(n) || n < 0 ? undefined : Math.floor(n);
-    }
+  private _tickAmountChanged = (raw: unknown): void => {
+    const n = raw === undefined || raw === null || raw === '' ? NaN : Number(raw);
+    const value = Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
     this.dispatchEvent(
       new CustomEvent('tick-amount-changed', {
         detail: { value },
@@ -296,16 +295,13 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
           @value-changed=${this._showChanged}
         ></apexcharts-card-bool-grid>
         <div class="tick-amount-block">
-          <ha-textfield
-            class="tick-amount-input"
-            label=${t('yaxis.tickAmount.label')}
-            type="number"
-            min="0"
-            step="1"
-            placeholder=${t('common.auto')}
-            .value=${this.tickAmount === undefined ? '' : String(this.tickAmount)}
-            @input=${this._tickAmountChanged}
-          ></ha-textfield>
+          ${formField({
+            name: 'tick_amount',
+            value: this.tickAmount,
+            selector: { number: { mode: 'box', min: 0, step: 1 } },
+            label: t('yaxis.tickAmount.label'),
+            onChange: this._tickAmountChanged,
+          })}
           <div class="tick-amount-helper">
             ${t('yaxis.tickAmount.helperPrefix')}
             <code>10</code> ${t('yaxis.tickAmount.helperMiddle')} <code>1</code> ${t('yaxis.tickAmount.helperMiddle2')}
@@ -320,14 +316,14 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
               @value-changed=${this._labelsShowChanged}
             ></apexcharts-card-bool-grid>
             <div class="formatter-block">
-              <ha-textarea
-                class="formatter-textarea"
-                label=${t('yaxis.formatter.label')}
-                rows="4"
-                placeholder="return value + ' kWh';"
-                .value=${this.labelsFormatterBody}
-                @change=${this._labelsFormatterChanged}
-              ></ha-textarea>
+              ${formField({
+                name: 'formatter',
+                value: this.labelsFormatterBody,
+                selector: { text: { multiline: true } },
+                label: t('yaxis.formatter.label'),
+                helper: "return value + ' kWh';",
+                onChange: (value) => this._labelsFormatterChanged(String(value ?? '')),
+              })}
               <div class="formatter-helper">
                 ${t('yaxis.formatter.helperPrefix')} <code>value</code>. ${t('yaxis.formatter.helperMiddle')}
                 <code>EVAL:function(value) { ... }</code> ${t('yaxis.formatter.helperSuffix')}

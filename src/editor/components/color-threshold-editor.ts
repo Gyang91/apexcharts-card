@@ -6,6 +6,7 @@ import { t } from '../localize';
 import { debounced, typedNumber } from '../helpers';
 import './color-input';
 import { bandLimits } from '../../visual-data';
+import { formField } from './form-field';
 
 const ICON_DELETE =
   'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
@@ -72,18 +73,15 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
 
   private _field(item: Threshold, index: number, key: 'value' | 'opacity' | 'name'): TemplateResult {
     const isNumber = key !== 'name';
-    const current = item[key];
-    const onInput = (ev: Event) => this._typed(index, key, (ev.target as HTMLInputElement).value, isNumber);
-    return html`<ha-textfield
-      type=${isNumber ? 'number' : 'text'}
-      step="any"
-      label=${key === 'value' && this.unit ? `${t('field.value')} (${this.unit})` : t(`field.${key}`)}
-      .value=${current === undefined ? '' : String(current)}
-      .helper=${t(`helper.threshold_${key}`)}
-      helperPersistent
-      @input=${onInput}
-      @change=${onInput}
-    ></ha-textfield>`;
+    return formField({
+      name: key,
+      value: item[key] ?? (isNumber ? undefined : ''),
+      selector: isNumber ? { number: { mode: 'box', step: 'any' } } : { text: {} },
+      label: key === 'value' && this.unit ? `${t('field.value')} (${this.unit})` : t(`field.${key}`),
+      helper: t(`helper.threshold_${key}`),
+      onChange: (value) =>
+        this._typed(index, key, value === undefined || value === null ? '' : String(value), isNumber),
+    });
   }
 
   private _add(): void {

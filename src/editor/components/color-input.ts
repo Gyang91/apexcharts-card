@@ -4,6 +4,7 @@ import { computeColor } from '../../utils';
 import { editorStyles } from '../styles';
 import { t } from '../localize';
 import { debounced } from '../helpers';
+import { formField } from './form-field';
 
 // A colour as text (hex, CSS name or var(--x)) next to a swatch that opens the
 // browser's colour picker. Fires value-changed while typing or picking, after a
@@ -43,8 +44,6 @@ export class ApexChartsCardColorInput extends LitElement {
     this._fire(value);
   };
 
-  private _typed = (ev: Event): void => this._fire((ev.target as HTMLInputElement).value);
-
   protected render(): TemplateResult {
     const resolved = this._resolved('');
     return html`
@@ -57,14 +56,14 @@ export class ApexChartsCardColorInput extends LitElement {
             @input=${this._picked}
           />
         </label>
-        <ha-textfield
-          label=${this.label ?? t('field.color')}
-          .value=${this.value || ''}
-          .helper=${t('helper.color')}
-          helperPersistent
-          @input=${this._typed}
-          @change=${this._typed}
-        ></ha-textfield>
+        ${formField({
+          name: 'color',
+          value: this.value ?? '',
+          selector: { text: {} },
+          label: this.label ?? t('field.color'),
+          helper: t('helper.color'),
+          onChange: (value) => this._fire(String(value ?? '')),
+        })}
       </div>
     `;
   }

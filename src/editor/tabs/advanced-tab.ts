@@ -9,6 +9,7 @@ import { BEHAVIOR_SCHEMA, EXPERIMENTAL_BOOL_FIELDS } from '../schemas/advanced';
 import { HaFormSchema } from '../types';
 import { BoolField } from '../components/bool-grid';
 import { t } from '../localize';
+import { formField } from '../components/form-field';
 import '../components/yaml-editor';
 import '../components/bool-grid';
 
@@ -183,19 +184,15 @@ export class ApexChartsCardEditorAdvanced extends LitElement {
               `,
             )}
             <div class="add-row">
-              <ha-textfield
-                label=${t('advanced.templates.nameLabel')}
-                .value=${this._templateInput}
-                @input=${(ev: Event) => {
-                  this._templateInput = (ev.target as HTMLInputElement).value;
-                }}
-                @keydown=${(ev: KeyboardEvent) => {
-                  if (ev.key === 'Enter') {
-                    ev.preventDefault();
-                    this._addTemplate();
-                  }
-                }}
-              ></ha-textfield>
+              ${formField({
+                name: 'template',
+                value: this._templateInput,
+                selector: { text: {} },
+                label: t('advanced.templates.nameLabel'),
+                onChange: (value) => {
+                  this._templateInput = String(value ?? '');
+                },
+              })}
               <ha-icon-button
                 .path=${ICON_ADD}
                 .label=${t('advanced.templates.add')}

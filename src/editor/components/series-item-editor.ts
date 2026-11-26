@@ -450,6 +450,8 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
     const s = this.series as ChartCardSeriesExternalConfig;
     const showColorThreshold = !this.isAllSeriesConfig && supports(this.config, 'color_threshold');
     const showHeaderActions = !this.isAllSeriesConfig;
+    // Hidden when the chart type uses none of its settings, as on heatmaps
+    const appearance = filterSchema(getSeriesAppearanceSchema(), this._applies);
     const yaxisIdSchema = filterSchema(this._yaxisIdSchema(), this._applies);
 
     return html`
@@ -501,34 +503,37 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
               `
             : nothing
         }
-
-        <ha-expansion-panel outlined header=${t('series.panel.appearance')}>
-          <div class="section">
-            <ha-form
-              .hass=${this.hass}
-              .data=${stable(this._appearanceData())}
-              .schema=${stable(filterSchema(getSeriesAppearanceSchema(), this._applies))}
-              .computeLabel=${computeLabel}
-              .computeHelper=${computeHelper}
-              @value-changed=${this._appearanceChanged}
-            ></ha-form>
-            ${
-              this._applies('invert')
-                ? html`<apexcharts-card-bool-grid
-                    .fields=${[
-                      {
-                        name: 'invert',
-                        label: computeLabel({ name: 'invert' } as HaFormSchema),
-                        value: s.invert ?? false,
-                      },
-                    ]}
-                    .columns=${1}
-                    @value-changed=${this._invertChanged}
-                  ></apexcharts-card-bool-grid>`
-                : nothing
-            }
-          </div>
-        </ha-expansion-panel>
+        ${
+          appearance.length || this._applies('invert')
+            ? html`<ha-expansion-panel outlined header=${t('series.panel.appearance')}>
+                <div class="section">
+                  <ha-form
+                    .hass=${this.hass}
+                    .data=${stable(this._appearanceData())}
+                    .schema=${stable(appearance)}
+                    .computeLabel=${computeLabel}
+                    .computeHelper=${computeHelper}
+                    @value-changed=${this._appearanceChanged}
+                  ></ha-form>
+                  ${
+                    this._applies('invert')
+                      ? html`<apexcharts-card-bool-grid
+                          .fields=${[
+                            {
+                              name: 'invert',
+                              label: computeLabel({ name: 'invert' } as HaFormSchema),
+                              value: s.invert ?? false,
+                            },
+                          ]}
+                          .columns=${1}
+                          @value-changed=${this._invertChanged}
+                        ></apexcharts-card-bool-grid>`
+                      : nothing
+                  }
+                </div>
+              </ha-expansion-panel>`
+            : nothing
+        }
 
         <ha-expansion-panel outlined header=${t('series.panel.visibility')}>
           <div class="section">

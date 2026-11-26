@@ -185,7 +185,7 @@ export const editorStyles = css`
     gap: 12px;
   }
 
-  /* Annotation row — bordered group with native inputs (avoids ha-textfield upgrade issues) */
+  /* Annotation row */
   .annotation-row {
     display: flex;
     flex-direction: column;
@@ -299,7 +299,7 @@ export const editorStyles = css`
     cursor: pointer;
     opacity: 0;
   }
-  .color-field ha-textfield {
+  .color-field ha-form {
     flex: 1;
   }
 
@@ -390,7 +390,7 @@ export const editorStyles = css`
     gap: 8px;
     align-items: center;
   }
-  .add-row ha-textfield {
+  .add-row ha-form {
     flex: 1;
   }
 

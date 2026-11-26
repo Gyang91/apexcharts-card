@@ -3,6 +3,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { computeColor } from '../../utils';
 import { editorStyles } from '../styles';
 import { t } from '../localize';
+import { formField } from './form-field';
 
 const ICON_DELETE =
   'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
@@ -58,11 +59,13 @@ export class ApexChartsCardColorListEditor extends LitElement {
           (c, i) => html`
             <div class="color-field" style="padding: 0 4px;">
               <span class="color-preview" style="background: ${this._swatch(c)};"></span>
-              <ha-textfield
-                label=${t('field.color')}
-                .value=${c}
-                @change=${(ev: Event) => this._update(i, (ev.target as HTMLInputElement).value)}
-              ></ha-textfield>
+              ${formField({
+                name: 'color',
+                value: c,
+                selector: { text: {} },
+                label: t('field.color'),
+                onChange: (value) => this._update(i, String(value ?? '')),
+              })}
               <ha-icon-button
                 .path=${ICON_DELETE}
                 .label=${t('display.colorList.remove')}

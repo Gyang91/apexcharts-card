@@ -26,10 +26,16 @@ const make = (tag: string, props: AnyEl = {}): AnyEl => {
   return el;
 };
 
-const typeInto = (field: Element, text: string) => {
-  (field as HTMLInputElement).value = text;
-  field.dispatchEvent(new Event('input'));
+// What ha-form reports as the user types: a number field gives a number, or nothing while
+// empty or half typed
+const typeInto = (form: Element, text: string) => {
+  const [field] = (form as AnyEl).schema;
+  const number = Number(text);
+  const value = field.selector.number ? (text.trim() === '' || isNaN(number) ? undefined : number) : text;
+  form.dispatchEvent(new CustomEvent('value-changed', { detail: { value: { [field.name]: value } } }));
 };
+const formsLabelled = (root: ShadowRoot, label: string) =>
+  [...root.querySelectorAll('ha-form')].filter((form: AnyEl) => form.schema?.[0]?.label === label) as Element[];
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
@@ -107,7 +113,7 @@ describe('colour band and threshold rows', () => {
   };
   const fields = async (list: AnyEl, label: string) => {
     await list.updateComplete;
-    return [...list.shadowRoot.querySelectorAll(`ha-textfield[label="${label}"]`)] as Element[];
+    return formsLabelled(list.shadowRoot, label);
   };
 
   it('updates while typing, after a short pause, and keeps the row where it is', async () => {
@@ -138,12 +144,12 @@ describe('colour band and threshold rows', () => {
   it('shows what each field expects', async () => {
     const { list } = rows([{ value: 10, color: 'red' }], 'name');
     const [name] = await fields(list, 'Name');
-    expect((name as AnyEl).helper).toBe('Shown in the legend');
+    expect((name as AnyEl).schema[0].helper).toBe('Shown in the legend');
     // bands get no hint of their own: the panel explains them once
     expect(list.shadowRoot.querySelector('.hint')).toBeNull();
     const colour = list.shadowRoot.querySelector('apexcharts-card-color-input');
     await colour.updateComplete;
-    expect(colour.shadowRoot.querySelector('ha-textfield').helper).toContain('#hex');
+    expect(colour.shadowRoot.querySelector('ha-form').schema[0].helper).toContain('#hex');
   });
 
   it('draws the bands as a colour strip in value order, following their colours', async () => {
