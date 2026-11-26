@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.23.2](https://github.com/Gyang91/apexcharts-card/compare/v2.23.1...v2.23.2) (2026-11-26)
+
+
+### Performance
+
+* **editor:** fewer preview rebuilds, no form rebuilds, faster first draw ([ae01bf0](https://github.com/Gyang91/apexcharts-card/commit/ae01bf0cdf768a249aae08eb6a0d5f02352073b6))
+
 ## [2.23.1](https://github.com/Gyang91/apexcharts-card/compare/v2.23.0...v2.23.1) (2026-11-26)
 
 
