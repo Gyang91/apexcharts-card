@@ -642,6 +642,8 @@ function getFillType(config: ChartCardConfig, brush: boolean) {
 function evalApexConfig(apexConfig: any): any {
   const eval2 = eval;
   Object.keys(apexConfig).forEach((key) => {
+    // Never write through keys that reach a prototype (user-supplied YAML/JSON)
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
     if (typeof apexConfig[key] === 'string' && apexConfig[key].trim().startsWith('EVAL:')) {
       apexConfig[key] = eval2(`(${apexConfig[key].trim().slice(5)})`);
     }
