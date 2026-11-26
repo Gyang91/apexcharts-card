@@ -1,8 +1,8 @@
 import { LitElement, html, TemplateResult, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { computeColor } from '../../utils';
 import { t } from '../localize';
 import { formField } from './form-field';
+import './color-input';
 
 const ICON_DELETE = 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
 const ICON_ADD = 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z';
@@ -23,24 +23,6 @@ export class ApexChartsCardAnnotationsEditor extends LitElement {
   // and ha-textfield uses HA's default theming exactly as it does in other forms.
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
-  }
-
-  private _swatch(color?: string): string {
-    if (!color) return 'transparent';
-    try {
-      return computeColor(color);
-    } catch {
-      return 'transparent';
-    }
-  }
-
-  private _hex(color?: string): string {
-    if (!color) return '#000000';
-    try {
-      return computeColor(color);
-    } catch {
-      return '#000000';
-    }
   }
 
   private _fire(items: AnnotationItem[]): void {
@@ -117,24 +99,13 @@ export class ApexChartsCardAnnotationsEditor extends LitElement {
               </div>
               <div class="annotation-field">
                 <div class="annotation-color-row">
-                  <!-- Native color input kept on purpose: only theme-independent color
-                       wheel available without relying on unstable HA internals -->
-                  <label class="color-preview" title=${t('common.pickColor')}>
-                    <span style="display:block;width:100%;height:100%;background: ${this._swatch(item.color)};"></span>
-                    <input
-                      type="color"
-                      .value=${this._hex(item.color)}
-                      @input=${(ev: Event) => this._update(i, { color: (ev.target as HTMLInputElement).value })}
-                    />
-                  </label>
-                  ${formField({
-                    name: 'color',
-                    value: item.color || '',
-                    selector: { text: {} },
-                    label: t('field.color'),
-                    helper: t('helper.color'),
-                    onChange: (value) => this._update(i, { color: String(value ?? '') }),
-                  })}
+                  <apexcharts-card-color-input
+                    .value=${item.color}
+                    @value-changed=${(ev: CustomEvent) => {
+                      ev.stopPropagation();
+                      this._update(i, { color: ev.detail.value ?? '' });
+                    }}
+                  ></apexcharts-card-color-input>
                   <ha-icon-button
                     .path=${ICON_DELETE}
                     .label=${t('annotations.remove')}

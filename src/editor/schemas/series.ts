@@ -62,8 +62,9 @@ export function getSeriesCoreSchema(): HaFormSchema[] {
 }
 
 // Common group_by settings by name; 'Custom…' shows the group_by fields
-export function getSmoothingSchema(): HaFormSchema[] {
-  const names = ['none', ...Object.keys(SMOOTHING_PRESETS), 'custom'];
+// `grouped`: the chart needs grouped points (heatmaps), so no ungrouped choice is offered
+export function getSmoothingSchema(grouped = false): HaFormSchema[] {
+  const names = [...(grouped ? [] : ['none']), ...Object.keys(SMOOTHING_PRESETS), 'custom'];
   return [
     {
       name: 'smoothing',
@@ -75,7 +76,7 @@ export function getSmoothingSchema(): HaFormSchema[] {
 }
 
 // Inner fields of the Group By expander (start_with_last rendered separately via bool-grid)
-export function getSeriesGroupBySchema(): HaFormSchema[] {
+export function getSeriesGroupBySchema(grouped = false): HaFormSchema[] {
   return [
     {
       type: 'grid',
@@ -88,7 +89,7 @@ export function getSeriesGroupBySchema(): HaFormSchema[] {
             select: {
               mode: 'dropdown',
               options: [
-                { value: 'raw', label: t('series.func.raw') },
+                ...(grouped ? [] : [{ value: 'raw', label: t('series.func.raw') }]),
                 { value: 'avg', label: t('series.func.avg') },
                 { value: 'time_avg', label: t('series.func.time_avg') },
                 { value: 'min', label: t('series.func.min') },

@@ -251,23 +251,36 @@ export function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T
   return out as Partial<T>;
 }
 
+// Every edit still waiting for typing to pause, so the editor can apply them before it saves
+const pendingEdits = new Set<() => void>();
+
+export function flushPendingEdits(): void {
+  for (const run of [...pendingEdits]) run();
+}
+
 // Runs fn once typing pauses; pending calls are kept per key, so one field never drops another's
 export function debounced<A extends unknown[]>(
   fn: (...args: A) => void,
   keyOf: (...args: A) => string = () => '',
   wait = 350,
 ): (...args: A) => void {
-  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const pending = new Map<string, { timer: ReturnType<typeof setTimeout>; run: () => void }>();
   return (...args: A) => {
     const key = keyOf(...args);
-    clearTimeout(timers.get(key));
-    timers.set(
-      key,
-      setTimeout(() => {
-        timers.delete(key);
-        fn(...args);
-      }, wait),
-    );
+    const previous = pending.get(key);
+    if (previous) {
+      clearTimeout(previous.timer);
+      pendingEdits.delete(previous.run);
+    }
+    const run = () => {
+      clearTimeout(timer);
+      pending.delete(key);
+      pendingEdits.delete(run);
+      fn(...args);
+    };
+    const timer = setTimeout(run, wait);
+    pending.set(key, { timer, run });
+    pendingEdits.add(run);
   };
 }
 

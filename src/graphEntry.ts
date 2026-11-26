@@ -78,7 +78,7 @@ export default class GraphEntry {
   private _updating = false;
 
   // 'read': use the browser cache but don't write to it (edit mode)
-  private _cache: boolean | 'read';
+  private _cache: boolean | 'read' = false;
 
   private _graphSpan: number;
 
@@ -138,12 +138,11 @@ export default class GraphEntry {
       diff_inc: this._diffIncreasing,
     };
     this._index = index;
-    // Statistics are fetched whole; computed series are rebuilt from their inputs
-    this._cache = config.statistics || isComputedSeries(config) ? false : cache;
     this._entityID = config.entity ?? '';
     this._isExternalStat = isExternalStatisticId(config.entity);
     this._graphSpan = graphSpan;
     this._config = config;
+    this.cache = cache;
     this._func = aggregateFuncMap[config.group_by.func];
     this._realEnd = new Date();
     this._realStart = new Date();
@@ -193,7 +192,8 @@ export default class GraphEntry {
   }
 
   set cache(cache: boolean | 'read') {
-    this._cache = this._config.statistics ? false : cache;
+    // Statistics and computed series are always fetched or built anew
+    this._cache = this._config.statistics || isComputedSeries(this._config) ? false : cache;
   }
 
   public resetHistory(): void {

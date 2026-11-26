@@ -186,7 +186,8 @@ describe('colour band and threshold rows', () => {
     picker.value = '#00ff00';
     picker.dispatchEvent(new Event('input'));
     vi.advanceTimersByTime(400);
-    expect(changed.mock.calls[1][0].detail.value).toEqual([{ value: 10, color: '#00ff00' }]);
+    // the row added just before stays: the list builds on its latest state
+    expect(changed.mock.calls[1][0].detail.value).toEqual([{ value: 10, color: '#00ff00' }, { value: 20 }]);
   });
 });
 

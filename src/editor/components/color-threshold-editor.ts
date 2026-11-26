@@ -3,7 +3,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { ChartCardColorThreshold, ChartCardHeatmapColorRange } from '../../types-config';
 import { editorStyles } from '../styles';
 import { t } from '../localize';
-import { debounced, typedNumber } from '../helpers';
+import { debounced, flushPendingEdits, typedNumber } from '../helpers';
 import './color-input';
 import { bandLimits } from '../../visual-data';
 import { formField } from './form-field';
@@ -32,6 +32,8 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
   }
 
   private _fire(thresholds: Threshold[]): void {
+    // The list in hand at once, so an edit and a removal right after it build on each other
+    this.thresholds = thresholds;
     // Kept in the order shown, so the row being edited stays put; the card sorts by value.
     this.dispatchEvent(
       new CustomEvent('value-changed', {
@@ -85,11 +87,13 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
   }
 
   private _add(): void {
+    flushPendingEdits();
     const last = this.thresholds[this.thresholds.length - 1];
     this._fire([...this.thresholds, { value: last ? last.value + 10 : 0 } as Threshold]);
   }
 
   private _remove(index: number): void {
+    flushPendingEdits();
     const list = [...this.thresholds];
     list.splice(index, 1);
     this._fire(list);
