@@ -1,0 +1,17 @@
+%% Source of docs/data_processing_chart.png: how one series' data is processed, in plain words.
+%% Render with mermaid (e.g. https://mermaid.live) and replace the PNG after a change.
+%% Colours follow the original diagram: source yellow, steps green, chart blue.
+flowchart LR
+  get("<b>1. Get the data</b><br/><small>history, <code>statistics</code>,<br/>your own code, other series</small>")
+  clean("<b>2. Clean up values</b><br/><small><code>transform</code>, <code>fill_raw</code></small>")
+  group("<b>3. Group by time</b><br/><small>optional: <code>group_by</code><br/>e.g. hourly average</small>")
+  prep("<b>4. Prepare for display</b><br/><small>shift, extend, flip,<br/>thin out points</small>")
+  chart("<b>5. Chart</b>")
+  get --> clean --> group --> prep --> chart
+
+  classDef source fill:#fff2cc,stroke:#d6b656,color:#000
+  classDef step fill:#d5e8d4,stroke:#82b366,color:#000
+  classDef output fill:#dae8fc,stroke:#6c8ebf,color:#000
+  class get source
+  class clean,group,prep step
+  class chart output

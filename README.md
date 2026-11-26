@@ -637,11 +637,22 @@ In the UI:
 
 ## Data processing steps
 
-This diagram shows how your data goes through all the steps allowed by this card:
+Each series goes through five steps, from left to right:
 
-![data_processing_steps](docs/data_processing_chart.png)
+![Five steps: get the data, clean up values, group by time, prepare for display, chart](docs/data_processing_chart.png)
 
-A [computed series](#compute-option) comes after these steps: it starts from the processed data of the series it reads, then goes through its own `group_by` and the display steps.
+1. **Get the data.** By default, the card reads the sensor's recent history from Home Assistant. Instead, a series can use long-term [`statistics`](#statistics-options), only the current state (`ignore_history`), points from your own code ([`data_generator`](#data_generator-option)), or values [computed](#compute-option) from the series above it.
+2. **Clean up values.** `transform` converts each value with your own code, and `fill_raw` decides what a missing value becomes. Points from your own code or from other series skip this step.
+3. **Group by time** (optional). [`group_by`](#group_by-options) combines the points of each period into one, for example the average per hour or the maximum per day. The header's value is taken after this step.
+4. **Prepare for display.** This changes only what is drawn, not the data:
+   - `offset` and `time_delta` shift the series in time;
+   - `extend_to` carries the last value to the end of the chart or to now;
+   - `invert` flips the sign;
+   - range bands and heatmaps arrange the series in their own shape;
+   - [`downsample`](#large-history-performance) thins out points on long line and area charts.
+5. **Chart.** The series appears in the main chart (`in_chart`), the brush (`in_brush`), or both.
+
+The diagram's source is [`docs/data_processing_chart.mmd`](docs/data_processing_chart.mmd) (Mermaid).
 
 ## Using the card
 
