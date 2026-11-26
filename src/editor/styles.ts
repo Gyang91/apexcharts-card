@@ -425,27 +425,27 @@ export const editorStyles = css`
   }
   .band-bar {
     display: flex;
+    height: 12px;
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid var(--divider-color);
   }
   .band-bar div {
     flex: 1;
-    min-width: 0;
-    padding: 6px 4px;
-    text-align: center;
   }
-  .band-bar span {
-    display: inline-block;
-    max-width: 100%;
-    padding: 0 4px;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.45);
-    color: #fff;
+  .band-scale {
+    position: relative;
+    height: 1.4em;
+    margin-bottom: 4px;
+    color: var(--secondary-text-color);
     font-size: 0.8em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+  .band-scale span {
+    position: absolute;
+    transform: translateX(-50%);
+  }
+  .band-scale .band-unit {
+    right: 0;
+    transform: none;
   }
   .band-range {
     font-weight: 500;
