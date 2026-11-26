@@ -1,5 +1,5 @@
 import { stable } from '../helpers';
-import { LitElement, html, TemplateResult, nothing, CSSResultGroup } from 'lit';
+import { LitElement, html, TemplateResult, nothing, CSSResultGroup, PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { editorStyles } from '../styles';
@@ -43,6 +43,11 @@ import './actions-editor';
 import './bool-grid';
 
 type Series = ChartCardSeriesExternalConfig | ChartCardAllSeriesExternalConfig;
+
+const seriesKey = (serie: Series | undefined) => {
+  const s = serie as ChartCardSeriesExternalConfig | undefined;
+  return `${s?.entity ?? ''}|${s?.id ?? ''}`;
+};
 
 // Series fields only some chart types use
 const FIELD_FEATURES: Record<string, Feature> = {
@@ -161,6 +166,18 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
   // Custom stays open once picked, even when its values happen to match a preset
   @state() private _customSmoothing = false;
+
+  // The list reuses this element for whichever series sits at its place: choices made here
+  // belong to the series, not the place
+  protected willUpdate(changed: PropertyValues): void {
+    const before = changed.get('series') as Series | undefined;
+    if (before && seriesKey(before) !== seriesKey(this.series)) this._customSmoothing = false;
+  }
+
+  // Heatmaps need grouped points, unless the series reads statistics
+  private _needsGrouping(): boolean {
+    return this.config?.chart_type === 'heatmap' && !this.series?.statistics;
+  }
 
   private _smoothing(): string {
     const preset = smoothingOf(this.series?.group_by);
@@ -558,7 +575,7 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
             <ha-form
               .hass=${this.hass}
               .data=${stable({ smoothing: this._smoothing() })}
-              .schema=${stable(getSmoothingSchema())}
+              .schema=${stable(getSmoothingSchema(this._needsGrouping()))}
               .computeLabel=${computeLabel}
               .computeHelper=${computeHelper}
               @value-changed=${this._smoothingChanged}
@@ -568,7 +585,7 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
                 ? html`<ha-form
                       .hass=${this.hass}
                       .data=${stable(this._groupByData())}
-                      .schema=${stable(getSeriesGroupBySchema())}
+                      .schema=${stable(getSeriesGroupBySchema(this._needsGrouping()))}
                       .computeLabel=${computeLabel}
                       .computeHelper=${computeHelper}
                       @value-changed=${this._groupByChanged}

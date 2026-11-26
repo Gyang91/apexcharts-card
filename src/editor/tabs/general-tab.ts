@@ -8,6 +8,7 @@ import { editorStyles } from '../styles';
 import {
   computeHelper,
   computeLabel,
+  filterSchema,
   fromSelectValue,
   isValidDuration,
   isValidOffset,
@@ -94,6 +95,11 @@ export class ApexChartsCardEditorGeneral extends LitElement {
       const span: ChartCardExternalConfig['span'] = {};
       if (data.span.start) span.start = data.span.start as NonNullable<ChartCardExternalConfig['span']>['start'];
       if (data.span.end) span.end = data.span.end as NonNullable<ChartCardExternalConfig['span']>['end'];
+      // Start and end exclude each other: the one just picked wins
+      if (span.start && span.end) {
+        if (span.end !== this.config.span?.end) delete span.start;
+        else delete span.end;
+      }
       if (data.span.offset) span.offset = data.span.offset;
       if (Object.keys(span).length > 0) newConfig.span = span;
       else delete newConfig.span;
@@ -269,7 +275,7 @@ export class ApexChartsCardEditorGeneral extends LitElement {
         <ha-form
           .hass=${this.hass}
           .data=${stable(data)}
-          .schema=${stable(getGeneralBottomSchema())}
+          .schema=${stable(filterSchema(getGeneralBottomSchema(), (name) => name !== 'span' || !this.config?.navigation?.show))}
           .computeLabel=${computeLabel}
           .computeHelper=${computeHelper}
           @value-changed=${this._onValueChanged}

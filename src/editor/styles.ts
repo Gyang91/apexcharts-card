@@ -323,6 +323,7 @@ export const editorStyles = css`
     cursor: pointer;
     opacity: 0;
   }
+  .color-field apexcharts-card-color-input,
   .color-field ha-form {
     flex: 1;
   }

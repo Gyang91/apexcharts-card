@@ -1,5 +1,5 @@
 import { stable } from '../helpers';
-import { LitElement, html, TemplateResult, nothing, CSSResultGroup } from 'lit';
+import { LitElement, html, TemplateResult, nothing, CSSResultGroup, PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { ChartCardYAxisExternal } from '../../types-config';
@@ -98,6 +98,12 @@ export class ApexChartsCardYAxisItemEditor extends LitElement {
 
   // A mode picked before its number is typed: nothing to save yet, but the field shows
   @state() private _pickedModes: Partial<Record<'min' | 'max', YaxisLimitMode>> = {};
+
+  // The list reuses this element for whichever axis sits at its place
+  protected willUpdate(changed: PropertyValues): void {
+    const before = changed.get('yaxis') as ChartCardYAxisExternal | undefined;
+    if (before && before.id !== this.yaxis?.id) this._pickedModes = {};
+  }
 
   static get styles(): CSSResultGroup {
     return editorStyles;

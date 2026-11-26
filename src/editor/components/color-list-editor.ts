@@ -1,9 +1,8 @@
 import { LitElement, html, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { computeColor } from '../../utils';
 import { editorStyles } from '../styles';
 import { t } from '../localize';
-import { formField } from './form-field';
+import './color-input';
 
 const ICON_DELETE =
   'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
@@ -15,15 +14,6 @@ export class ApexChartsCardColorListEditor extends LitElement {
 
   static get styles(): CSSResultGroup {
     return editorStyles;
-  }
-
-  private _swatch(color: string): string {
-    if (!color) return 'transparent';
-    try {
-      return computeColor(color);
-    } catch {
-      return 'transparent';
-    }
   }
 
   private _fire(colors: string[]): void {
@@ -58,14 +48,13 @@ export class ApexChartsCardColorListEditor extends LitElement {
         ${this.colors.map(
           (c, i) => html`
             <div class="color-field" style="padding: 0 4px;">
-              <span class="color-preview" style="background: ${this._swatch(c)};"></span>
-              ${formField({
-                name: 'color',
-                value: c,
-                selector: { text: {} },
-                label: t('field.color'),
-                onChange: (value) => this._update(i, String(value ?? '')),
-              })}
+              <apexcharts-card-color-input
+                .value=${c}
+                @value-changed=${(ev: CustomEvent) => {
+                  ev.stopPropagation();
+                  this._update(i, ev.detail.value ?? '');
+                }}
+              ></apexcharts-card-color-input>
               <ha-icon-button
                 .path=${ICON_DELETE}
                 .label=${t('display.colorList.remove')}

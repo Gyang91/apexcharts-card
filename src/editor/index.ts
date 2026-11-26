@@ -5,6 +5,7 @@ import { ChartCardExternalConfig } from '../types-config';
 import { EDITOR_TABS } from './types';
 import { editorStyles } from './styles';
 import { setEditorLocale, t } from './localize';
+import { flushPendingEdits } from './helpers';
 import { applyPreset, EditorPreset, presetChartType } from './presets';
 import { changeChartType, emptyStash, removeUnsupported, supports, unsupportedSettings } from './support';
 
@@ -79,6 +80,7 @@ export class ApexChartsCardEditor extends LitElement {
   }
 
   private _flush = (): void => {
+    flushPendingEdits();
     if (this._pending) this._send();
   };
 
