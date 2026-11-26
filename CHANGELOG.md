@@ -4,6 +4,13 @@
 
 * Fix the chart not rendering sometimes ([1c09cf6](https://github.com/RomRider/apexcharts-card/commit/1c09cf69704b1597fd875e152772e92f24f51636)), closes [#945](https://github.com/RomRider/apexcharts-card/issues/945)
 
+## [2.23.6](https://github.com/Gyang91/apexcharts-card/compare/v2.23.5...v2.23.6) (2026-11-26)
+
+
+### Bug Fixes
+
+* **editor:** presets show which one is in effect, and each does something different ([ace6573](https://github.com/Gyang91/apexcharts-card/commit/ace6573a31f48b7339597ccbd529cfe164d962d6))
+
 ## [2.23.5](https://github.com/Gyang91/apexcharts-card/compare/v2.23.4...v2.23.5) (2026-11-26)
 
 
