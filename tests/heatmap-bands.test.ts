@@ -4,7 +4,7 @@ import '../src/apexcharts-card';
 import '../src/editor/tabs/display-tab';
 import '../src/editor/components/color-threshold-editor';
 import { getLayoutConfig } from '../src/apex-layouts';
-import { heatmapColorScale } from '../src/visual-data';
+import { heatmapColorScale, heatmapTickAmount, heatmapTimeLabel } from '../src/visual-data';
 import { mkHass } from './fixtures/hass';
 import type { ChartCardExternalConfig } from '../src/types-config';
 
@@ -149,5 +149,25 @@ describe('heatmap bands in the visual editor', () => {
     expect(list.shadowRoot.querySelectorAll('ha-textfield[label="Opacity"]').length).toBe(1);
     expect(list.shadowRoot.querySelectorAll('ha-textfield[label="Name"]').length).toBe(0);
     expect(list.shadowRoot.querySelector('.add-button').textContent).toContain('Add Threshold');
+  });
+});
+
+describe('heatmap time labels', () => {
+  it('splits the cells evenly into at most 8 intervals, or keeps a tick amount that fits', () => {
+    expect(heatmapTickAmount(24)).toBe(8);
+    expect(heatmapTickAmount(25)).toBe(5);
+    expect(heatmapTickAmount(23)).toBeUndefined();
+    expect(heatmapTickAmount(24, 6)).toBe(6);
+    expect(heatmapTickAmount(24, 7)).toBeUndefined();
+  });
+
+  it('shows the time, and the day at midnight', () => {
+    const now = new Date(2026, 10, 26, 10).getTime();
+    expect(heatmapTimeLabel(new Date(2026, 10, 26, 9).getTime(), now, 'en', false)).toBe('09:00');
+    expect(heatmapTimeLabel(new Date(2026, 10, 26, 21).getTime(), now, 'en', true)).toBe('9:00 PM');
+    expect(heatmapTimeLabel(new Date(2026, 10, 26).getTime(), now, 'en', false)).toBe('Today');
+    expect(heatmapTimeLabel(new Date(2026, 10, 25).getTime(), now, 'en', false)).toBe('Yesterday');
+    expect(heatmapTimeLabel(new Date(2026, 10, 23).getTime(), now, 'en', false)).toBe('Mon');
+    expect(heatmapTimeLabel(new Date(2026, 10, 26).getTime(), now, 'fr', false)).toBe("Aujourd’hui");
   });
 });

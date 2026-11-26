@@ -79,6 +79,31 @@ export function heatmapXRange(columns: number[]): { min: number; max: number } |
   return { min: columns[0] - step / 2, max: columns[columns.length - 1] + step / 2 };
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+
+// ApexCharts' own datetime ticks put the date in every label once the chart spans days.
+// Ticks of our own sit on cell edges: how many intervals split `cells` evenly, at most `max`.
+export function heatmapTickAmount(cells: number, wanted?: number, max = 8): number | undefined {
+  if (wanted) return cells % wanted === 0 ? wanted : undefined;
+  for (let amount = Math.min(max, cells); amount >= 3; amount--) if (cells % amount === 0) return amount;
+  return undefined;
+}
+
+// A time of day, or at midnight the day: "Today", "Yesterday", or a weekday further back
+export function heatmapTimeLabel(ts: number, now: number, lang: string, hours12: boolean): string {
+  const date = new Date(Math.round(ts / 60000) * 60000);
+  if (date.getHours() || date.getMinutes()) {
+    const clock: Intl.DateTimeFormatOptions = hours12 ? { hour: 'numeric', hour12: true } : { hourCycle: 'h23' };
+    return date.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit', ...clock });
+  }
+  const days = Math.round((date.getTime() - new Date(now).setHours(0, 0, 0, 0)) / DAY);
+  const word =
+    Math.abs(days) <= 1
+      ? new Intl.RelativeTimeFormat(lang, { numeric: 'auto' }).format(days, 'day')
+      : date.toLocaleDateString(lang, { weekday: 'short' });
+  return word.charAt(0).toLocaleUpperCase(lang) + word.slice(1);
+}
+
 /**
  * ApexCharts colour-scale ranges for `heatmap.color_ranges`: each band runs
  * from its value up to just below the next band's, the lowest one from -∞ and

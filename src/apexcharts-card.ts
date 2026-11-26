@@ -24,6 +24,7 @@ import {
   decompress,
   formatApexDate,
   getLang,
+  is12Hour,
   getPercentFromValue,
   isExternalStatisticId,
   log,
@@ -76,7 +77,15 @@ import { actionHandler } from './action-handler-directive';
 import { setLocale, t } from './localize';
 import type { SamplingRange } from './downsample';
 import { hasSampling, sampleSeries, SamplingSeries } from './sampling';
-import { assertHeatmapBudget, heatmapData, heatmapXRange, rangeAreaData } from './visual-data';
+import { chartBuckets } from './bucket-range';
+import {
+  assertHeatmapBudget,
+  heatmapData,
+  heatmapTickAmount,
+  heatmapTimeLabel,
+  heatmapXRange,
+  rangeAreaData,
+} from './visual-data';
 
 // Options passed to ApexCharts' updateOptions on each refresh
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1443,10 +1452,32 @@ export class ChartsCard extends LitElement {
         name: series[row].name,
         data: data.filter((point) => point.y !== null),
       }));
-      const range = heatmapXRange(rows[0]?.map((point) => point.x) ?? []);
-      if (range) graphData.xaxis = { ...graphData.xaxis, ...range };
+      const columns = rows[0]?.map((point) => point.x) ?? [];
+      const range = heatmapXRange(columns);
+      if (range) graphData.xaxis = { ...graphData.xaxis, ...range, ...this._heatmapTicks(columns.length) };
     }
     return visualEmpty;
+  }
+
+  // Short labels on cell edges for cells shorter than a day, unless apex_config formats them
+  private _heatmapTicks(cells: number): Record<string, unknown> {
+    const config = this._config!;
+    const xaxis = config.apex_config?.xaxis;
+    const buckets = chartBuckets(config);
+    const subDay = buckets && ('duration' in buckets ? buckets.duration < 24 * 3600 * 1000 : buckets.period === 'hour');
+    if (!subDay || xaxis?.labels?.formatter) return {};
+    const wanted = typeof xaxis?.tickAmount === 'number' ? xaxis.tickAmount : undefined;
+    const tickAmount = heatmapTickAmount(cells, wanted);
+    if (!tickAmount) return {};
+    const lang = getLang(config, this._hass);
+    const hours12 = is12Hour(config, this._hass);
+    return {
+      tickAmount,
+      labels: {
+        formatter: (value: number, timestamp?: number) =>
+          heatmapTimeLabel(typeof timestamp === 'number' ? timestamp : value, Date.now(), lang, hours12),
+      },
+    };
   }
 
   // Series colors, and the markers, legend, tooltip and gradient fill of threshold colors
