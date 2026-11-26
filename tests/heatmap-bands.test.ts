@@ -168,6 +168,6 @@ describe('heatmap time labels', () => {
     expect(heatmapTimeLabel(new Date(2026, 10, 26).getTime(), now, 'en', false)).toBe('Today');
     expect(heatmapTimeLabel(new Date(2026, 10, 25).getTime(), now, 'en', false)).toBe('Yesterday');
     expect(heatmapTimeLabel(new Date(2026, 10, 23).getTime(), now, 'en', false)).toBe('Mon');
-    expect(heatmapTimeLabel(new Date(2026, 10, 26).getTime(), now, 'fr', false)).toBe("Aujourd’hui");
+    expect(heatmapTimeLabel(new Date(2026, 10, 26).getTime(), now, 'fr', false)).toBe('Aujourd’hui');
   });
 });
