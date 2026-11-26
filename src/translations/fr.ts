@@ -495,4 +495,6 @@ export const fr: Record<string, string> = {
   'field.heatmap': 'Réglages de la heatmap',
   'editor.rangeAreaPair':
     'Une bande de plage demande exactement 2 séries dans l’onglet Séries : la borne basse puis la borne haute. Elle en a {count}.',
+  'helper.brush':
+    'Un petit graphique d’ensemble sous le principal : faites-y glisser pour choisir la période affichée au-dessus.',
 };

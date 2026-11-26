@@ -4,11 +4,10 @@ import { HomeAssistant } from 'custom-card-helpers';
 import { ChartCardExternalConfig } from '../../types-config';
 import { computeHelper, computeLabel } from '../helpers';
 import { editorStyles } from '../styles';
-import { BEHAVIOR_SCHEMA, BRUSH_SCHEMA, EXPERIMENTAL_BOOL_FIELDS } from '../schemas/advanced';
+import { BEHAVIOR_SCHEMA, EXPERIMENTAL_BOOL_FIELDS } from '../schemas/advanced';
 import { HaFormSchema } from '../types';
 import { BoolField } from '../components/bool-grid';
 import { t } from '../localize';
-import { supports } from '../support';
 import '../components/yaml-editor';
 import '../components/bool-grid';
 
@@ -62,15 +61,6 @@ export class ApexChartsCardEditorAdvanced extends LitElement {
     if (value) (next as Record<string, unknown>)[name] = true;
     else delete (next as Record<string, unknown>)[name];
     this._fire({ experimental: Object.keys(next).length > 0 ? next : undefined });
-  };
-
-  private _brushChanged = (ev: CustomEvent): void => {
-    ev.stopPropagation();
-    const data = ev.detail.value as NonNullable<ChartCardExternalConfig['brush']>;
-    const next: NonNullable<ChartCardExternalConfig['brush']> = { ...(this.config?.brush || {}) };
-    if (data.selection_span) next.selection_span = data.selection_span;
-    else delete next.selection_span;
-    this._fire({ brush: Object.keys(next).length > 0 ? next : undefined });
   };
 
   private _cacheChanged = (ev: CustomEvent): void => {
@@ -129,10 +119,7 @@ export class ApexChartsCardEditorAdvanced extends LitElement {
         value: cfg.cache !== false,
       },
     ];
-    // Experimental switches this chart type can use (see support.ts); the rest always apply
-    const expFields: BoolField[] = EXPERIMENTAL_BOOL_FIELDS.filter(
-      (name) => name === 'disable_config_validation' || supports(cfg, name),
-    ).map((name) => ({
+    const expFields: BoolField[] = EXPERIMENTAL_BOOL_FIELDS.map((name) => ({
       name,
       label: computeLabel({ name } as HaFormSchema),
       value: !!(exp as Record<string, unknown>)[name],
@@ -165,23 +152,6 @@ export class ApexChartsCardEditorAdvanced extends LitElement {
             @value-changed=${this._experimentalBoolChanged}
           ></apexcharts-card-bool-grid>
         </ha-expansion-panel>
-
-        ${
-          exp.brush && supports(cfg, 'brush')
-            ? html`
-                <ha-expansion-panel outlined header=${t('advanced.panel.brush')}>
-                  <ha-form
-                    .hass=${this.hass}
-                    .data=${cfg.brush || {}}
-                    .schema=${BRUSH_SCHEMA}
-                    .computeLabel=${computeLabel}
-                    .computeHelper=${computeHelper}
-                    @value-changed=${this._brushChanged}
-                  ></ha-form>
-                </ha-expansion-panel>
-              `
-            : nothing
-        }
 
         <apexcharts-card-bool-grid
           .fields=${cacheFields}

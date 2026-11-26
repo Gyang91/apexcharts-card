@@ -20,6 +20,7 @@ import { AnnotationItem } from '../components/annotations-editor';
 import { getApexValue, setApexValue, setApexValues } from '../apex-config-utils';
 import { t } from '../localize';
 import { supports } from '../support';
+import { BRUSH_SCHEMA } from '../schemas/advanced';
 import '../components/header-editor';
 import '../components/color-list-editor';
 import '../components/color-threshold-editor';
@@ -108,6 +109,22 @@ export class ApexChartsCardEditorDisplay extends LitElement {
       else delete next.last_updated;
     }
     this._fire({ show: Object.keys(next).length > 0 ? next : undefined });
+  };
+
+  // The brush switch and its settings: turning it off keeps the settings for later
+  private _brushSwitched = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    const experimental = { ...this.config?.experimental, brush: ev.detail.value || undefined };
+    if (!experimental.brush) delete experimental.brush;
+    this._fire({ experimental: Object.keys(experimental).length ? experimental : undefined });
+  };
+
+  private _brushChanged = (ev: CustomEvent): void => {
+    ev.stopPropagation();
+    const span = (ev.detail.value as { selection_span?: string }).selection_span;
+    const brush = { ...this.config?.brush, selection_span: span || undefined };
+    if (!brush.selection_span) delete brush.selection_span;
+    this._fire({ brush: Object.keys(brush).length ? brush : undefined });
   };
 
   private _colorListChanged = (ev: CustomEvent): void => {
@@ -617,7 +634,38 @@ export class ApexChartsCardEditorDisplay extends LitElement {
               </ha-expansion-panel>`
             : ''
         }
-
+        ${
+          supports(cfg, 'brush')
+            ? html`<ha-expansion-panel outlined header=${t('advanced.panel.brush')}>
+                <div class="section">
+                  <apexcharts-card-bool-grid
+                    .fields=${[
+                      {
+                        name: 'brush',
+                        label: t('field.brush'),
+                        helper: t('helper.brush'),
+                        value: !!cfg.experimental?.brush,
+                      },
+                    ]}
+                    .columns=${1}
+                    @value-changed=${this._brushSwitched}
+                  ></apexcharts-card-bool-grid>
+                  ${
+                    cfg.experimental?.brush
+                      ? html`<ha-form
+                          .hass=${this.hass}
+                          .data=${cfg.brush || {}}
+                          .schema=${BRUSH_SCHEMA}
+                          .computeLabel=${computeLabel}
+                          .computeHelper=${computeHelper}
+                          @value-changed=${this._brushChanged}
+                        ></ha-form>`
+                      : nothing
+                  }
+                </div>
+              </ha-expansion-panel>`
+            : nothing
+        }
         <ha-expansion-panel outlined header=${t('display.panel.colorPalette')}>
           <apexcharts-card-color-list-editor
             .colors=${cfg.color_list || []}

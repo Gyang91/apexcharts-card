@@ -125,6 +125,18 @@ export class ApexChartsCardSeriesEditor extends LitElement {
     this._fire({ series });
   }
 
+  // Thresholds and hidden-by-default only work with their experimental switch: turn it on
+  // with the first use
+  private _experimentalFor(serie: ChartCardAllSeriesExternalConfig): Partial<ChartCardExternalConfig> {
+    const needed = {
+      ...(serie.color_threshold?.length ? { color_threshold: true } : {}),
+      ...(serie.show?.hidden_by_default ? { hidden_by_default: true } : {}),
+    };
+    const experimental = this.config?.experimental || {};
+    const missing = Object.keys(needed).some((key) => !experimental[key as keyof typeof experimental]);
+    return missing ? { experimental: { ...experimental, ...needed } } : {};
+  }
+
   private _seriesChanged(index: number, ev: CustomEvent): void {
     ev.stopPropagation();
     if (!this.config) return;
@@ -139,12 +151,7 @@ export class ApexChartsCardSeriesEditor extends LitElement {
     }
     const series = [...(this.config.series || [])];
     series[index] = updatedSeries;
-    // Thresholds only take effect with the experimental switch: turn it on with the first one
-    if (updatedSeries.color_threshold?.length && !this.config.experimental?.color_threshold) {
-      this._fire({ series, experimental: { ...this.config.experimental, color_threshold: true } });
-      return;
-    }
-    this._fire({ series });
+    this._fire({ series, ...this._experimentalFor(updatedSeries) });
   }
 
   private _allSeriesChanged = (ev: CustomEvent): void => {
@@ -153,7 +160,7 @@ export class ApexChartsCardSeriesEditor extends LitElement {
     if (Object.keys(updated || {}).length === 0) {
       this._fire({ all_series_config: undefined });
     } else {
-      this._fire({ all_series_config: updated });
+      this._fire({ all_series_config: updated, ...this._experimentalFor(updated) });
     }
   };
 

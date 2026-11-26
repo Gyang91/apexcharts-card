@@ -292,14 +292,14 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
         value: (show[name] as boolean | undefined) ?? defaultValue,
       }),
     );
-    if (this.config?.experimental?.color_threshold) {
+    if (this.config?.experimental?.color_threshold || this.series?.color_threshold?.length) {
       fields.push({
         name: 'header_color_threshold',
         label: computeLabel({ name: 'header_color_threshold' } as HaFormSchema),
         value: !!show.header_color_threshold,
       });
     }
-    if (this.config?.experimental?.hidden_by_default) {
+    if (supports(this.config, 'hidden_by_default')) {
       fields.push({
         name: 'hidden_by_default',
         label: computeLabel({ name: 'hidden_by_default' } as HaFormSchema),
@@ -481,6 +481,10 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
           .computeHelper=${computeHelper}
           @value-changed=${this._coreChanged}
         ></ha-form>
+        <apexcharts-card-color-input
+          .value=${s.color}
+          @value-changed=${this._colorChanged}
+        ></apexcharts-card-color-input>
 
         ${
           yaxisIdSchema.length > 0
@@ -499,10 +503,6 @@ export class ApexChartsCardSeriesItemEditor extends LitElement {
 
         <ha-expansion-panel outlined header=${t('series.panel.appearance')}>
           <div class="section">
-            <apexcharts-card-color-input
-              .value=${s.color}
-              @value-changed=${this._colorChanged}
-            ></apexcharts-card-color-input>
             <ha-form
               .hass=${this.hass}
               .data=${this._appearanceData()}
