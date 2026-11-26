@@ -1,5 +1,6 @@
 import { HaFormSchema, SEL_FALSE, SEL_TRUE, SEL_UNDEFINED } from '../types';
 import { t } from '../localize';
+import { BUCKET_PRESETS, durationField, OFFSET_PRESETS, SMOOTHING_PRESETS } from '../helpers';
 
 // Schemas below are exposed as functions (not module-level constants) so that option labels
 // re-resolve to the current editor locale on every render.
@@ -63,6 +64,19 @@ export function getSeriesCoreSchema(): HaFormSchema[] {
   ];
 }
 
+// Common group_by settings by name; 'Custom…' shows the group_by fields
+export function getSmoothingSchema(): HaFormSchema[] {
+  const names = ['none', ...Object.keys(SMOOTHING_PRESETS), 'custom'];
+  return [
+    {
+      name: 'smoothing',
+      selector: {
+        select: { mode: 'dropdown', options: names.map((value) => ({ value, label: t(`series.smoothing.${value}`) })) },
+      },
+    },
+  ];
+}
+
 // Inner fields of the Group By expander (start_with_last rendered separately via bool-grid)
 export function getSeriesGroupBySchema(): HaFormSchema[] {
   return [
@@ -70,7 +84,7 @@ export function getSeriesGroupBySchema(): HaFormSchema[] {
       type: 'grid',
       name: '',
       schema: [
-        { name: 'duration', selector: { text: {} } },
+        durationField('duration', BUCKET_PRESETS),
         {
           name: 'func',
           selector: {
@@ -371,10 +385,7 @@ export function getSeriesAdvancedBaseSchema(): HaFormSchema[] {
     {
       type: 'grid',
       name: '',
-      schema: [
-        { name: 'offset', selector: { text: {} } },
-        { name: 'time_delta', selector: { text: {} } },
-      ],
+      schema: [durationField('offset', OFFSET_PRESETS), durationField('time_delta', OFFSET_PRESETS)],
     },
   ];
 }

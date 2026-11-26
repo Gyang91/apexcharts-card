@@ -1,9 +1,10 @@
 import { LitElement, html, TemplateResult, CSSResultGroup } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ChartCardColorThreshold, ChartCardHeatmapColorRange } from '../../types-config';
-import { computeColor } from '../../utils';
 import { editorStyles } from '../styles';
 import { t } from '../localize';
+import { debounced, typedNumber } from '../helpers';
+import './color-input';
 
 const ICON_DELETE =
   'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
@@ -25,20 +26,11 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
     return editorStyles;
   }
 
-  private _swatch(color?: string): string {
-    if (!color) return 'transparent';
-    try {
-      return computeColor(color);
-    } catch {
-      return 'transparent';
-    }
-  }
-
   private _fire(thresholds: Threshold[]): void {
-    const sorted = [...thresholds].sort((a, b) => (a.value ?? 0) - (b.value ?? 0));
+    // Kept in the order shown, so the row being edited stays put; the card sorts by value.
     this.dispatchEvent(
       new CustomEvent('value-changed', {
-        detail: { value: sorted },
+        detail: { value: thresholds },
         bubbles: true,
         composed: true,
       }),
@@ -57,9 +49,42 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
     this._fire(list);
   }
 
+  // Typing waits for a pause; a cleared or half-typed number keeps the row as it was.
+  private _typed = debounced(
+    (index: number, key: keyof Threshold, text: string, isNumber: boolean) => {
+      if (!isNumber) {
+        this._update(index, key, text.trim() || undefined);
+        return;
+      }
+      if (text.trim() === '') {
+        if (key !== 'value') this._update(index, key, undefined);
+        return;
+      }
+      const value = typedNumber(text);
+      if (value !== undefined) this._update(index, key, value);
+    },
+    (index, key) => `${index}:${key}`,
+  );
+
+  private _field(item: Threshold, index: number, key: 'value' | 'opacity' | 'name'): TemplateResult {
+    const isNumber = key !== 'name';
+    const current = item[key];
+    const onInput = (ev: Event) => this._typed(index, key, (ev.target as HTMLInputElement).value, isNumber);
+    return html`<ha-textfield
+      type=${isNumber ? 'number' : 'text'}
+      step="any"
+      label=${t(`field.${key}`)}
+      .value=${current === undefined ? '' : String(current)}
+      .helper=${t(`helper.threshold_${key}`)}
+      helperPersistent
+      @input=${onInput}
+      @change=${onInput}
+    ></ha-textfield>`;
+  }
+
   private _add(): void {
-    const next = [...this.thresholds, { value: 0 } as Threshold];
-    this._fire(next);
+    const last = this.thresholds[this.thresholds.length - 1];
+    this._fire([...this.thresholds, { value: last ? last.value + 10 : 0 } as Threshold]);
   }
 
   private _remove(index: number): void {
@@ -71,52 +96,19 @@ export class ApexChartsCardColorThresholdEditor extends LitElement {
   protected render(): TemplateResult {
     return html`
       <div class="list-editor">
+        <div class="hint">${t(this.third === 'name' ? 'hint.bands' : 'hint.thresholds')}</div>
         ${this.thresholds.map(
           (item, i) => html`
             <div class="list-item">
               <div class="list-item-body" style="padding-top: 12px;">
-                <div class="grid-3">
-                  <ha-textfield
-                    type="number"
-                    label=${t('field.value')}
-                    .value=${item.value !== undefined ? String(item.value) : ''}
-                    @change=${(ev: Event) => {
-                      const v = (ev.target as HTMLInputElement).value;
-                      if (v === '') {
-                        this._remove(i);
-                      } else {
-                        this._update(i, 'value', Number(v));
-                      }
-                    }}
-                  ></ha-textfield>
-                  <div class="color-field">
-                    <span class="color-preview" style="background: ${this._swatch(item.color)}"></span>
-                    <ha-textfield
-                      label=${t('field.color')}
-                      .value=${item.color || ''}
-                      @change=${(ev: Event) =>
-                        this._update(i, 'color', (ev.target as HTMLInputElement).value || undefined)}
-                    ></ha-textfield>
-                  </div>
-                  ${
-                    this.third === 'name'
-                      ? html`<ha-textfield
-                          label=${t('field.name')}
-                          .value=${item.name || ''}
-                          @change=${(ev: Event) =>
-                            this._update(i, 'name', (ev.target as HTMLInputElement).value || undefined)}
-                        ></ha-textfield>`
-                      : html`<ha-textfield
-                          type="number"
-                          label=${t('field.opacity')}
-                          .value=${item.opacity !== undefined ? String(item.opacity) : ''}
-                          @change=${(ev: Event) => {
-                            const v = (ev.target as HTMLInputElement).value;
-                            this._update(i, 'opacity', v === '' ? undefined : Number(v));
-                          }}
-                        ></ha-textfield>`
-                  }
-                </div>
+                <div class="grid-2">${this._field(item, i, 'value')} ${this._field(item, i, this.third)}</div>
+                <apexcharts-card-color-input
+                  .value=${item.color}
+                  @value-changed=${(ev: CustomEvent) => {
+                    ev.stopPropagation();
+                    this._update(i, 'color', ev.detail.value);
+                  }}
+                ></apexcharts-card-color-input>
               </div>
               <div class="item-controls" style="position: absolute; right: 8px; top: 8px;">
                 <ha-icon-button

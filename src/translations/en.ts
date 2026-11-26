@@ -214,21 +214,27 @@ export const en: Record<string, string> = {
 
   // ── Helper texts (computeHelper) ──
   'helper.graph_span':
-    'How much time the x-axis covers (the visible time window). Examples: 1h, 12h, 7d, 30d. Defaults to 24h.',
-  'helper.update_interval': 'e.g. 1min, 5min, 1h. Leave empty for state-based updates',
-  'helper.update_delay': 'Default: 1500ms. Increase if last state not shown',
+    'How much time the chart shows. Pick one or type a number and a unit: ms, s, min, h, d or w (e.g. 90min, 36h, 2w). Default: 24h.',
+  'helper.update_interval':
+    'How often to redraw. Pick one or type a number and a unit: ms, s, min, h, d or w (e.g. 30s, 5min). Empty: redraw when a state changes.',
+  'helper.update_delay':
+    'Wait after a state change before redrawing. Pick one or type a number and a unit: ms, s, min, h, d or w (e.g. 2s). Default: 1500ms.',
   'helper.locale': 'e.g. en, fr, de. Defaults to HA setting',
-  'helper.offset': 'e.g. -1d, +6h',
-  'helper.time_delta': 'e.g. -30min, +2h',
-  'helper.duration': 'e.g. 1h, 30min, 1d',
+  'helper.offset':
+    'Shift this series in time: + or -, then a number and a unit: ms, s, min, h, d or w (e.g. -1d shows yesterday, +6h).',
+  'helper.time_delta':
+    "Shift the points' timestamps: + or -, then a number and a unit: ms, s, min, h, d or w (e.g. -30min, +2h).",
+  'helper.duration':
+    'Size of each bucket. Pick one or type a number and a unit: ms, s, min, h, d or w (e.g. 10min, 2h).',
   'helper.transform': 'JS expression. Use `x` for the value (e.g. `return x / 1000;`)',
   'helper.compute':
     'JS function body, run for each timestamp. Available: values (by series ID), x, hass. Return a number or null.',
   'helper.series_id': 'Key of this series in the values of a computed series.',
   'helper.data_generator': 'JS function body. Available: entity, start, end, hass',
   'helper.stroke_dash': 'Number or comma-separated (e.g. 5,3,2)',
-  'helper.selection_span': 'e.g. 6h. Default: 1/4 of graph_span',
-  'helper.color': 'CSS color, var, or named color',
+  'helper.selection_span':
+    'Window selected in the brush. Pick one or type a number and a unit: ms, s, min, h, d or w (e.g. 6h). Default: 1/4 of the span.',
+  'helper.color': '#hex, a CSS name or a theme variable: #ff9800, red, var(--primary-color)',
   'helper.attribute': 'Attribute name to use as value, if not the state',
   'helper.unit': 'Override unit of measurement',
   'helper.float_precision': 'Decimal places when displaying values',
@@ -253,7 +259,7 @@ export const en: Record<string, string> = {
   'general.span.end.helper':
     'Anchor the graph to the end of the chosen period. e.g. "Day" ends at midnight tonight. Only one of Start or End may be set.',
   'general.span.offset.helper':
-    'Shift the anchored time window. Must start with + or -. e.g. "-1d" shows yesterday when Start is Day; "+6h" shifts the window forward by 6 hours.',
+    'Shift the anchored window: + or -, then a number and a unit: ms, s, min, h, d or w. e.g. "-1d" shows yesterday when Start is Day; "+6h" moves the window 6 hours forward.',
   'general.validation.graphSpan': 'X Axis Span: invalid duration format (e.g. 1h, 12h, 7d).',
   'general.validation.updateInterval': 'Update Interval: invalid duration format.',
   'general.validation.updateDelay': 'Update Delay: invalid duration format.',
@@ -264,7 +270,6 @@ export const en: Record<string, string> = {
   'series.add': 'Add Series',
   'series.newSeries': '(new series)',
   'series.allSeriesConfig': 'All Series Config',
-  'series.color.placeholder': 'e.g. #ff0000, red, var(--my-color)',
   'series.source.entity': 'Entity',
   'series.source.compute': 'Computed from other series',
   'series.validation.entityRequired': 'Entity is required.',
@@ -389,7 +394,8 @@ export const en: Record<string, string> = {
   'yaxis.none': 'No custom Y-axes. Add one to override defaults.',
   'yaxis.defaultName': 'Y-Axis',
   'yaxis.add': 'Add Y-Axis',
-  'yaxis.minMaxFormats': 'Min/Max formats: number, "auto", "~5" (soft limit), or "|5|" (absolute offset).',
+  'yaxis.minMaxFormats':
+    "Min/Max: Auto follows the data. Fixed always ends at the number. At least keeps the number in view but follows data beyond it. Padding adds the number to the data's own min or max.",
   'yaxis.panel.labels': 'Labels',
   'yaxis.labels.show.label': 'Show Labels',
   'yaxis.labels.show.helper': 'Toggle tick labels on this axis.',
@@ -449,4 +455,33 @@ export const en: Record<string, string> = {
 
   // ── Period labels (group_by.period) ──
   'period.quarter': 'Q{quarter} {year}',
+
+  // ── Format hints and pickers ──
+  'field.smoothing': 'Smoothing',
+  'helper.smoothing': 'Combines points into buckets to steady a noisy line. Custom… shows every grouping option.',
+  'series.smoothing.none': 'None (every point)',
+  'series.smoothing.avg_5min': 'Average per 5 minutes',
+  'series.smoothing.avg_15min': 'Average per 15 minutes',
+  'series.smoothing.avg_1h': 'Average per hour',
+  'series.smoothing.avg_1d': 'Average per day',
+  'series.smoothing.max_1d': 'Maximum per day',
+  'series.smoothing.min_1d': 'Minimum per day',
+  'series.smoothing.custom': 'Custom…',
+  'helper.threshold_value': 'A number, e.g. 20',
+  'helper.threshold_opacity': '0 (clear) to 1 (solid)',
+  'helper.threshold_name': 'Shown in the legend',
+  'hint.thresholds': "From each value upwards, the line takes that row's colour. Rows are applied in value order.",
+  'hint.bands': "Cells from each value up to the next row's value take its colour. Rows are applied in value order.",
+  'hint.thresholdsExperimental':
+    'Adding a threshold turns on the experimental colour-threshold mode for this card. In that mode columns can be thinner and tooltip colours can be off.',
+  'yaxis.limit.auto': 'Auto',
+  'yaxis.limit.fixed': 'Fixed',
+  'yaxis.limit.soft': 'At least',
+  'yaxis.limit.padding': 'Padding',
+  'yaxis.limit.fixed.min.helper': 'The axis always starts here, e.g. 0',
+  'yaxis.limit.fixed.max.helper': 'The axis always ends here, e.g. 100',
+  'yaxis.limit.soft.min.helper': 'Starts here or lower if the data goes lower, e.g. 15',
+  'yaxis.limit.soft.max.helper': 'Ends here or higher if the data goes higher, e.g. 30',
+  'yaxis.limit.padding.min.helper': 'Added to the lowest value, e.g. -5 for 5 below it',
+  'yaxis.limit.padding.max.helper': 'Added to the highest value, e.g. 10 for 10 above it',
 };

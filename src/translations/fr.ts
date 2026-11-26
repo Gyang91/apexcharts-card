@@ -214,21 +214,27 @@ export const fr: Record<string, string> = {
 
   // ── Textes d’aide (computeHelper) ──
   'helper.graph_span':
-    'Durée couverte par l’axe X (la fenêtre temporelle visible). Exemples : 1h, 12h, 7d, 30d. Par défaut : 24h.',
-  'helper.update_interval': 'Ex. : 1min, 5min, 1h. Laissez vide pour une mise à jour basée sur les états.',
-  'helper.update_delay': 'Par défaut : 1500ms. Augmentez si le dernier état ne s’affiche pas.',
+    'Durée affichée par le graphique. Choisissez ou saisissez un nombre et une unité : ms, s, min, h, d ou w (ex. : 90min, 36h, 2w). Par défaut : 24h.',
+  'helper.update_interval':
+    'Fréquence de rafraîchissement. Choisissez ou saisissez un nombre et une unité : ms, s, min, h, d ou w (ex. : 30s, 5min). Vide : à chaque changement d’état.',
+  'helper.update_delay':
+    'Attente après un changement d’état avant de redessiner. Choisissez ou saisissez un nombre et une unité : ms, s, min, h, d ou w (ex. : 2s). Par défaut : 1500ms.',
   'helper.locale': 'Ex. : en, fr, de. Utilise le paramètre de Home Assistant par défaut.',
-  'helper.offset': 'Ex. : -1d, +6h',
-  'helper.time_delta': 'Ex. : -30min, +2h',
-  'helper.duration': 'Ex. : 1h, 30min, 1d',
+  'helper.offset':
+    'Décale cette série dans le temps : + ou -, puis un nombre et une unité : ms, s, min, h, d ou w (ex. : -1d montre hier, +6h).',
+  'helper.time_delta':
+    'Décale l’horodatage des points : + ou -, puis un nombre et une unité : ms, s, min, h, d ou w (ex. : -30min, +2h).',
+  'helper.duration':
+    'Taille de chaque intervalle. Choisissez ou saisissez un nombre et une unité : ms, s, min, h, d ou w (ex. : 10min, 2h).',
   'helper.transform': 'Expression JS. Utilisez `x` pour la valeur (ex. : `return x / 1000;`).',
   'helper.compute':
     'Corps de fonction JS, exécuté pour chaque horodatage. Disponibles : values (par ID de série), x, hass. Renvoie un nombre ou null.',
   'helper.series_id': 'Clé de cette série dans les values d’une série calculée.',
   'helper.data_generator': 'Corps de fonction JS. Disponibles : entity, start, end, hass.',
   'helper.stroke_dash': 'Nombre ou liste séparée par des virgules (ex. : 5,3,2).',
-  'helper.selection_span': 'Ex. : 6h. Par défaut : 1/4 de graph_span.',
-  'helper.color': 'Couleur CSS, variable ou couleur nommée.',
+  'helper.selection_span':
+    'Fenêtre sélectionnée dans le brush. Choisissez ou saisissez un nombre et une unité : ms, s, min, h, d ou w (ex. : 6h). Par défaut : 1/4 de la durée.',
+  'helper.color': '#hex, un nom CSS ou une variable du thème : #ff9800, red, var(--primary-color)',
   'helper.attribute': 'Nom de l’attribut à utiliser comme valeur, si ce n’est pas l’état.',
   'helper.unit': 'Remplace l’unité de mesure.',
   'helper.float_precision': 'Nombre de décimales affichées.',
@@ -253,7 +259,7 @@ export const fr: Record<string, string> = {
   'general.span.end.helper':
     'Ancre le graphique à la fin de la période choisie. Ex. : « Jour » se termine à minuit ce soir. Un seul des deux champs Début ou Fin peut être défini.',
   'general.span.offset.helper':
-    'Décale la fenêtre temporelle ancrée. Doit commencer par + ou -. Ex. : « -1d » affiche hier lorsque Début vaut Jour ; « +6h » décale la fenêtre de 6 heures vers l’avant.',
+    'Décale la fenêtre ancrée : + ou -, puis un nombre et une unité : ms, s, min, h, d ou w. Ex. : « -1d » montre hier si Début vaut Jour ; « +6h » avance la fenêtre de 6 heures.',
   'general.validation.graphSpan': 'Étendue de l’axe X : format de durée invalide (ex. : 1h, 12h, 7d).',
   'general.validation.updateInterval': 'Intervalle de mise à jour : format de durée invalide.',
   'general.validation.updateDelay': 'Délai de mise à jour : format de durée invalide.',
@@ -264,7 +270,6 @@ export const fr: Record<string, string> = {
   'series.add': 'Ajouter une série',
   'series.newSeries': '(nouvelle série)',
   'series.allSeriesConfig': 'Configuration commune à toutes les séries',
-  'series.color.placeholder': 'ex. : #ff0000, red, var(--my-color)',
   'series.source.entity': 'Entité',
   'series.source.compute': 'Calculée à partir d’autres séries',
   'series.validation.entityRequired': 'L’entité est requise.',
@@ -390,7 +395,8 @@ export const fr: Record<string, string> = {
   'yaxis.none': 'Aucun axe Y personnalisé. Ajoutez-en un pour remplacer les valeurs par défaut.',
   'yaxis.defaultName': 'Axe Y',
   'yaxis.add': 'Ajouter un axe Y',
-  'yaxis.minMaxFormats': 'Formats Min/Max : nombre, « auto », « ~5 » (limite souple), ou « |5| » (décalage absolu).',
+  'yaxis.minMaxFormats':
+    'Min/Max : Auto suit les données. Fixe s’arrête toujours au nombre. Au moins garde le nombre visible mais suit les données au-delà. Marge ajoute le nombre au min ou max des données.',
   'yaxis.panel.labels': 'Libellés',
   'yaxis.labels.show.label': 'Afficher les libellés',
   'yaxis.labels.show.helper': 'Active ou désactive les libellés de graduation sur cet axe.',
@@ -452,4 +458,36 @@ export const fr: Record<string, string> = {
 
   // ── Libellés de période (group_by.period) ──
   'period.quarter': 'T{quarter} {year}',
+
+  // ── Format hints and pickers ──
+  'field.smoothing': 'Lissage',
+  'helper.smoothing':
+    'Regroupe les points par intervalle pour stabiliser une courbe bruitée. Personnalisé… affiche toutes les options.',
+  'series.smoothing.none': 'Aucun (chaque point)',
+  'series.smoothing.avg_5min': 'Moyenne par 5 minutes',
+  'series.smoothing.avg_15min': 'Moyenne par 15 minutes',
+  'series.smoothing.avg_1h': 'Moyenne par heure',
+  'series.smoothing.avg_1d': 'Moyenne par jour',
+  'series.smoothing.max_1d': 'Maximum par jour',
+  'series.smoothing.min_1d': 'Minimum par jour',
+  'series.smoothing.custom': 'Personnalisé…',
+  'helper.threshold_value': 'Un nombre, ex. : 20',
+  'helper.threshold_opacity': 'De 0 (transparent) à 1 (opaque)',
+  'helper.threshold_name': 'Affiché dans la légende',
+  'hint.thresholds':
+    'À partir de chaque valeur, la courbe prend la couleur de la ligne. Les lignes s’appliquent par ordre de valeur.',
+  'hint.bands':
+    'Les cellules entre chaque valeur et la suivante prennent sa couleur. Les lignes s’appliquent par ordre de valeur.',
+  'hint.thresholdsExperimental':
+    'Ajouter un seuil active le mode expérimental des seuils de couleur pour cette carte. Dans ce mode, les colonnes peuvent être plus fines et les couleurs des info-bulles inexactes.',
+  'yaxis.limit.auto': 'Auto',
+  'yaxis.limit.fixed': 'Fixe',
+  'yaxis.limit.soft': 'Au moins',
+  'yaxis.limit.padding': 'Marge',
+  'yaxis.limit.fixed.min.helper': 'L’axe commence toujours ici, ex. : 0',
+  'yaxis.limit.fixed.max.helper': 'L’axe finit toujours ici, ex. : 100',
+  'yaxis.limit.soft.min.helper': 'Commence ici, ou plus bas si les données descendent, ex. : 15',
+  'yaxis.limit.soft.max.helper': 'Finit ici, ou plus haut si les données montent, ex. : 30',
+  'yaxis.limit.padding.min.helper': 'Ajouté à la valeur la plus basse, ex. : -5 pour 5 en dessous',
+  'yaxis.limit.padding.max.helper': 'Ajouté à la valeur la plus haute, ex. : 10 pour 10 au-dessus',
 };
