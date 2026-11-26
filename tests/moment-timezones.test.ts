@@ -7,7 +7,7 @@ import { moment } from '../src/const';
 import { packZone } from '../src/moment-timezones';
 import { zoneOffset } from '../src/zone';
 // @ts-expect-error plain JavaScript build script
-import { buildZoneAbbreviations } from '../scripts/build-zone-abbreviations.mjs';
+import { buildZoneAbbreviations } from '../scripts/build-zone-abbreviations';
 
 interface Unpacked {
   abbrs: string[];

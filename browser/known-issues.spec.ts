@@ -1,11 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.ready);
 });
 
-const settle = async (page) => {
+const settle = async (page: Page) => {
   await page.waitForFunction(() => window.card._dataLoaded && !window.card._updating);
   await page.evaluate(() =>
     window.card._apexChart.updateOptions(
@@ -46,7 +46,7 @@ test('smooth area fills stay inside each numeric run across missing data and ref
       return {
         paths: paths.length,
         invalid: paths.some((path) => /NaN|Infinity/.test(path.getAttribute('d'))),
-        filled: points.map(([timestamp]) => {
+        filled: points.map(([timestamp]: Point) => {
           const x = ((timestamp - minX) / (maxX - minX)) * gridWidth;
           return paths.some((path) => path.isPointInFill(new DOMPoint(x, gridHeight * 0.75)));
         }),
@@ -93,9 +93,9 @@ for (const sparse of [false, true]) {
       const chart = window.card._apexChart;
       const { minX, maxX, gridWidth } = chart.w.globals;
       // bars with a value, in order, and the data points they draw
-      const data = chart.w.config.series[0].data.filter(([, value]) => value !== null);
+      const data = chart.w.config.series[0].data.filter(([, value]: Point) => value !== null);
       const bars = [...window.card.shadowRoot.querySelectorAll('.apexcharts-bar-area')];
-      const pixel = (timestamp) => ((timestamp - minX) / (maxX - minX)) * gridWidth;
+      const pixel = (timestamp: number) => ((timestamp - minX) / (maxX - minX)) * gridWidth;
       // the six hourly buckets of the 6h window end at groupingEnd
       const windowStart = window.groupingEnd - 6 * 3600000;
       return bars
@@ -145,7 +145,7 @@ test('binary history, gaps, computed and raw headers render without a transform'
     window.card.hass = {
       ...window.card._hass,
       states: { [binary]: state },
-      callWS: async (message) => {
+      callWS: async (message: { type: string; start_time?: string }) => {
         if (message.type !== 'history/history_during_period') throw new Error('Unexpected request');
         const start = Date.parse(message.start_time) / 1000;
         return {
@@ -161,7 +161,7 @@ test('binary history, gaps, computed and raw headers render without a transform'
   await settle(page);
   expect(
     await page.evaluate(() => ({
-      values: window.card._apexChart.w.config.series[0].data.map(([, value]) => value),
+      values: window.card._apexChart.w.config.series[0].data.map(([, value]: Point) => value),
       header: window.card._headerState,
     })),
   ).toEqual({ values: [0, 1, null, null, 1], header: [1, 1] });

@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 
-const routes = new Map([
+const routes = new Map<string, [URL, string]>([
   ['/', [new URL('../browser/fixture.html', import.meta.url), 'text/html']],
   ['/card.js', [new URL('../dist/apexcharts-card.js', import.meta.url), 'text/javascript']],
 ]);
